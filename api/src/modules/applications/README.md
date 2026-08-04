@@ -1,6 +1,6 @@
 # Applications module
 
-Owns `applications` table. Draft generation + document review (Phase 3).
+Owns `applications` table. Draft generation, review, and approval-gated submit (P3–P4).
 
 | Method | Path | Notes |
 |--------|------|-------|
@@ -8,6 +8,7 @@ Owns `applications` table. Draft generation + document review (Phase 3).
 | GET | `/api/v1/applications/:id` | Owned only |
 | POST | `/api/v1/applications/:id/regenerate` | Clear docs + re-enqueue |
 | POST | `/api/v1/applications/:id/review` | Sets `documentsReviewedAt`; uploads MinIO |
+| POST | `/api/v1/applications/:id/approve` | HG-4: draft→pending_approval→approved; enqueue submit with `approved_at` |
 | GET | `/api/v1/applications/:id/download/cv\|cl` | Presigned URL |
 
-`canApply` is true only after review. Submit still requires P4 approve (HG-4).
+`canApprove` / `canApply` are true only after review while status is `draft`. Submit is never enqueued without `approved_at`.

@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
+  approveApplicationAction,
   downloadDocAction,
   getApplicationAction,
   markReviewedAction,
@@ -43,6 +44,8 @@ export function DocumentReviewPanel({ applicationId, initial }: Props) {
 
   const ready = Boolean(app.tailoredCvContent && app.coverLetterContent);
   const reviewed = Boolean(app.documentsReviewedAt);
+  const canApprove = Boolean(app.canApprove ?? app.canApply);
+  const approved = Boolean(app.approvedAt) || app.status === "approved";
 
   return (
     <div className="space-y-6">
@@ -195,24 +198,38 @@ export function DocumentReviewPanel({ applicationId, initial }: Props) {
         <Button
           type="button"
           className="cursor-pointer"
-          disabled={!app.canApply}
+          disabled={!canApprove || pending || approved}
           title={
-            app.canApply
-              ? "Continue to approval (Phase 4)"
-              : "Confirm review before applying"
+            approved
+              ? "Already approved — submission queued"
+              : canApprove
+                ? "Approve and enqueue submission (HG-4)"
+                : "Confirm review before approving"
           }
           onClick={() => {
-            if (!app.canApply) return;
-            router.push(`/dashboard?apply=${applicationId}`);
+            if (!canApprove) return;
+            startTransition(async () => {
+              const res = await approveApplicationAction(applicationId);
+              if (!res.ok) setError(res.error);
+              else if (res.data?.application) {
+                setApp(res.data.application);
+                router.push(`/dashboard?approved=${applicationId}`);
+              }
+            });
           }}
         >
-          Apply
+          {approved ? "Approved" : "Approve & apply"}
         </Button>
       </div>
-      {!app.canApply && (
+      {!canApprove && !approved && (
         <p className="text-xs text-muted-foreground">
-          Apply stays disabled until you confirm review. Submission still
-          requires approval in a later step.
+          Approve stays disabled until you confirm review. Submission only
+          runs after this approve call (HG-4).
+        </p>
+      )}
+      {approved && (
+        <p className="text-xs text-muted-foreground">
+          Approved — submit worker will process this application.
         </p>
       )}
     </div>

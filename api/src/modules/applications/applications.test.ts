@@ -13,6 +13,7 @@ vi.mock("./applications.service.js", async (importOriginal) => {
     createApplication: vi.fn(),
     regenerateDocuments: vi.fn(),
     markDocumentsReviewed: vi.fn(),
+    approveApplication: vi.fn(),
     getDocumentDownloadUrl: vi.fn(),
     ApplicationError: actual.ApplicationError,
   };
@@ -49,10 +50,12 @@ const sampleApp = {
     },
   ],
   documentsReviewedAt: null,
+  approvedAt: null,
   generationModel: "heuristic-docs-v1",
   createdAt: new Date(),
   updatedAt: new Date(),
   canApply: false,
+  canApprove: false,
 };
 
 describe("POST /api/v1/applications", () => {
@@ -118,6 +121,100 @@ describe("POST /api/v1/applications/:id/review", () => {
     );
     const res = await buildApp().request(
       `/api/v1/applications/${sampleApp.id}/review`,
+      {
+        method: "POST",
+        headers: { Authorization: await authHeader("user-b") },
+      },
+    );
+    expect(res.status).toBe(404);
+  });
+});
+
+describe("POST /api/v1/applications/:id/approve", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("401 without auth", async () => {
+    const res = await buildApp().request(
+      `/api/v1/applications/${sampleApp.id}/approve`,
+      { method: "POST" },
+    );
+    expect(res.status).toBe(401);
+    expect(mockService.approveApplication).not.toHaveBeenCalled();
+  });
+
+  it("200 approves and returns approved status (HG-4 gate)", async () => {
+    const approvedAt = new Date("2026-08-05T12:00:00.000Z");
+    mockService.approveApplication.mockResolvedValue({
+      application: {
+        ...sampleApp,
+        status: "approved",
+        documentsReviewedAt: new Date(),
+        approvedAt,
+        canApply: false,
+        canApprove: false,
+      },
+      status: "approved",
+    });
+    const res = await buildApp().request(
+      `/api/v1/applications/${sampleApp.id}/approve`,
+      {
+        method: "POST",
+        headers: { Authorization: await authHeader() },
+      },
+    );
+    expect(res.status).toBe(200);
+    expect(mockService.approveApplication).toHaveBeenCalledWith(
+      "user-a",
+      sampleApp.id,
+    );
+    const body = (await res.json()) as {
+      status: string;
+      application: { status: string; approvedAt: string };
+    };
+    expect(body.status).toBe("approved");
+    expect(body.application.status).toBe("approved");
+  });
+
+  it("400 when documents not reviewed", async () => {
+    mockService.approveApplication.mockRejectedValue(
+      new applicationsService.ApplicationError(
+        "Documents must be reviewed before approval",
+        400,
+      ),
+    );
+    const res = await buildApp().request(
+      `/api/v1/applications/${sampleApp.id}/approve`,
+      {
+        method: "POST",
+        headers: { Authorization: await authHeader() },
+      },
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("409 when already approved", async () => {
+    mockService.approveApplication.mockRejectedValue(
+      new applicationsService.ApplicationError(
+        "Cannot approve application in status 'approved'",
+        409,
+      ),
+    );
+    const res = await buildApp().request(
+      `/api/v1/applications/${sampleApp.id}/approve`,
+      {
+        method: "POST",
+        headers: { Authorization: await authHeader() },
+      },
+    );
+    expect(res.status).toBe(409);
+  });
+
+  it("404 IDOR — other user cannot approve", async () => {
+    mockService.approveApplication.mockRejectedValue(
+      new applicationsService.ApplicationError("Application not found", 404),
+    );
+    const res = await buildApp().request(
+      `/api/v1/applications/${sampleApp.id}/approve`,
       {
         method: "POST",
         headers: { Authorization: await authHeader("user-b") },

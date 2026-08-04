@@ -105,6 +105,28 @@ applicationsRoutes.post(
   },
 );
 
+applicationsRoutes.post(
+  "/:id/approve",
+  zValidator("param", applicationIdParamSchema),
+  async (c) => {
+    const { userId } = c.get("auth");
+    try {
+      return c.json(
+        await applicationsService.approveApplication(
+          userId,
+          c.req.valid("param").id,
+        ),
+        200,
+      );
+    } catch (err) {
+      if (isAppError(err)) {
+        return c.json({ error: err.message }, err.statusCode);
+      }
+      throw err;
+    }
+  },
+);
+
 applicationsRoutes.get(
   "/:id/download/:kind",
   zValidator("param", applicationDownloadParamSchema),

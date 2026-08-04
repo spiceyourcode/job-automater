@@ -6,9 +6,15 @@ import {
   profiles,
   type Application,
 } from "../../db/schema/index.js";
-import { enqueueGenerateDocs } from "../../lib/queue.js";
+import {
+  enqueueGenerateDocs,
+  enqueueSubmitApplication,
+} from "../../lib/queue.js";
 import { getPresignedGetUrl, uploadObject } from "../../lib/s3.js";
 import type { CreateApplicationBody } from "./applications.schema.js";
+
+/** Contract state machine: draft → pending_approval → approved → submitted */
+const APPROVABLE_STATUSES = new Set(["draft"]);
 
 export class ApplicationError extends Error {
   constructor(
@@ -21,6 +27,11 @@ export class ApplicationError extends Error {
 }
 
 function toPublic(app: Application) {
+  const reviewed = app.documentsReviewedAt != null;
+  const canApprove =
+    reviewed &&
+    APPROVABLE_STATUSES.has(app.status) &&
+    Boolean(app.tailoredCvContent && app.coverLetterContent);
   return {
     id: app.id,
     jobId: app.jobId,
@@ -32,11 +43,13 @@ function toPublic(app: Application) {
     coverLetterUrl: app.coverLetterUrl,
     bulletTraces: app.bulletTraces,
     documentsReviewedAt: app.documentsReviewedAt,
+    approvedAt: app.approvedAt,
     generationModel: app.generationModel,
     createdAt: app.createdAt,
     updatedAt: app.updatedAt,
-    /** Apply is blocked until review (P3.2 / HG-4 precursor). */
-    canApply: app.documentsReviewedAt != null && app.status === "draft",
+    /** Approve/Apply blocked until review (P3.2); submit only after approve (HG-4). */
+    canApply: canApprove,
+    canApprove,
   };
 }
 
@@ -115,6 +128,7 @@ export async function createApplication(
       .set({
         status: "draft",
         documentsReviewedAt: null,
+        approvedAt: null,
         tailoredCvContent: null,
         coverLetterContent: null,
         bulletTraces: [],
@@ -157,6 +171,7 @@ export async function regenerateDocuments(userId: string, id: string) {
     .update(applications)
     .set({
       documentsReviewedAt: null,
+      approvedAt: null,
       tailoredCvContent: null,
       coverLetterContent: null,
       bulletTraces: [],
@@ -223,4 +238,67 @@ export async function getDocumentDownloadUrl(
   if (!key) throw new ApplicationError("Document not available", 404);
   const url = await getPresignedGetUrl(key, 600);
   return { url };
+}
+
+/**
+ * P4.1 / HG-4: draft → pending_approval → approved, then enqueue submit.
+ * Submit is never enqueued without approved_at.
+ */
+export async function approveApplication(userId: string, id: string) {
+  const app = await getOwned(userId, id);
+
+  if (!app.documentsReviewedAt) {
+    throw new ApplicationError("Documents must be reviewed before approval", 400);
+  }
+  if (!app.tailoredCvContent || !app.coverLetterContent) {
+    throw new ApplicationError("Documents not ready for approval", 400);
+  }
+  if (!APPROVABLE_STATUSES.has(app.status)) {
+    throw new ApplicationError(
+      `Cannot approve application in status '${app.status}'`,
+      409,
+    );
+  }
+
+  // Intermediate pending_approval (contract state machine)
+  await db
+    .update(applications)
+    .set({ status: "pending_approval", updatedAt: new Date() })
+    .where(and(eq(applications.id, id), eq(applications.userId, userId)));
+
+  const approvedAt = new Date();
+  const [updated] = await db
+    .update(applications)
+    .set({
+      status: "approved",
+      approvedAt,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(applications.id, id), eq(applications.userId, userId)))
+    .returning();
+
+  if (!updated?.approvedAt) {
+    throw new ApplicationError("Failed to approve application", 400);
+  }
+
+  try {
+    await enqueueSubmitApplication({
+      application_id: updated.id,
+      user_id: userId,
+      approved_at: updated.approvedAt.toISOString(),
+    });
+  } catch {
+    // Roll back to pending_approval so user can retry — never leave approved
+    // without a queue payload that carries approved_at.
+    await db
+      .update(applications)
+      .set({
+        status: "pending_approval",
+        updatedAt: new Date(),
+      })
+      .where(and(eq(applications.id, id), eq(applications.userId, userId)));
+    throw new ApplicationError("Failed to enqueue submission", 503);
+  }
+
+  return { application: toPublic(updated), status: "approved" as const };
 }

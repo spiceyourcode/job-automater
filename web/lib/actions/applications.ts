@@ -17,7 +17,9 @@ export type ApplicationPublic = {
   tailoredCvContent: string | null;
   coverLetterContent: string | null;
   documentsReviewedAt: string | null;
+  approvedAt?: string | null;
   canApply: boolean;
+  canApprove?: boolean;
   bulletTraces: Array<{ text: string; chunkId: string; section: string }>;
 };
 
@@ -107,6 +109,30 @@ export async function markReviewedAction(
     }
     const data = (await res.json()) as { application: ApplicationPublic };
     revalidatePath(`/applications/${id}/review`);
+    return { ok: true, data };
+  } catch {
+    return { ok: false, error: "Network error" };
+  }
+}
+
+/** P4.1 / HG-4 — only path that enqueues submit (requires approved_at server-side). */
+export async function approveApplicationAction(
+  id: string,
+): Promise<ActionResult<{ application: ApplicationPublic }>> {
+  const headers = await authHeaders();
+  if (!headers) return { ok: false, error: "Unauthorized" };
+  try {
+    const res = await fetch(`${API_URL}/api/v1/applications/${id}/approve`, {
+      method: "POST",
+      headers,
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      return { ok: false, error: body.error ?? "Approval failed" };
+    }
+    const data = (await res.json()) as { application: ApplicationPublic };
+    revalidatePath(`/applications/${id}/review`);
+    revalidatePath("/dashboard");
     return { ok: true, data };
   } catch {
     return { ok: false, error: "Network error" };
