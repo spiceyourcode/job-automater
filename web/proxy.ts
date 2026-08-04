@@ -15,15 +15,28 @@ export function proxy(request: NextRequest) {
   const isDashboard = pathname.startsWith("/dashboard");
   const isOnboarding = pathname.startsWith("/onboarding");
   const isSettings = pathname.startsWith("/settings");
+  const isAnalytics = pathname.startsWith("/analytics");
+  const isApplications = pathname.startsWith("/applications");
 
-  if ((isDashboard || isOnboarding || isSettings) && !token) {
+  if (
+    (isDashboard ||
+      isOnboarding ||
+      isSettings ||
+      isAnalytics ||
+      isApplications) &&
+    !token
+  ) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("from", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  // Authenticated but incomplete onboarding cannot use dashboard/settings
-  if ((isDashboard || isSettings) && token && !onboardingDone) {
+  // Authenticated but incomplete onboarding cannot use app surfaces
+  if (
+    (isDashboard || isSettings || isAnalytics || isApplications) &&
+    token &&
+    !onboardingDone
+  ) {
     return NextResponse.redirect(new URL("/onboarding", request.url));
   }
 

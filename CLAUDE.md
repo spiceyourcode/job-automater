@@ -85,9 +85,11 @@ Full matrix + per-task AUTO SKILLS: **`AGENT-PROMPTS.md`**
 
 **Phase 4 — Apply** ✅ complete (P4.1–P4.4 — one commit each)
 
-**Next:** **P5.1** — Email monitor  
-Prompt: `AGENT-PROMPTS.md` → Phase 5 → P5.1  
-Contract: `docs/contracts/phase-5-monitoring.md`
+**Phase 5 — Email + Analytics** ✅ complete (P5.1–P5.2 — one commit each)
+
+**Next:** **P6.1** — Multi-user RBAC  
+Prompt: `AGENT-PROMPTS.md` → Phase 6 → P6.1  
+Contract: `docs/contracts/phase-6-launch.md`
 
 ---
 

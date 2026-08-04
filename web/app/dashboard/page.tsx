@@ -25,6 +25,9 @@ export default async function DashboardPage() {
           </span>
           <nav className="flex items-center gap-2" aria-label="Account">
             <Button asChild variant="ghost" size="sm" className="cursor-pointer">
+              <a href="/analytics">Analytics</a>
+            </Button>
+            <Button asChild variant="ghost" size="sm" className="cursor-pointer">
               <a href="/settings/sources">Sources</a>
             </Button>
             <form action={logoutAction}>
