@@ -70,7 +70,7 @@
 
 | # | Task | Service | Status | Contract |
 |---|------|---------|--------|----------|
-| 5.1 | Email monitor + classifier | workers | [ ] | phase-5-monitoring |
+| 5.1 | Email monitor + classifier | workers | [x] | phase-5-monitoring |
 | 5.2 | Analytics dashboard | web, api | [ ] | phase-5-monitoring |
 
 ---

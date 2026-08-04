@@ -41,6 +41,14 @@ export {
   type NewApplication,
 } from "./applications.js";
 export {
+  emails,
+  notifications,
+  type Email,
+  type NewEmail,
+  type Notification,
+  type NewNotification,
+} from "./emails.js";
+export {
   salaryCentsSchema,
   userInsertSchema,
   profileInsertSchema,

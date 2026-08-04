@@ -20,6 +20,19 @@ export type SubmitApplicationPayload = {
   approved_at: string;
 };
 
+export type MonitorEmailPayload = {
+  user_id: string;
+  messages: Array<{
+    external_id: string;
+    from_email: string;
+    from_name?: string;
+    subject?: string;
+    snippet?: string;
+    body_text?: string;
+    received_at?: string;
+  }>;
+};
+
 /**
  * Publish CollectSourceJob to Redis for Celery (HG-10).
  * Uses a simple list the workers can BRPOP in P2.2.
@@ -71,6 +84,22 @@ export async function enqueueSubmitApplication(
     await client.connect();
     await client.lPush(
       "jobautomater:submit_application",
+      JSON.stringify(payload),
+    );
+  } finally {
+    await client.quit().catch(() => {});
+  }
+}
+
+/** Publish MonitorEmailJob — never logs email bodies (HG-8). */
+export async function enqueueMonitorEmail(
+  payload: MonitorEmailPayload,
+): Promise<void> {
+  const client = createClient({ url: env.redisUrl });
+  try {
+    await client.connect();
+    await client.lPush(
+      "jobautomater:monitor_email",
       JSON.stringify(payload),
     );
   } finally {

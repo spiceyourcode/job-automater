@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 COLLECT_QUEUE_KEY = "jobautomater:collect_source"
 GENERATE_DOCS_KEY = "jobautomater:generate_docs"
 SUBMIT_APPLICATION_KEY = "jobautomater:submit_application"
+MONITOR_EMAIL_KEY = "jobautomater:monitor_email"
 
 _stop = threading.Event()
 _thread: threading.Thread | None = None
@@ -55,6 +56,15 @@ def _dispatch(key: str, payload: dict[str, Any]) -> None:
             "bridge_submit_application application_id=%s",
             payload.get("application_id"),
         )
+    elif key == MONITOR_EMAIL_KEY:
+        from tasks.monitor_email import monitor_email
+
+        monitor_email.delay(payload)
+        logger.info(
+            "bridge_monitor_email user_id=%s messages=%s",
+            payload.get("user_id"),
+            len(payload.get("messages") or []),
+        )
 
 
 def _loop() -> None:
@@ -63,7 +73,12 @@ def _loop() -> None:
     while not _stop.is_set():
         try:
             item = client.brpop(
-                [COLLECT_QUEUE_KEY, GENERATE_DOCS_KEY, SUBMIT_APPLICATION_KEY],
+                [
+                    COLLECT_QUEUE_KEY,
+                    GENERATE_DOCS_KEY,
+                    SUBMIT_APPLICATION_KEY,
+                    MONITOR_EMAIL_KEY,
+                ],
                 timeout=2,
             )
             if not item:

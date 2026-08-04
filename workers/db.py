@@ -580,3 +580,153 @@ def mark_application_submit_failed(
                 user_id,
             ),
         )
+
+
+def list_applications_with_jobs(
+    conn: psycopg.Connection, user_id: str
+) -> list[dict[str, Any]]:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT a.id, a.status, a.job_id, j.company, j.title
+            FROM applications a
+            JOIN jobs j ON j.id = a.job_id
+            WHERE a.user_id = %s::uuid
+            ORDER BY a.updated_at DESC
+            """,
+            (user_id,),
+        )
+        return [dict(r) for r in cur.fetchall()]
+
+
+def upsert_email(
+    conn: psycopg.Connection,
+    *,
+    user_id: str,
+    external_id: str,
+    from_email: str,
+    from_name: str | None,
+    subject: str | None,
+    snippet: str | None,
+    body_text: str | None,
+    received_at: Any,
+    provider: str = "imap",
+) -> str:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO emails (
+                user_id, external_id, from_email, from_name, subject, snippet,
+                body_text, received_at, provider
+            ) VALUES (
+                %s::uuid, %s, %s, %s, %s, %s, %s, %s, %s
+            )
+            ON CONFLICT (user_id, external_id) DO UPDATE SET
+                subject = EXCLUDED.subject,
+                snippet = EXCLUDED.snippet
+            RETURNING id
+            """,
+            (
+                user_id,
+                external_id,
+                from_email,
+                from_name,
+                subject,
+                snippet,
+                body_text,
+                received_at,
+                provider,
+            ),
+        )
+        row = cur.fetchone()
+        assert row is not None
+        return str(row["id"])
+
+
+def save_email_classification(
+    conn: psycopg.Connection,
+    *,
+    email_id: str,
+    user_id: str,
+    category: str,
+    confidence: float,
+    classifier_version: str,
+    application_id: str | None,
+    extracted: dict[str, Any],
+    processed: bool,
+    needs_manual_review: bool,
+    processing_error: str | None = None,
+) -> None:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE emails SET
+                category = %s,
+                confidence = %s,
+                classified_at = NOW(),
+                classifier_version = %s,
+                application_id = %s::uuid,
+                extracted_data = %s::jsonb,
+                processed = %s,
+                processed_at = CASE WHEN %s THEN NOW() ELSE processed_at END,
+                needs_manual_review = %s,
+                processing_error = %s
+            WHERE id = %s::uuid AND user_id = %s::uuid
+            """,
+            (
+                category,
+                confidence,
+                classifier_version,
+                application_id,
+                json.dumps(extracted),
+                processed,
+                processed,
+                needs_manual_review,
+                processing_error,
+                email_id,
+                user_id,
+            ),
+        )
+
+
+def update_application_status(
+    conn: psycopg.Connection,
+    *,
+    application_id: str,
+    user_id: str,
+    status: str,
+) -> None:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE applications SET
+                status = %s,
+                updated_at = NOW()
+            WHERE id = %s::uuid AND user_id = %s::uuid
+            """,
+            (status, application_id, user_id),
+        )
+
+
+def insert_notification(
+    conn: psycopg.Connection,
+    *,
+    user_id: str,
+    type_: str,
+    title: str,
+    message: str,
+    data: dict[str, Any],
+    priority: int = 0,
+) -> str:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO notifications (user_id, type, title, message, data, priority)
+            VALUES (%s::uuid, %s, %s, %s, %s::jsonb, %s)
+            RETURNING id
+            """,
+            (user_id, type_, title, message, json.dumps(data), priority),
+        )
+        row = cur.fetchone()
+        assert row is not None
+        return str(row["id"])
