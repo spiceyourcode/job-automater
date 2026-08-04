@@ -126,7 +126,7 @@ def process_collect_source(payload: dict[str, Any]) -> dict[str, Any]:
 
             raw_jobs = asyncio.run(_run_collector(job.source_type, config))
             rows = _raw_jobs_to_rows(raw_jobs)
-            inserted = insert_jobs_raw(
+            inserted_ids = insert_jobs_raw(
                 conn,
                 user_id=job.user_id,
                 source_config_id=job.source_id,
@@ -138,7 +138,7 @@ def process_collect_source(payload: dict[str, Any]) -> dict[str, Any]:
                 source_id=job.source_id,
                 user_id=job.user_id,
                 jobs_found=len(raw_jobs),
-                jobs_inserted=inserted,
+                jobs_inserted=len(inserted_ids),
                 duration_ms=duration_ms,
             )
             logger.info(
@@ -146,15 +146,24 @@ def process_collect_source(payload: dict[str, Any]) -> dict[str, Any]:
                 job.source_id,
                 job.source_type,
                 len(raw_jobs),
-                inserted,
+                len(inserted_ids),
                 duration_ms,
             )
-            return {
+            result = {
                 "status": "success",
                 "jobs_found": len(raw_jobs),
-                "jobs_inserted": inserted,
+                "jobs_inserted": len(inserted_ids),
+                "job_ids": inserted_ids,
                 "duration_ms": duration_ms,
             }
+            if inserted_ids:
+                # Late import avoids circular deps at module load
+                from tasks.normalize_jobs import normalize_jobs
+
+                normalize_jobs.delay(
+                    {"job_ids": inserted_ids, "user_id": job.user_id}
+                )
+            return result
         except Exception as exc:
             _fail(
                 conn,

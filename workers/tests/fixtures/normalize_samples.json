@@ -1,0 +1,149 @@
+[
+  {
+    "id": "fix-01",
+    "source_type": "rss",
+    "source_external_id": "rss-py-001",
+    "source_url": "https://jobs.example.com/py-001",
+    "raw_data": {
+      "format": "rss",
+      "title": "Senior Python Engineer at Acme Corp",
+      "link": "https://jobs.example.com/py-001",
+      "description": "Build APIs with FastAPI and PostgreSQL. Remote. $140k-$160k.",
+      "guid": "py-001"
+    }
+  },
+  {
+    "id": "fix-02",
+    "source_type": "rss",
+    "source_external_id": "rss-fe-002",
+    "source_url": "https://jobs.example.com/fe-002",
+    "raw_data": {
+      "format": "rss",
+      "title": "Frontend Developer",
+      "link": "https://jobs.example.com/fe-002",
+      "description": "React and TypeScript. Hybrid in Berlin.",
+      "guid": "fe-002"
+    }
+  },
+  {
+    "id": "fix-03",
+    "source_type": "api",
+    "source_external_id": "api-42",
+    "source_url": "https://api.example.com/jobs/42",
+    "raw_data": {
+      "format": "api",
+      "item": {
+        "id": "42",
+        "title": "Backend Engineer",
+        "company": "Nimbus",
+        "location": "Remote",
+        "url": "https://api.example.com/jobs/42",
+        "description": "Node and PostgreSQL. Fully remote. Salary 120k."
+      }
+    }
+  },
+  {
+    "id": "fix-04",
+    "source_type": "api",
+    "source_external_id": "api-99",
+    "source_url": "https://api.example.com/jobs/99",
+    "raw_data": {
+      "format": "api",
+      "item": {
+        "id": "99",
+        "role": "SRE",
+        "org": "Beta Labs",
+        "applyUrl": "https://api.example.com/jobs/99",
+        "description": "Kubernetes and AWS. On-site NYC."
+      }
+    }
+  },
+  {
+    "id": "fix-05",
+    "source_type": "imap",
+    "source_external_id": "msg-555",
+    "source_url": "https://boards.example.com/j/555",
+    "raw_data": {
+      "format": "imap",
+      "subject": "Job alert: Data Analyst",
+      "from": "alerts@indeed.example",
+      "body_preview": "New role for SQL and dashboards. Apply https://boards.example.com/j/555",
+      "urls": ["https://boards.example.com/j/555"],
+      "message_id": "<555@indeed.example>"
+    }
+  },
+  {
+    "id": "fix-06",
+    "source_type": "rss",
+    "source_external_id": "rss-go-006",
+    "source_url": "https://jobs.example.com/go-006",
+    "raw_data": {
+      "format": "rss",
+      "title": "Golang Engineer at CloudNine",
+      "link": "https://jobs.example.com/go-006",
+      "description": "Write Go services with Docker and Redis.",
+      "guid": "go-006"
+    }
+  },
+  {
+    "id": "fix-07",
+    "source_type": "api",
+    "source_external_id": "api-7",
+    "source_url": "https://careers.example.com/7",
+    "raw_data": {
+      "format": "api",
+      "item": {
+        "id": "7",
+        "title": "Staff Platform Engineer",
+        "company": "Orbit",
+        "description": "Java and Kubernetes. Lead level. $200k.",
+        "url": "https://careers.example.com/7",
+        "location": "Austin, TX"
+      }
+    }
+  },
+  {
+    "id": "fix-08",
+    "source_type": "imap",
+    "source_external_id": "msg-888",
+    "source_url": null,
+    "raw_data": {
+      "format": "imap",
+      "subject": "Interview request — Product Designer",
+      "from": "talent@designco.example",
+      "body_preview": "We loved your portfolio. Contact hiring@designco.example",
+      "urls": [],
+      "message_id": "<888@designco.example>"
+    }
+  },
+  {
+    "id": "fix-09",
+    "source_type": "rss",
+    "source_external_id": "rss-ml-009",
+    "source_url": "https://jobs.example.com/ml-009",
+    "raw_data": {
+      "format": "rss",
+      "title": "ML Engineer",
+      "link": "https://jobs.example.com/ml-009",
+      "description": "Python, AWS, and GraphQL experience preferred. Remote OK.",
+      "guid": "ml-009"
+    }
+  },
+  {
+    "id": "fix-10",
+    "source_type": "api",
+    "source_external_id": "api-10",
+    "source_url": "https://api.example.com/jobs/10",
+    "raw_data": {
+      "format": "api",
+      "item": {
+        "id": "10",
+        "title": "Junior QA Engineer",
+        "company": "QualityFirst",
+        "description": "Entry level. JavaScript and SQL. Part-time hybrid.",
+        "url": "https://api.example.com/jobs/10",
+        "location": "Toronto"
+      }
+    }
+  }
+]

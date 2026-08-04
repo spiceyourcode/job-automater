@@ -21,6 +21,11 @@ export {
   type NewJobRaw,
 } from "./jobs-raw.js";
 export {
+  jobs,
+  type Job,
+  type NewJob,
+} from "./jobs.js";
+export {
   salaryCentsSchema,
   userInsertSchema,
   profileInsertSchema,

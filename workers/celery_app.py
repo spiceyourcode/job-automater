@@ -7,7 +7,7 @@ app = Celery(
     "workers",
     broker=settings.celery_broker_url,
     backend=settings.celery_result_backend,
-    include=["tasks.health", "tasks.collect_source", "tasks.collect_bridge"],
+    include=["tasks.health", "tasks.collect_source", "tasks.collect_bridge", "tasks.normalize_jobs"],
 )
 
 app.conf.update(

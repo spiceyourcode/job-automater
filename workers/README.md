@@ -1,12 +1,12 @@
 # Workers — Celery + collectors + agents
 
-**Status:** P1.5 scaffold + **P2.2 collectors** (RSS / API / IMAP).
+**Status:** P1.5 scaffold + P2.2 collectors + **P2.3 extract_normalize**.
 
 ## Contract
 
 - `docs/contracts/phase-2-collection.md`
 - `08-skills/job-agent-skill.md`
-- `contracts/queue-payloads.schema.json` → `CollectSourceJob`
+- `contracts/queue-payloads.schema.json` → `CollectSourceJob`, `NormalizeJobsJob`
 
 ## Structure
 
@@ -14,17 +14,15 @@
 workers/
 ├── celery_app.py
 ├── config.py
-├── db.py                 # Postgres helpers (jobs_raw + source_configs status)
-├── collectors/
-│   ├── base.py           # BaseCollector, RawJob
-│   ├── registry.py
-│   ├── rss.py
-│   ├── api.py
-│   └── imap.py
+├── db.py
+├── collectors/           # rss, api, imap
+├── agents/
+│   └── extract_normalize/  # LangGraph: extract → validate (HG-9)
 ├── tasks/
 │   ├── health.py
-│   ├── collect_source.py # tasks.collect_source
-│   └── collect_bridge.py # BRPOP jobautomater:collect_source → Celery
+│   ├── collect_source.py
+│   ├── collect_bridge.py
+│   └── normalize_jobs.py
 └── tests/
 ```
 
@@ -38,15 +36,20 @@ pip install -e ".[dev]"
 celery -A celery_app worker --loglevel=info
 ```
 
-API `POST /api/v1/sources/:id/run` LPUSH-es to Redis key `jobautomater:collect_source`.
-The bridge thread BRPOPs and enqueues `tasks.collect_source`.
+Via WSL + [rtk](https://github.com/rtk-ai/rtk) (Homebrew):
 
-On failure, `source_configs.last_run_status` is set to `failed` (never silent).
+```bash
+wsl -d Debian -- bash -lc 'export PATH=/home/linuxbrew/.linuxbrew/bin:$PATH; cd /mnt/c/.../workers && rtk proxy ./.venv/Scripts/python.exe -m pytest -q'
+```
+
+API `POST /sources/:id/run` → Redis list → `tasks.collect_source` → `tasks.normalize_jobs`.
+
+On failure, `source_configs.last_run_status` / `jobs_raw.processing_error` is set (never silent).
 
 ## Tests
 
 ```bash
-pytest
+rtk proxy ./.venv/Scripts/python.exe -m pytest -q
 ```
 
-Golden RSS fixture: `tests/fixtures/sample_rss.xml` + `golden_rss_parse.json`.
+Fixtures: `tests/fixtures/normalize_samples.json` (10 postings), golden RSS.

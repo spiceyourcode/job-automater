@@ -53,11 +53,11 @@ def insert_jobs_raw(
     user_id: str,
     source_config_id: str,
     jobs: list[dict[str, Any]],
-) -> int:
-    """Insert raw jobs; skip duplicates on (source_config_id, source_id). Returns inserted count."""
+) -> list[str]:
+    """Insert raw jobs; skip duplicates. Returns list of inserted UUIDs."""
     if not jobs:
-        return 0
-    inserted = 0
+        return []
+    inserted_ids: list[str] = []
     with conn.cursor() as cur:
         for job in jobs:
             cur.execute(
@@ -80,9 +80,133 @@ def insert_jobs_raw(
                     job.get("dedup_hash"),
                 ),
             )
-            if cur.fetchone():
-                inserted += 1
-    return inserted
+            row = cur.fetchone()
+            if row:
+                inserted_ids.append(str(row["id"]))
+    return inserted_ids
+
+
+def load_jobs_raw(
+    conn: psycopg.Connection,
+    *,
+    user_id: str,
+    job_ids: list[str],
+) -> list[dict[str, Any]]:
+    if not job_ids:
+        return []
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT jr.id, jr.user_id, jr.source_config_id, jr.source_id,
+                   jr.source_url, jr.raw_data, jr.processed,
+                   sc.source_type
+            FROM jobs_raw jr
+            LEFT JOIN source_configs sc ON sc.id = jr.source_config_id
+            WHERE jr.user_id = %s::uuid
+              AND jr.id = ANY(%s::uuid[])
+            """,
+            (user_id, job_ids),
+        )
+        return [dict(r) for r in cur.fetchall()]
+
+
+def insert_normalized_job(
+    conn: psycopg.Connection,
+    *,
+    user_id: str,
+    source_config_id: str | None,
+    jobs_raw_id: str,
+    job: dict[str, Any],
+) -> str | None:
+    """Insert validated job. Returns id or None if duplicate conflict."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO jobs (
+                user_id, source, source_id, source_url, source_config_id,
+                jobs_raw_id, company, title, location, is_remote, remote_type,
+                employment_type, experience_level, salary_min, salary_max,
+                salary_currency, salary_period, description, requirements,
+                responsibilities, benefits, nice_to_have, application_url,
+                application_email, application_method, tags, tech_stack,
+                keywords, field_confidence, status
+            ) VALUES (
+                %s::uuid, %s, %s, %s, %s::uuid,
+                %s::uuid, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s,
+                %s, %s, %s, %s,
+                %s, %s, %s, %s,
+                %s, %s, %s::jsonb, %s::jsonb,
+                %s::jsonb, %s::jsonb, 'new'
+            )
+            ON CONFLICT (user_id, source, source_id) DO NOTHING
+            RETURNING id
+            """,
+            (
+                user_id,
+                job["source"],
+                job.get("source_id"),
+                job.get("source_url"),
+                source_config_id,
+                jobs_raw_id,
+                job["company"],
+                job["title"],
+                job.get("location"),
+                job.get("is_remote", False),
+                job.get("remote_type"),
+                job.get("employment_type"),
+                job.get("experience_level"),
+                job.get("salary_min"),
+                job.get("salary_max"),
+                job.get("salary_currency") or "USD",
+                job.get("salary_period") or "yearly",
+                job.get("description"),
+                job.get("requirements"),
+                job.get("responsibilities"),
+                job.get("benefits"),
+                job.get("nice_to_have"),
+                job.get("application_url"),
+                job.get("application_email"),
+                job.get("application_method"),
+                json.dumps(job.get("tags") or []),
+                json.dumps(job.get("tech_stack") or []),
+                json.dumps(job.get("keywords") or []),
+                json.dumps(job.get("field_confidence") or {}),
+            ),
+        )
+        row = cur.fetchone()
+        return str(row["id"]) if row else None
+
+
+def mark_jobs_raw_processed(
+    conn: psycopg.Connection,
+    *,
+    jobs_raw_id: str,
+    error: str | None = None,
+) -> None:
+    with conn.cursor() as cur:
+        if error:
+            cur.execute(
+                """
+                UPDATE jobs_raw SET
+                    processed = true,
+                    processed_at = NOW(),
+                    processing_error = %s
+                WHERE id = %s::uuid
+                """,
+                (error[:500], jobs_raw_id),
+            )
+        else:
+            cur.execute(
+                """
+                UPDATE jobs_raw SET
+                    processed = true,
+                    processed_at = NOW(),
+                    processing_error = NULL
+                WHERE id = %s::uuid
+                """,
+                (jobs_raw_id,),
+            )
 
 
 def mark_source_success(

@@ -167,9 +167,10 @@ def test_process_success_inserts_and_marks_ok():
             },
         ),
         patch("tasks.collect_source._run_collector", side_effect=fake_collect),
-        patch("tasks.collect_source.insert_jobs_raw", return_value=1) as insert,
+        patch("tasks.collect_source.insert_jobs_raw", return_value=["aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"]) as insert,
         patch("tasks.collect_source.mark_source_success") as mark_ok,
         patch("tasks.collect_source.mark_source_failed") as mark_failed,
+        patch("tasks.normalize_jobs.normalize_jobs") as norm_task,
     ):
         result = process_collect_source(payload)
 
@@ -179,3 +180,4 @@ def test_process_success_inserts_and_marks_ok():
     insert.assert_called_once()
     mark_ok.assert_called_once()
     mark_failed.assert_not_called()
+    norm_task.delay.assert_called_once()
