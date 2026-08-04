@@ -77,10 +77,13 @@ Full matrix + per-task AUTO SKILLS: **`AGENT-PROMPTS.md`**
 | ✓ | P2.2 Collector plugins (RSS, API, IMAP) |
 | ✓ | P2.3 ExtractNormalize agent |
 | ✓ | P2.4 Dedup + MatchScore agent |
+| ✓ | P2.5 Jobs list + score UI |
 
-**Next:** **P2.5** — Jobs list + score UI  
-Prompt: `AGENT-PROMPTS.md` → Phase 2 → P2.5  
-Contract: `docs/contracts/phase-2-collection.md`
+**Phase 2 — Collection** ✅ complete
+
+**Next:** **P3.1** — GenerateDocs agent  
+Prompt: `AGENT-PROMPTS.md` → Phase 3 → P3.1  
+Contract: `docs/contracts/phase-3-documents.md`
 
 ---
 
