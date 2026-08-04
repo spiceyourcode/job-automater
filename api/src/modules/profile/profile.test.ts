@@ -6,6 +6,7 @@ import {
   ALLOWED_CV_MIME_TYPES,
   MAX_CV_BYTES,
   patchProfileBodySchema,
+  resolveCvMimeType,
 } from "./profile.schema.js";
 
 vi.mock("./profile.service.js", () => ({
@@ -296,5 +297,13 @@ describe("schema constants", () => {
   it("patch schema rejects float salary", () => {
     const r = patchProfileBodySchema.safeParse({ salaryMin: 99.9 });
     expect(r.success).toBe(false);
+  });
+
+  it("resolves MIME from extension when empty or octet-stream", () => {
+    expect(resolveCvMimeType("", "cv.pdf")).toBe("application/pdf");
+    expect(resolveCvMimeType("application/octet-stream", "resume.docx")).toBe(
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    );
+    expect(resolveCvMimeType("text/plain", "cv.pdf")).toBeNull();
   });
 });

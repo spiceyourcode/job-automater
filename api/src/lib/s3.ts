@@ -1,9 +1,11 @@
 import {
   CreateBucketCommand,
+  GetObjectCommand,
   HeadBucketCommand,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { env } from "../env.js";
 
 export const s3 = new S3Client({
@@ -30,14 +32,14 @@ export async function ensureBucket(): Promise<void> {
 }
 
 /**
- * Upload bytes to MinIO/S3. Returns the object key and a public-ish URL.
+ * Upload bytes to MinIO/S3. Returns the object key (stored in DB).
  * Never logs body contents (HG-8).
  */
 export async function uploadObject(params: {
   key: string;
   body: Buffer;
   contentType: string;
-}): Promise<{ key: string; url: string }> {
+}): Promise<{ key: string }> {
   await ensureBucket();
   await s3.send(
     new PutObjectCommand({
@@ -47,6 +49,17 @@ export async function uploadObject(params: {
       ContentType: params.contentType,
     }),
   );
-  const url = `${env.s3Endpoint}/${env.s3Bucket}/${params.key}`;
-  return { key: params.key, url };
+  return { key: params.key };
+}
+
+/** Time-limited download URL for a private object (default 1 hour). */
+export async function getPresignedGetUrl(
+  key: string,
+  expiresInSeconds = 3600,
+): Promise<string> {
+  return getSignedUrl(
+    s3,
+    new GetObjectCommand({ Bucket: env.s3Bucket, Key: key }),
+    { expiresIn: expiresInSeconds },
+  );
 }

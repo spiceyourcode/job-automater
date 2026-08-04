@@ -1,13 +1,13 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { extname } from "node:path";
-import { and, desc, eq, max } from "drizzle-orm";
+import { and, desc, eq, max, sql } from "drizzle-orm";
 import { db } from "../../db/index.js";
 import { profiles, cvDocuments } from "../../db/schema/index.js";
-import { uploadObject } from "../../lib/s3.js";
+import { getPresignedGetUrl, uploadObject } from "../../lib/s3.js";
 import {
   ALLOWED_CV_EXTENSIONS,
-  ALLOWED_CV_MIME_TYPES,
   MAX_CV_BYTES,
+  resolveCvMimeType,
   type PatchProfileBody,
 } from "./profile.schema.js";
 
@@ -45,7 +45,20 @@ export async function getProfile(userId: string) {
 }
 
 export async function patchProfile(userId: string, body: PatchProfileBody) {
-  await getOrCreateProfile(userId);
+  const existing = await getOrCreateProfile(userId);
+
+  // Merge partial salary fields against stored values so min/max stays ordered
+  const nextMin =
+    body.salaryMin !== undefined ? body.salaryMin : existing.salaryMin;
+  const nextMax =
+    body.salaryMax !== undefined ? body.salaryMax : existing.salaryMax;
+  if (
+    nextMin != null &&
+    nextMax != null &&
+    nextMin > nextMax
+  ) {
+    throw new ProfileError("salaryMin must be <= salaryMax", 400);
+  }
 
   const [updated] = await db
     .update(profiles)
@@ -82,92 +95,113 @@ export async function uploadCv(
   if (!ALLOWED_CV_EXTENSIONS.has(ext)) {
     throw new ProfileError("Only PDF and DOCX files are allowed", 400);
   }
-  if (!ALLOWED_CV_MIME_TYPES.has(file.mimeType)) {
+
+  const mimeType = resolveCvMimeType(file.mimeType, file.filename);
+  if (!mimeType) {
     throw new ProfileError("Invalid Content-Type for CV upload", 400);
   }
 
   const fileHash = createHash("sha256").update(file.data).digest("hex");
   const safeName = sanitizeFilename(file.filename);
+  // UUID in key prevents S3 overwrite even under version races
+  const objectId = randomUUID();
+  const key = `cvs/${userId}/${objectId}/${safeName}`;
 
-  // Next version for this user
-  const [agg] = await db
-    .select({ maxVersion: max(cvDocuments.version) })
-    .from(cvDocuments)
-    .where(eq(cvDocuments.userId, userId));
-  const nextVersion = (agg?.maxVersion ?? 0) + 1;
-
-  const key = `cvs/${userId}/v${nextVersion}/${safeName}`;
-  // Upload — body never logged
-  const { url } = await uploadObject({
+  // Upload before DB — unique key; orphaned objects are acceptable if insert fails
+  await uploadObject({
     key,
     body: file.data,
-    contentType: file.mimeType,
+    contentType: mimeType,
   });
 
-  const [doc] = await db.transaction(async (tx) => {
-    // Deactivate previous active docs for this user
-    await tx
-      .update(cvDocuments)
-      .set({ isActive: false })
-      .where(
-        and(eq(cvDocuments.userId, userId), eq(cvDocuments.isActive, true)),
+  let created;
+  try {
+    [created] = await db.transaction(async (tx) => {
+      // Serialize version allocation per user (Postgres advisory xact lock)
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtext(${userId}::text))`,
       );
 
-    const [created] = await tx
-      .insert(cvDocuments)
-      .values({
-        userId,
-        version: nextVersion,
-        originalFilename: safeName,
-        fileUrl: url,
-        fileHash,
-        fileSize: file.data.byteLength,
-        mimeType: file.mimeType,
-        isActive: true,
-      })
-      .returning();
+      const [agg] = await tx
+        .select({ maxVersion: max(cvDocuments.version) })
+        .from(cvDocuments)
+        .where(eq(cvDocuments.userId, userId));
+      const nextVersion = (agg?.maxVersion ?? 0) + 1;
 
-    if (!created) throw new Error("Failed to create cv_document");
-
-    const [existingProfile] = await tx
-      .select({ id: profiles.id })
-      .from(profiles)
-      .where(eq(profiles.userId, userId))
-      .limit(1);
-
-    if (!existingProfile) {
-      await tx.insert(profiles).values({
-        userId,
-        cvFileId: created.id,
-        cvVersion: nextVersion,
-      });
-    } else {
       await tx
-        .update(profiles)
-        .set({
-          cvFileId: created.id,
-          cvVersion: nextVersion,
-          updatedAt: new Date(),
-        })
-        .where(eq(profiles.userId, userId));
-    }
+        .update(cvDocuments)
+        .set({ isActive: false })
+        .where(
+          and(eq(cvDocuments.userId, userId), eq(cvDocuments.isActive, true)),
+        );
 
-    return [created];
-  });
+      const [row] = await tx
+        .insert(cvDocuments)
+        .values({
+          userId,
+          version: nextVersion,
+          originalFilename: safeName,
+          fileUrl: key, // store object key; API returns presigned URL
+          fileHash,
+          fileSize: file.data.byteLength,
+          mimeType,
+          isActive: true,
+        })
+        .returning();
+
+      if (!row) throw new Error("Failed to create cv_document");
+
+      const [existingProfile] = await tx
+        .select({ id: profiles.id })
+        .from(profiles)
+        .where(eq(profiles.userId, userId))
+        .limit(1);
+
+      if (!existingProfile) {
+        await tx.insert(profiles).values({
+          userId,
+          cvFileId: row.id,
+          cvVersion: nextVersion,
+        });
+      } else {
+        await tx
+          .update(profiles)
+          .set({
+            cvFileId: row.id,
+            cvVersion: nextVersion,
+            updatedAt: new Date(),
+          })
+          .where(eq(profiles.userId, userId));
+      }
+
+      return [row];
+    });
+  } catch (err: unknown) {
+    if (
+      err instanceof Error &&
+      "code" in err &&
+      (err as { code: string }).code === "23505"
+    ) {
+      throw new ProfileError("Concurrent upload conflict — retry", 400);
+    }
+    throw err;
+  }
+
+  const fileUrl = await getPresignedGetUrl(key);
 
   return {
     cvDocument: {
-      id: doc!.id,
-      version: doc!.version,
-      originalFilename: doc!.originalFilename,
-      fileUrl: doc!.fileUrl,
-      fileSize: doc!.fileSize,
-      mimeType: doc!.mimeType,
-      isActive: doc!.isActive,
-      createdAt: doc!.createdAt,
+      id: created!.id,
+      version: created!.version,
+      originalFilename: created!.originalFilename,
+      fileUrl,
+      fileSize: created!.fileSize,
+      mimeType: created!.mimeType,
+      isActive: created!.isActive,
+      createdAt: created!.createdAt,
       // Intentionally omit parsedText / parsedSections (HG-8)
     },
-    taskId: null as string | null, // async parse deferred to later phase
+    taskId: null as string | null,
   };
 }
 
@@ -187,7 +221,14 @@ export async function listCvVersions(userId: string) {
     .where(eq(cvDocuments.userId, userId))
     .orderBy(desc(cvDocuments.version));
 
-  return { versions: rows };
+  const versions = await Promise.all(
+    rows.map(async (row) => ({
+      ...row,
+      fileUrl: await getPresignedGetUrl(row.fileUrl),
+    })),
+  );
+
+  return { versions };
 }
 
 /**
@@ -209,5 +250,8 @@ export async function getCvDocumentForUser(userId: string, cvId: string) {
     .limit(1);
 
   if (!doc) throw new ProfileError("CV not found", 404);
-  return doc;
+  return {
+    ...doc,
+    fileUrl: await getPresignedGetUrl(doc.fileUrl),
+  };
 }

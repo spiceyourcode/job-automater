@@ -47,3 +47,33 @@ export const ALLOWED_CV_MIME_TYPES = new Set([
 ]);
 
 export const ALLOWED_CV_EXTENSIONS = new Set([".pdf", ".docx", ".doc"]);
+
+const EXT_TO_MIME: Record<string, string> = {
+  ".pdf": "application/pdf",
+  ".docx":
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ".doc": "application/msword",
+};
+
+/**
+ * Resolve MIME for upload. Empty / octet-stream falls back to extension
+ * so curl and mobile clients that omit Content-Type still work.
+ */
+export function resolveCvMimeType(
+  mimeType: string | undefined,
+  filename: string,
+): string | null {
+  const trimmed = (mimeType ?? "").trim().toLowerCase();
+  if (trimmed && ALLOWED_CV_MIME_TYPES.has(trimmed)) return trimmed;
+  if (
+    !trimmed ||
+    trimmed === "application/octet-stream" ||
+    trimmed === "binary/octet-stream"
+  ) {
+    const ext = filename.includes(".")
+      ? `.${filename.split(".").pop()!.toLowerCase()}`
+      : "";
+    return EXT_TO_MIME[ext] ?? null;
+  }
+  return null;
+}

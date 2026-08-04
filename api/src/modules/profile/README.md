@@ -16,11 +16,13 @@ A user can never read or write another user's profile or CV.
 
 ## CV upload
 
-- Allowed: `.pdf`, `.docx`, `.doc`
+- Allowed: `.pdf`, `.docx`, `.doc` (MIME inferred from extension if omitted)
 - Max size: 10 MB
-- Stored at `cvs/{userId}/v{n}/{filename}` in MinIO
+- Stored at `cvs/{userId}/{uuid}/{filename}` in MinIO (UUID key avoids overwrite races)
+- Version allocated under Postgres advisory lock per user
+- DB stores object key; API responses return time-limited presigned GET URLs
 - Metadata logged only (filename, size, mime) — never file body (HG-8)
-- Salary fields remain integer cents (HG-3)
+- Salary fields remain integer cents (HG-3); partial PATCH merges against stored min/max
 
 ## Dependencies
 

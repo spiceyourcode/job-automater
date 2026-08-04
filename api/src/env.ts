@@ -9,6 +9,9 @@ const repoRoot = resolve(apiRoot, "..");
 config({ path: resolve(repoRoot, ".env") });
 config({ path: resolve(apiRoot, ".env"), override: true });
 
+const nodeEnv = process.env.NODE_ENV ?? "development";
+const isProd = nodeEnv === "production";
+
 const envSchema = z
   .object({
     DATABASE_URL: z.string().min(1),
@@ -17,10 +20,10 @@ const envSchema = z
     JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 chars"),
     JWT_ACCESS_TTL: z.string().default("15m"),
     JWT_REFRESH_TTL: z.string().default("7d"),
-    S3_ENDPOINT: z.string().url().default("http://localhost:9000"),
-    S3_ACCESS_KEY: z.string().min(1).default("minioadmin"),
-    S3_SECRET_KEY: z.string().min(1).default("minioadmin"),
-    S3_BUCKET: z.string().min(1).default("jobautomater"),
+    S3_ENDPOINT: z.string().url(),
+    S3_ACCESS_KEY: z.string().min(1),
+    S3_SECRET_KEY: z.string().min(1),
+    S3_BUCKET: z.string().min(1),
     S3_REGION: z.string().min(1).default("us-east-1"),
   })
   .strict();
@@ -28,15 +31,20 @@ const envSchema = z
 const parsed = envSchema.safeParse({
   DATABASE_URL: process.env.DATABASE_URL,
   API_PORT: process.env.API_PORT ?? "3001",
-  NODE_ENV: process.env.NODE_ENV ?? "development",
+  NODE_ENV: nodeEnv,
   JWT_SECRET: process.env.JWT_SECRET ?? "",
   JWT_ACCESS_TTL: process.env.JWT_ACCESS_TTL ?? "15m",
   JWT_REFRESH_TTL: process.env.JWT_REFRESH_TTL ?? "7d",
-  S3_ENDPOINT: process.env.S3_ENDPOINT,
-  S3_ACCESS_KEY: process.env.S3_ACCESS_KEY,
-  S3_SECRET_KEY: process.env.S3_SECRET_KEY,
-  S3_BUCKET: process.env.S3_BUCKET,
-  S3_REGION: process.env.S3_REGION,
+  // Dev-only defaults for local MinIO; production must set explicitly (fail closed)
+  S3_ENDPOINT:
+    process.env.S3_ENDPOINT ??
+    (isProd ? undefined : "http://localhost:9000"),
+  S3_ACCESS_KEY:
+    process.env.S3_ACCESS_KEY ?? (isProd ? undefined : "minioadmin"),
+  S3_SECRET_KEY:
+    process.env.S3_SECRET_KEY ?? (isProd ? undefined : "minioadmin"),
+  S3_BUCKET: process.env.S3_BUCKET ?? (isProd ? undefined : "jobautomater"),
+  S3_REGION: process.env.S3_REGION ?? "us-east-1",
 });
 
 if (!parsed.success) {

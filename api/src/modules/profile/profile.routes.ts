@@ -50,6 +50,7 @@ profileRoutes.post("/cv", async (c) => {
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
+  const rawMime = file.type || "";
   // Log metadata only — never content (HG-8)
   console.info(
     JSON.stringify({
@@ -57,14 +58,14 @@ profileRoutes.post("/cv", async (c) => {
       userId,
       filename: file.name,
       size: buffer.byteLength,
-      mimeType: file.type || "application/octet-stream",
+      mimeType: rawMime || "application/octet-stream",
     }),
   );
 
   try {
     const result = await profileService.uploadCv(userId, {
       filename: file.name || "cv.pdf",
-      mimeType: file.type || "application/octet-stream",
+      mimeType: rawMime,
       data: buffer,
     });
     return c.json(result, 201);
