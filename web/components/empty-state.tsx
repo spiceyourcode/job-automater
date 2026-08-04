@@ -29,9 +29,9 @@ export function EmptyState({
       <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted text-muted-foreground">
         {icon}
       </div>
-      <h2 className="mb-2 text-lg font-semibold tracking-tight text-foreground">
+      <h3 className="mb-2 text-lg font-semibold tracking-tight text-foreground">
         {title}
-      </h2>
+      </h3>
       <p className="mb-6 max-w-xs text-sm text-muted-foreground">{description}</p>
       {action && (
         <Button asChild className="cursor-pointer">
