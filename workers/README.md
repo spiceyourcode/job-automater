@@ -1,27 +1,34 @@
-# Workers — Celery + LangGraph + Playwright
+# Workers — Celery + collectors + agents
 
-**Status:** Not scaffolded. Start with task **P1.5** in `.agent-settings/phase-orchestrator.md`.
+**Status:** P1.5 scaffold + **P2.2 collectors** (RSS / API / IMAP).
 
 ## Contract
 
-Read `docs/contracts/phase-1-foundation.md` and `08-skills/job-agent-skill.md`.
+- `docs/contracts/phase-2-collection.md`
+- `08-skills/job-agent-skill.md`
+- `contracts/queue-payloads.schema.json` → `CollectSourceJob`
 
-## Planned structure
+## Structure
 
 ```
 workers/
 ├── celery_app.py
-├── tasks/
-├── agents/
-│   ├── extract_normalize/
-│   ├── match_score/
-│   ├── generate_docs/
-│   └── submit_verify/
+├── config.py
+├── db.py                 # Postgres helpers (jobs_raw + source_configs status)
 ├── collectors/
-└── pyproject.toml
+│   ├── base.py           # BaseCollector, RawJob
+│   ├── registry.py
+│   ├── rss.py
+│   ├── api.py
+│   └── imap.py
+├── tasks/
+│   ├── health.py
+│   ├── collect_source.py # tasks.collect_source
+│   └── collect_bridge.py # BRPOP jobautomater:collect_source → Celery
+└── tests/
 ```
 
-## Run (after scaffold)
+## Run
 
 ```bash
 cd workers
@@ -31,4 +38,15 @@ pip install -e ".[dev]"
 celery -A celery_app worker --loglevel=info
 ```
 
-Queue payloads must match `contracts/queue-payloads.schema.json`.
+API `POST /api/v1/sources/:id/run` LPUSH-es to Redis key `jobautomater:collect_source`.
+The bridge thread BRPOPs and enqueues `tasks.collect_source`.
+
+On failure, `source_configs.last_run_status` is set to `failed` (never silent).
+
+## Tests
+
+```bash
+pytest
+```
+
+Golden RSS fixture: `tests/fixtures/sample_rss.xml` + `golden_rss_parse.json`.

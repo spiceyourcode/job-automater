@@ -1,0 +1,42 @@
+{
+  "feed_url": "https://jobs.example.com/feed.xml",
+  "expected_count": 3,
+  "jobs": [
+    {
+      "title": "Senior Python Engineer",
+      "source_url": "https://jobs.example.com/jobs/py-001",
+      "raw_data": {
+        "title": "Senior Python Engineer",
+        "link": "https://jobs.example.com/jobs/py-001",
+        "guid": "https://jobs.example.com/jobs/py-001",
+        "description": "Build APIs with FastAPI and PostgreSQL. Remote OK.",
+        "pubDate": "Mon, 03 Aug 2026 10:00:00 GMT",
+        "format": "rss"
+      }
+    },
+    {
+      "title": "Frontend Developer",
+      "source_url": "https://jobs.example.com/jobs/fe-002",
+      "raw_data": {
+        "title": "Frontend Developer",
+        "link": "https://jobs.example.com/jobs/fe-002",
+        "guid": "fe-002",
+        "description": "React and TypeScript. Hybrid in Berlin.",
+        "pubDate": "Tue, 04 Aug 2026 09:00:00 GMT",
+        "format": "rss"
+      }
+    },
+    {
+      "title": "Data Analyst",
+      "source_url": "https://jobs.example.com/jobs/da-003",
+      "raw_data": {
+        "title": "Data Analyst",
+        "link": "https://jobs.example.com/jobs/da-003",
+        "guid": "da-003",
+        "description": "SQL and dashboards.",
+        "pubDate": "Tue, 04 Aug 2026 11:00:00 GMT",
+        "format": "rss"
+      }
+    }
+  ]
+}

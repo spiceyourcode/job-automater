@@ -16,6 +16,11 @@ export {
   type NewSourceConfig,
 } from "./source-configs.js";
 export {
+  jobsRaw,
+  type JobRaw,
+  type NewJobRaw,
+} from "./jobs-raw.js";
+export {
   salaryCentsSchema,
   userInsertSchema,
   profileInsertSchema,

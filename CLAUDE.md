@@ -74,9 +74,10 @@ Full matrix + per-task AUTO SKILLS: **`AGENT-PROMPTS.md`**
 | Done | Task |
 |------|------|
 | ✓ | P2.1 Source CRUD API + Settings UI |
+| ✓ | P2.2 Collector plugins (RSS, API, IMAP) |
 
-**Next:** **P2.2** — Collector plugins (RSS, API, IMAP)  
-Prompt: `AGENT-PROMPTS.md` → Phase 2 → P2.2  
+**Next:** **P2.3** — ExtractNormalize agent  
+Prompt: `AGENT-PROMPTS.md` → Phase 2 → P2.3  
 Contract: `docs/contracts/phase-2-collection.md`
 
 ---

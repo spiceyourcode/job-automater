@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Acme Jobs</title>
+    <link>https://jobs.example.com</link>
+    <description>Sample feed for golden tests</description>
+    <item>
+      <title>Senior Python Engineer</title>
+      <link>https://jobs.example.com/jobs/py-001</link>
+      <guid isPermaLink="true">https://jobs.example.com/jobs/py-001</guid>
+      <description>Build APIs with FastAPI and PostgreSQL. Remote OK.</description>
+      <pubDate>Mon, 03 Aug 2026 10:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Frontend Developer</title>
+      <link>https://jobs.example.com/jobs/fe-002</link>
+      <guid>fe-002</guid>
+      <description>React and TypeScript. Hybrid in Berlin.</description>
+      <pubDate>Tue, 04 Aug 2026 09:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Data Analyst</title>
+      <link>https://jobs.example.com/jobs/da-003</link>
+      <guid>da-003</guid>
+      <description>SQL and dashboards.</description>
+      <pubDate>Tue, 04 Aug 2026 11:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>

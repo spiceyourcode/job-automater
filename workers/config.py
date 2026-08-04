@@ -16,6 +16,9 @@ class Settings(BaseSettings):
 
     celery_broker_url: str = "redis://localhost:6379/0"
     celery_result_backend: str = "redis://localhost:6379/1"
+    database_url: str = (
+        "postgresql://jobautomater:jobautomater@127.0.0.1:5432/jobautomater"
+    )
 
 
 settings = Settings()

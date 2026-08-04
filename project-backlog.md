@@ -38,7 +38,7 @@
 | # | Task | Service | Status |
 |---|------|---------|--------|
 | 2.1 | Source CRUD API + UI | api, web | [x] |
-| 2.2 | Collector plugins: RSS, API, IMAP | workers | [ ] |
+| 2.2 | Collector plugins: RSS, API, IMAP | workers | [x] |
 | 2.3 | ExtractNormalize agent | workers | [ ] |
 | 2.4 | Dedup + MatchScore agent | workers | [ ] |
 | 2.5 | Jobs list + score UI | web | [ ] |
