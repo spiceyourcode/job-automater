@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { signAccessToken } from "../../lib/jwt.js";
+import { testAuthHeader } from "../../test/auth-header.js";
 import { jobsRoutes } from "./jobs.routes.js";
 
 vi.mock("./jobs.service.js", async (importOriginal) => {
@@ -22,10 +22,7 @@ const buildApp = () => {
   return app;
 };
 
-const authHeader = async (userId = "user-a") => {
-  const token = await signAccessToken({ sub: userId, email: "a@example.com" });
-  return `Bearer ${token}`;
-};
+const authHeader = (userId = "user-a") => testAuthHeader(userId);
 
 const sampleJob = {
   id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",

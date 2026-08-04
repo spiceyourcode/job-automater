@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { signAccessToken } from "../../lib/jwt.js";
+import { testAuthHeader } from "../../test/auth-header.js";
 import { sourcesRoutes } from "./sources.routes.js";
 import { createSourceBodySchema } from "./sources.schema.js";
 import {
@@ -36,14 +36,15 @@ const buildApp = () => {
   return app;
 };
 
-const authHeader = async (userId = "user-a") => {
-  const token = await signAccessToken({ sub: userId, email: "a@example.com" });
-  return `Bearer ${token}`;
-};
+const authHeader = (
+  userId = "user-a",
+  role: "owner" | "member" | "viewer" = "owner",
+) => testAuthHeader(userId, role);
 
 const sampleSource = {
   id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
   userId: "user-a",
+  workspaceId: "w0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
   sourceType: "rss",
   name: "HN Jobs",
   description: null,
@@ -86,7 +87,16 @@ describe("GET /api/v1/sources", () => {
       headers: { Authorization: await authHeader("user-a") },
     });
     expect(res.status).toBe(200);
-    expect(mockService.listSources).toHaveBeenCalledWith("user-a");
+    expect(mockService.listSources).toHaveBeenCalledWith(
+      "w0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+    );
+  });
+
+  it("403 viewer cannot list sources", async () => {
+    const res = await buildApp().request("/api/v1/sources", {
+      headers: { Authorization: await authHeader("user-a", "viewer") },
+    });
+    expect(res.status).toBe(403);
   });
 });
 
@@ -156,7 +166,7 @@ describe("ownership / IDOR", () => {
     );
     expect(res.status).toBe(404);
     expect(mockService.getSource).toHaveBeenCalledWith(
-      "user-a",
+      "w0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
       "b1eebc99-9c0b-4ef8-bb6d-6bb9bd380a22",
     );
   });
@@ -184,7 +194,7 @@ describe("POST /:id/test and /run", () => {
   it("202 run endpoint", async () => {
     mockService.runSource.mockResolvedValue({
       pipelineRunId: "33333333-3333-3333-3333-333333333333",
-      status: "started",
+      status: "queued",
     });
     const res = await buildApp().request(
       `/api/v1/sources/${sampleSource.id}/run`,

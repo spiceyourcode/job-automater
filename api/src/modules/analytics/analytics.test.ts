@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { signAccessToken } from "../../lib/jwt.js";
+import { testAuthHeader } from "../../test/auth-header.js";
 import { analyticsRoutes } from "./analytics.routes.js";
 
 vi.mock("./analytics.service.js", async (importOriginal) => {
@@ -24,10 +24,7 @@ const buildApp = () => {
   return app;
 };
 
-const authHeader = async (userId = "user-a") => {
-  const token = await signAccessToken({ sub: userId, email: "a@example.com" });
-  return `Bearer ${token}`;
-};
+const authHeader = (userId = "user-a") => testAuthHeader(userId);
 
 describe("GET /api/v1/analytics/dashboard", () => {
   afterEach(() => vi.clearAllMocks());

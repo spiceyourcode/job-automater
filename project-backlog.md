@@ -79,7 +79,7 @@
 
 | # | Task | Service | Status | Contract |
 |---|------|---------|--------|----------|
-| 6.1 | Multi-user RBAC | api, web | [ ] | phase-6-launch |
+| 6.1 | Multi-user RBAC | api, web | [x] | phase-6-launch |
 | 6.2 | GDPR export/delete + E2E suite | api, web | [ ] | phase-6-launch |
 
 All task prompts: [`AGENT-PROMPTS.md`](./AGENT-PROMPTS.md)

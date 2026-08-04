@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { signAccessToken } from "../../lib/jwt.js";
+import { testAuthHeader } from "../../test/auth-header.js";
 import { profileRoutes } from "./profile.routes.js";
 import {
   ALLOWED_CV_MIME_TYPES,
@@ -35,10 +35,7 @@ const buildApp = () => {
   return app;
 };
 
-const authHeader = async (userId = "user-a", email = "a@example.com") => {
-  const token = await signAccessToken({ sub: userId, email });
-  return `Bearer ${token}`;
-};
+const authHeader = (userId = "user-a") => testAuthHeader(userId);
 
 const sampleProfile = {
   id: "prof-1",

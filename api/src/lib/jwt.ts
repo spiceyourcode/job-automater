@@ -4,6 +4,8 @@ import { env } from "../env.js";
 export interface AccessTokenPayload {
   sub: string;
   email: string;
+  role: "owner" | "member" | "viewer";
+  workspaceId: string;
 }
 
 const getSecret = (): Uint8Array =>
@@ -26,7 +28,11 @@ export const signAccessToken = async (
   payload: AccessTokenPayload,
 ): Promise<string> => {
   const ttlSeconds = parseTtlSeconds(env.jwtAccessTtl);
-  return new SignJWT({ email: payload.email })
+  return new SignJWT({
+    email: payload.email,
+    role: payload.role,
+    workspaceId: payload.workspaceId,
+  })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(payload.sub)
     .setIssuedAt()
@@ -40,8 +46,21 @@ export const verifyAccessToken = async (
   const { payload } = await jwtVerify(token, getSecret(), {
     algorithms: ["HS256"],
   });
-  if (typeof payload.sub !== "string" || typeof payload.email !== "string") {
+  if (
+    typeof payload.sub !== "string" ||
+    typeof payload.email !== "string" ||
+    typeof payload.role !== "string" ||
+    typeof payload.workspaceId !== "string"
+  ) {
     throw new Error("Invalid token payload");
   }
-  return { sub: payload.sub, email: payload.email };
+  if (!["owner", "member", "viewer"].includes(payload.role)) {
+    throw new Error("Invalid role in token");
+  }
+  return {
+    sub: payload.sub,
+    email: payload.email,
+    role: payload.role as AccessTokenPayload["role"],
+    workspaceId: payload.workspaceId,
+  };
 };

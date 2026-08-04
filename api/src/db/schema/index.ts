@@ -49,6 +49,16 @@ export {
   type NewNotification,
 } from "./emails.js";
 export {
+  workspaces,
+  workspaceMembers,
+  WORKSPACE_ROLES,
+  type Workspace,
+  type NewWorkspace,
+  type WorkspaceMember,
+  type NewWorkspaceMember,
+  type WorkspaceRole,
+} from "./workspaces.js";
+export {
   salaryCentsSchema,
   userInsertSchema,
   profileInsertSchema,

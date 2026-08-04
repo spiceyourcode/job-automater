@@ -37,7 +37,7 @@ const buildApp = () => {
 
 // ── Real JWT middleware tests (no DB, real jose) ──────────────────────────────
 
-import { signAccessToken } from "../../lib/jwt.js";
+import { testAuthHeader } from "../../test/auth-header.js";
 import { requireAuth } from "../../middleware/require-auth.js";
 
 const makeProtected = () => {
@@ -48,12 +48,8 @@ const makeProtected = () => {
 
 describe("requireAuth middleware", () => {
   it("200 with a valid real JWT", async () => {
-    const token = await signAccessToken({
-      sub: "user-id",
-      email: "a@b.com",
-    });
     const res = await makeProtected().request("/protected", {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: await testAuthHeader("user-id", "owner") },
     });
     expect(res.status).toBe(200);
   });
@@ -80,17 +76,20 @@ describe("requireAuth middleware", () => {
 
 // ── Route-level tests ─────────────────────────────────────────────────────────
 
-const AUTH_HEADER = async () => {
-  const token = await signAccessToken({ sub: "user-id", email: "t@e.com" });
-  return `Bearer ${token}`;
-};
+const AUTH_HEADER = () => testAuthHeader("user-id", "owner");
 
 describe("POST /api/v1/auth/register", () => {
   afterEach(() => vi.clearAllMocks());
 
   it("201 on valid registration", async () => {
     mockService.register.mockResolvedValue({
-      user: { id: "uid", email: "a@b.com", name: null },
+      user: {
+        id: "uid",
+        email: "a@b.com",
+        name: null,
+        role: "owner",
+        workspaceId: "w0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+      },
       tokens: { accessToken: "at", refreshToken: "rt" },
     });
     const res = await buildApp().request("/api/v1/auth/register", {
@@ -138,7 +137,13 @@ describe("POST /api/v1/auth/login", () => {
 
   it("200 on valid credentials", async () => {
     mockService.login.mockResolvedValue({
-      user: { id: "uid", email: "a@b.com", name: null },
+      user: {
+        id: "uid",
+        email: "a@b.com",
+        name: null,
+        role: "owner",
+        workspaceId: "w0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+      },
       tokens: { accessToken: "at", refreshToken: "rt" },
     });
     const res = await buildApp().request("/api/v1/auth/login", {
@@ -225,6 +230,8 @@ describe("GET /api/v1/auth/me", () => {
       id: "uid",
       email: "test@example.com",
       name: null,
+      role: "owner",
+      workspaceId: "w0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
     });
     const res = await buildApp().request("/api/v1/auth/me", {
       headers: { Authorization: await AUTH_HEADER() },

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { requireAuth } from "../../middleware/require-auth.js";
+import { requireAuth, requireRole } from "../../middleware/require-auth.js";
 import {
   applicationDownloadParamSchema,
   applicationIdParamSchema,
@@ -18,13 +18,14 @@ const isAppError = (
 
 applicationsRoutes.use("*", requireAuth);
 
-applicationsRoutes.get("/", async (c) => {
+applicationsRoutes.get("/", requireRole("owner", "member", "viewer"), async (c) => {
   const { userId } = c.get("auth");
   return c.json(await applicationsService.listApplications(userId), 200);
 });
 
 applicationsRoutes.post(
   "/",
+  requireRole("owner", "member"),
   zValidator("json", createApplicationBodySchema),
   async (c) => {
     const { userId } = c.get("auth");
@@ -45,6 +46,7 @@ applicationsRoutes.post(
 
 applicationsRoutes.get(
   "/:id",
+  requireRole("owner", "member", "viewer"),
   zValidator("param", applicationIdParamSchema),
   async (c) => {
     const { userId } = c.get("auth");
@@ -64,6 +66,7 @@ applicationsRoutes.get(
 
 applicationsRoutes.post(
   "/:id/regenerate",
+  requireRole("owner", "member"),
   zValidator("param", applicationIdParamSchema),
   async (c) => {
     const { userId } = c.get("auth");
@@ -86,6 +89,7 @@ applicationsRoutes.post(
 
 applicationsRoutes.post(
   "/:id/review",
+  requireRole("owner", "member"),
   zValidator("param", applicationIdParamSchema),
   async (c) => {
     const { userId } = c.get("auth");
@@ -108,6 +112,7 @@ applicationsRoutes.post(
 
 applicationsRoutes.post(
   "/:id/approve",
+  requireRole("owner", "member"),
   zValidator("param", applicationIdParamSchema),
   async (c) => {
     const { userId } = c.get("auth");
@@ -130,6 +135,7 @@ applicationsRoutes.post(
 
 applicationsRoutes.patch(
   "/:id/stage",
+  requireRole("owner", "member"),
   zValidator("param", applicationIdParamSchema),
   zValidator("json", updateStageBodySchema),
   async (c) => {
@@ -154,6 +160,7 @@ applicationsRoutes.patch(
 
 applicationsRoutes.get(
   "/:id/download/:kind",
+  requireRole("owner", "member", "viewer"),
   zValidator("param", applicationDownloadParamSchema),
   async (c) => {
     const { userId } = c.get("auth");

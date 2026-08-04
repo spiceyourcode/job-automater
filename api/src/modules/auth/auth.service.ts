@@ -5,7 +5,13 @@ import type { PgTransaction } from "drizzle-orm/pg-core";
 import type { PostgresJsQueryResultHKT } from "drizzle-orm/postgres-js";
 import { db } from "../../db/index.js";
 import * as schema from "../../db/schema/index.js";
-import { users, userSessions } from "../../db/schema/index.js";
+import {
+  users,
+  userSessions,
+  workspaces,
+  workspaceMembers,
+} from "../../db/schema/index.js";
+import type { WorkspaceRole } from "../../db/schema/workspaces.js";
 import { signAccessToken } from "../../lib/jwt.js";
 import {
   generateRefreshToken,
@@ -49,14 +55,65 @@ export class ConflictError extends Error {
   }
 }
 
+async function createPersonalWorkspace(
+  tx: Tx,
+  userId: string,
+  email: string,
+): Promise<{ workspaceId: string; role: WorkspaceRole }> {
+  const label = email.split("@")[0] || "User";
+  const [ws] = await tx
+    .insert(workspaces)
+    .values({
+      name: `${label}'s workspace`,
+      ownerUserId: userId,
+    })
+    .returning({ id: workspaces.id });
+  if (!ws) throw new Error("Failed to create workspace");
+  await tx.insert(workspaceMembers).values({
+    workspaceId: ws.id,
+    userId,
+    role: "owner",
+  });
+  return { workspaceId: ws.id, role: "owner" };
+}
+
+async function resolveMembership(
+  tx: Tx,
+  userId: string,
+  email: string,
+): Promise<{ workspaceId: string; role: WorkspaceRole }> {
+  const [row] = await tx
+    .select({
+      workspaceId: workspaceMembers.workspaceId,
+      role: workspaceMembers.role,
+    })
+    .from(workspaceMembers)
+    .where(eq(workspaceMembers.userId, userId))
+    .limit(1);
+  if (row) {
+    return {
+      workspaceId: row.workspaceId,
+      role: row.role as WorkspaceRole,
+    };
+  }
+  return createPersonalWorkspace(tx, userId, email);
+}
+
 const issueTokens = async (
   tx: Tx,
   userId: string,
   email: string,
+  role: WorkspaceRole,
+  workspaceId: string,
   userAgent?: string | null,
   ipAddress?: string | null,
 ): Promise<TokenPair> => {
-  const accessToken = await signAccessToken({ sub: userId, email });
+  const accessToken = await signAccessToken({
+    sub: userId,
+    email,
+    role,
+    workspaceId,
+  });
   const rawRefresh = generateRefreshToken();
   const tokenHash = hashToken(rawRefresh);
 
@@ -99,9 +156,24 @@ export const register = async (
 
       if (!user) throw new Error("Failed to create user");
 
-      const tokens = await issueTokens(tx, user.id, user.email, userAgent, ipAddress);
+      const membership = await createPersonalWorkspace(tx, user.id, user.email);
+      const tokens = await issueTokens(
+        tx,
+        user.id,
+        user.email,
+        membership.role,
+        membership.workspaceId,
+        userAgent,
+        ipAddress,
+      );
       return {
-        user: { id: user.id, email: user.email, name: user.name ?? null },
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name ?? null,
+          role: membership.role,
+          workspaceId: membership.workspaceId,
+        },
         tokens,
       };
     });
@@ -144,13 +216,28 @@ export const login = async (
   if (!user || !valid) throw new AuthError();
 
   return await db.transaction(async (tx) => {
-    const tokens = await issueTokens(tx, user.id, user.email, userAgent, ipAddress);
+    const membership = await resolveMembership(tx, user.id, user.email);
+    const tokens = await issueTokens(
+      tx,
+      user.id,
+      user.email,
+      membership.role,
+      membership.workspaceId,
+      userAgent,
+      ipAddress,
+    );
     await tx
       .update(users)
       .set({ lastLoginAt: new Date() })
       .where(eq(users.id, user.id));
     return {
-      user: { id: user.id, email: user.email, name: user.name ?? null },
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name ?? null,
+        role: membership.role,
+        workspaceId: membership.workspaceId,
+      },
       tokens,
     };
   });
@@ -215,7 +302,16 @@ export const refresh = async (
 
     if (!user) throw new AuthError();
 
-    return issueTokens(tx, user.id, user.email, userAgent, ipAddress);
+    const membership = await resolveMembership(tx, user.id, user.email);
+    return issueTokens(
+      tx,
+      user.id,
+      user.email,
+      membership.role,
+      membership.workspaceId,
+      userAgent,
+      ipAddress,
+    );
   });
 };
 
@@ -236,5 +332,14 @@ export const getMe = async (userId: string): Promise<AuthUser> => {
     .limit(1);
 
   if (!user) throw new AuthError();
-  return { id: user.id, email: user.email, name: user.name ?? null };
+  const membership = await db.transaction(async (tx) =>
+    resolveMembership(tx, user.id, user.email),
+  );
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name ?? null,
+    role: membership.role,
+    workspaceId: membership.workspaceId,
+  };
 };

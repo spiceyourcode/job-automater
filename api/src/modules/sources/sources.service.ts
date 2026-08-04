@@ -120,37 +120,47 @@ export function toPublicSource(row: SourceConfig) {
   };
 }
 
-async function getOwnedSource(userId: string, id: string): Promise<SourceConfig> {
+async function getWorkspaceSource(
+  workspaceId: string,
+  id: string,
+): Promise<SourceConfig> {
   const [row] = await db
     .select()
     .from(sourceConfigs)
-    .where(and(eq(sourceConfigs.id, id), eq(sourceConfigs.userId, userId)))
+    .where(
+      and(eq(sourceConfigs.id, id), eq(sourceConfigs.workspaceId, workspaceId)),
+    )
     .limit(1);
   if (!row) throw new SourceError("Source not found", 404);
   return row;
 }
 
-export async function listSources(userId: string) {
+export async function listSources(workspaceId: string) {
   const rows = await db
     .select()
     .from(sourceConfigs)
-    .where(eq(sourceConfigs.userId, userId))
+    .where(eq(sourceConfigs.workspaceId, workspaceId))
     .orderBy(desc(sourceConfigs.createdAt));
   return { sources: rows.map(toPublicSource) };
 }
 
-export async function getSource(userId: string, id: string) {
-  const row = await getOwnedSource(userId, id);
+export async function getSource(workspaceId: string, id: string) {
+  const row = await getWorkspaceSource(workspaceId, id);
   return { sourceConfig: toPublicSource(row) };
 }
 
-export async function createSource(userId: string, body: CreateSourceBody) {
+export async function createSource(
+  userId: string,
+  workspaceId: string,
+  body: CreateSourceBody,
+) {
   const config = parseTypedConfig(body.sourceType, body.config);
 
   const [created] = await db
     .insert(sourceConfigs)
     .values({
       userId,
+      workspaceId,
       sourceType: body.sourceType,
       name: body.name,
       description: body.description ?? null,
@@ -173,11 +183,11 @@ export async function createSource(userId: string, body: CreateSourceBody) {
 }
 
 export async function patchSource(
-  userId: string,
+  workspaceId: string,
   id: string,
   body: PatchSourceBody,
 ) {
-  const existing = await getOwnedSource(userId, id);
+  const existing = await getWorkspaceSource(workspaceId, id);
   const sourceType = existing.sourceType as SourceType;
 
   const updates: Record<string, unknown> = { ...body, updatedAt: new Date() };
@@ -194,17 +204,21 @@ export async function patchSource(
   const [updated] = await db
     .update(sourceConfigs)
     .set(updates)
-    .where(and(eq(sourceConfigs.id, id), eq(sourceConfigs.userId, userId)))
+    .where(
+      and(eq(sourceConfigs.id, id), eq(sourceConfigs.workspaceId, workspaceId)),
+    )
     .returning();
 
   if (!updated) throw new SourceError("Source not found", 404);
   return { sourceConfig: toPublicSource(updated) };
 }
 
-export async function deleteSource(userId: string, id: string) {
+export async function deleteSource(workspaceId: string, id: string) {
   const result = await db
     .delete(sourceConfigs)
-    .where(and(eq(sourceConfigs.id, id), eq(sourceConfigs.userId, userId)))
+    .where(
+      and(eq(sourceConfigs.id, id), eq(sourceConfigs.workspaceId, workspaceId)),
+    )
     .returning({ id: sourceConfigs.id });
   if (result.length === 0) throw new SourceError("Source not found", 404);
   return { success: true as const };
@@ -214,8 +228,8 @@ export async function deleteSource(userId: string, id: string) {
  * Dry-run / connectivity test — does not persist jobs.
  * Never logs IMAP passwords or API credentials (HG-8).
  */
-export async function testSource(userId: string, id: string) {
-  const source = await getOwnedSource(userId, id);
+export async function testSource(workspaceId: string, id: string) {
+  const source = await getWorkspaceSource(workspaceId, id);
   const config = source.config as Record<string, unknown>;
   const errors: string[] = [];
   const sampleJobs: Array<{ title: string; company: string; url?: string }> =
@@ -313,8 +327,12 @@ export async function testSource(userId: string, id: string) {
 }
 
 /** Enqueue CollectSourceJob; mark source as queued before publish. */
-export async function runSource(userId: string, id: string) {
-  const source = await getOwnedSource(userId, id);
+export async function runSource(
+  userId: string,
+  workspaceId: string,
+  id: string,
+) {
+  const source = await getWorkspaceSource(workspaceId, id);
   if (!source.isActive) {
     throw new SourceError("Source is inactive", 400);
   }
@@ -330,7 +348,9 @@ export async function runSource(userId: string, id: string) {
       lastError: null,
       updatedAt: new Date(),
     })
-    .where(and(eq(sourceConfigs.id, id), eq(sourceConfigs.userId, userId)));
+    .where(
+      and(eq(sourceConfigs.id, id), eq(sourceConfigs.workspaceId, workspaceId)),
+    );
 
   try {
     await enqueueCollectSource({
@@ -346,9 +366,14 @@ export async function runSource(userId: string, id: string) {
         lastError: "Failed to enqueue collection job",
         updatedAt: new Date(),
       })
-      .where(and(eq(sourceConfigs.id, id), eq(sourceConfigs.userId, userId)));
+      .where(
+        and(
+          eq(sourceConfigs.id, id),
+          eq(sourceConfigs.workspaceId, workspaceId),
+        ),
+      );
     throw new SourceError("Failed to enqueue collection job", 503);
   }
 
-  return { pipelineRunId, status: "started" as const };
+  return { status: "queued" as const, pipelineRunId };
 }

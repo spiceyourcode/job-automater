@@ -12,6 +12,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { users } from "./users.js";
+import { workspaces } from "./workspaces.js";
 
 export const sourceConfigs = pgTable(
   "source_configs",
@@ -20,6 +21,10 @@ export const sourceConfigs = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    /** Shared within team — Owner CRUD; Member read (P6.1). */
+    workspaceId: uuid("workspace_id").references(() => workspaces.id, {
+      onDelete: "cascade",
+    }),
     sourceType: varchar("source_type", { length: 50 }).notNull(),
     name: varchar("name", { length: 255 }).notNull(),
     description: text("description"),
