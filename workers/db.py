@@ -414,3 +414,92 @@ def mark_job_scored(conn: psycopg.Connection, *, job_id: str, user_id: str) -> N
             """,
             (job_id, user_id),
         )
+
+
+def load_cv_chunks_for_user(
+    conn: psycopg.Connection, user_id: str
+) -> list[dict[str, Any]]:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT id, content, section_type, chunk_index
+            FROM cv_chunks
+            WHERE user_id = %s::uuid
+            ORDER BY chunk_index
+            LIMIT 100
+            """,
+            (user_id,),
+        )
+        return [dict(r) for r in cur.fetchall()]
+
+
+def load_application(
+    conn: psycopg.Connection, *, application_id: str, user_id: str
+) -> dict[str, Any] | None:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT *
+            FROM applications
+            WHERE id = %s::uuid AND user_id = %s::uuid
+            LIMIT 1
+            """,
+            (application_id, user_id),
+        )
+        row = cur.fetchone()
+        return dict(row) if row else None
+
+
+def load_job_for_user(
+    conn: psycopg.Connection, *, job_id: str, user_id: str
+) -> dict[str, Any] | None:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT id, user_id, title, company, location, description, requirements,
+                   is_remote, employment_type, source
+            FROM jobs
+            WHERE id = %s::uuid AND user_id = %s::uuid
+            LIMIT 1
+            """,
+            (job_id, user_id),
+        )
+        row = cur.fetchone()
+        return dict(row) if row else None
+
+
+def save_application_documents(
+    conn: psycopg.Connection,
+    *,
+    application_id: str,
+    user_id: str,
+    tailored_cv: str,
+    cover_letter: str,
+    bullet_traces: list[dict[str, Any]],
+    model_used: str,
+    duration_ms: int,
+) -> None:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE applications SET
+                tailored_cv_content = %s,
+                cover_letter_content = %s,
+                bullet_traces = %s::jsonb,
+                generation_model = %s,
+                generation_duration_ms = %s,
+                status = 'draft',
+                documents_reviewed_at = NULL,
+                updated_at = NOW()
+            WHERE id = %s::uuid AND user_id = %s::uuid
+            """,
+            (
+                tailored_cv,
+                cover_letter,
+                json.dumps(bullet_traces),
+                model_used,
+                duration_ms,
+                application_id,
+                user_id,
+            ),
+        )

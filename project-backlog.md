@@ -49,9 +49,9 @@
 
 | # | Task | Service | Status |
 |---|------|---------|--------|
-| 3.1 | GenerateDocs agent | workers | [ ] |
-| 3.2 | Document review UI (side-by-side) | web | [ ] |
-| 3.3 | Application draft status | api | [ ] |
+| 3.1 | GenerateDocs agent | workers | [x] |
+| 3.2 | Document review UI (side-by-side) | web | [x] |
+| 3.3 | Application draft status | api | [x] |
 
 ---
 

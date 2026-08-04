@@ -13,6 +13,7 @@ app = Celery(
         "tasks.collect_bridge",
         "tasks.normalize_jobs",
         "tasks.match_score",
+        "tasks.generate_docs",
     ],
 )
 

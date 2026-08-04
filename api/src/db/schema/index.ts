@@ -36,6 +36,11 @@ export {
   type NewCvChunk,
 } from "./cv-chunks.js";
 export {
+  applications,
+  type Application,
+  type NewApplication,
+} from "./applications.js";
+export {
   salaryCentsSchema,
   userInsertSchema,
   profileInsertSchema,

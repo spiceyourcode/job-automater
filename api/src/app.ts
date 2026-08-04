@@ -4,6 +4,7 @@ import { registerRoutes as registerAuthRoutes } from "./modules/auth/index.js";
 import { registerRoutes as registerProfileRoutes } from "./modules/profile/index.js";
 import { registerRoutes as registerSourcesRoutes } from "./modules/sources/index.js";
 import { registerRoutes as registerJobsRoutes } from "./modules/jobs/index.js";
+import { registerRoutes as registerApplicationsRoutes } from "./modules/applications/index.js";
 
 export const createApp = (): Hono => {
   const app = new Hono();
@@ -13,6 +14,7 @@ export const createApp = (): Hono => {
   registerProfileRoutes(app);
   registerSourcesRoutes(app);
   registerJobsRoutes(app);
+  registerApplicationsRoutes(app);
 
   app.notFound((c) => c.json({ error: "not_found" }, 404));
 

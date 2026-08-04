@@ -43,6 +43,13 @@
       "when": 1785880086871,
       "tag": "0005_certain_lilith",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785881555147,
+      "tag": "0006_yielding_fabian_cortez",
+      "breakpoints": true
     }
   ]
 }

@@ -87,7 +87,7 @@ describe("GET /api/v1/jobs", () => {
       jobs: Array<{ score: { overall: number } }>;
     };
     expect(body.jobs).toHaveLength(1);
-    expect(body.jobs[0].score.overall).toBe(92);
+    expect(body.jobs[0]?.score.overall).toBe(92);
   });
 });
 

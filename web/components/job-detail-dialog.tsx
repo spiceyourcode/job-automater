@@ -1,8 +1,10 @@
 "use client";
 
 import { MapPin, Banknote, ExternalLink } from "lucide-react";
+import { useRouter } from "next/navigation";
 import type { JobPublic } from "@/lib/jobs";
 import { formatSalaryCents } from "@/lib/jobs";
+import { createApplicationAction } from "@/lib/actions/applications";
 import { MatchScoreBadge } from "@/components/match-score-badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,7 +21,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
-import { useState } from "react";
+import { useState, useTransition } from "react";
 
 type Props = {
   job: JobPublic | null;
@@ -39,7 +41,10 @@ const BREAKDOWN: Array<{
 ];
 
 export function JobDetailDialog({ job, open, onOpenChange }: Props) {
+  const router = useRouter();
   const [reasoningOpen, setReasoningOpen] = useState(false);
+  const [genError, setGenError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
   if (!job) return null;
 
   const salary = formatSalaryCents(
@@ -103,7 +108,10 @@ export function JobDetailDialog({ job, open, onOpenChange }: Props) {
                           {Math.round(value)}%
                         </span>
                       </div>
-                      <Progress value={value} aria-label={`${label} ${Math.round(value)} percent`} />
+                      <Progress
+                        value={value}
+                        aria-label={`${label} ${Math.round(value)} percent`}
+                      />
                     </li>
                   );
                 })}
@@ -148,8 +156,38 @@ export function JobDetailDialog({ job, open, onOpenChange }: Props) {
           </>
         )}
 
-        {job.applicationUrl && (
-          <div className="pt-2">
+        {genError && (
+          <p className="text-sm text-destructive" role="alert">
+            {genError}
+          </p>
+        )}
+
+        <div className="flex flex-wrap gap-2 pt-2">
+          <Button
+            type="button"
+            size="sm"
+            className="cursor-pointer"
+            disabled={pending}
+            onClick={() => {
+              setGenError(null);
+              startTransition(async () => {
+                const res = await createApplicationAction(job.id);
+                if (!res.ok || !res.data?.application) {
+                  setGenError(
+                    !res.ok ? res.error : "Could not start generation",
+                  );
+                  return;
+                }
+                onOpenChange(false);
+                router.push(
+                  `/applications/${res.data.application.id}/review`,
+                );
+              });
+            }}
+          >
+            {pending ? "Starting…" : "Generate documents"}
+          </Button>
+          {job.applicationUrl && (
             <Button asChild variant="outline" size="sm" className="cursor-pointer">
               <a
                 href={job.applicationUrl}
@@ -160,8 +198,8 @@ export function JobDetailDialog({ job, open, onOpenChange }: Props) {
                 <ExternalLink className="ml-2 h-3.5 w-3.5" aria-hidden />
               </a>
             </Button>
-          </div>
-        )}
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );
