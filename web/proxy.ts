@@ -7,21 +7,26 @@ export function proxy(request: NextRequest) {
   const token = request.cookies.get("access_token");
 
   const isPublicPath = PUBLIC_PATHS.some(
-    (p) => pathname === p || pathname.startsWith(`${p}/`)
+    (p) => pathname === p || pathname.startsWith(`${p}/`),
   );
   const isAuthPath = pathname === "/login" || pathname === "/register";
+  const isProtected =
+    pathname.startsWith("/dashboard") || pathname.startsWith("/onboarding");
 
-  if (pathname.startsWith("/dashboard") && !token) {
+  if (isProtected && !token) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("from", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
   if (isAuthPath && token) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    const onboardingDone = request.cookies.get("onboarding_complete");
+    return NextResponse.redirect(
+      new URL(onboardingDone ? "/dashboard" : "/onboarding", request.url),
+    );
   }
 
-  if (!isPublicPath && !pathname.startsWith("/dashboard") && !token) {
+  if (!isPublicPath && !isProtected && !token) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 

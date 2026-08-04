@@ -107,7 +107,7 @@ export async function registerAction(input: {
     tokens: { accessToken: string; refreshToken: string };
   };
   await setAuthCookies(data.tokens);
-  redirect("/dashboard");
+  redirect("/onboarding");
 }
 
 export async function logoutAction(): Promise<void> {
@@ -124,5 +124,6 @@ export async function logoutAction(): Promise<void> {
 
   cookieStore.delete("access_token");
   cookieStore.delete("refresh_token");
+  cookieStore.delete("onboarding_complete");
   redirect("/login");
 }

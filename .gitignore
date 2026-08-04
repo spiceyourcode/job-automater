@@ -1,4 +1,3 @@
-
 # --- Secrets / local env (never commit) ---
 .env
 .env.*
@@ -67,24 +66,16 @@ blob-report/
 data/
 *.sql.gz
 
-# --- Agentic workspace (local only — not the product codebase) ---
+# --- Agentic local runtime (not shared) ---
 .agent-settings/
 .agents/
 .cursor/
 07-tools-mcp/
-08-skills/
 active/
-AGENT-PROMPTS.md
-AGENTS.md
-CLAUDE.md
-CONVENTIONS.md
-contracts/
-docker-compose.yml
-docs/
-project-backlog.md
+
+# --- Workers Python artifacts ---
 workers/.venv/
 workers/__pycache__/
 workers/**/__pycache__/
 workers/*.egg-info/
 workers/.pytest_cache/
-.github/

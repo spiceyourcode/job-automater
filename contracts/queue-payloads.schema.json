@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jobautomater.local/contracts/queue-payloads",
+  "title": "JobAutomater Queue Payloads",
+  "description": "Shared TS/Python contract for Redis/Celery job payloads",
+  "definitions": {
+    "CollectSourceJob": {
+      "type": "object",
+      "required": ["source_id", "user_id", "source_type"],
+      "properties": {
+        "source_id": { "type": "string", "format": "uuid" },
+        "user_id": { "type": "string", "format": "uuid" },
+        "source_type": {
+          "type": "string",
+          "enum": ["rss", "api", "imap", "playwright", "telegram", "whatsapp", "career_page"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "NormalizeJobsJob": {
+      "type": "object",
+      "required": ["job_ids", "user_id"],
+      "properties": {
+        "job_ids": { "type": "array", "items": { "type": "string", "format": "uuid" } },
+        "user_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "MatchScoreJob": {
+      "type": "object",
+      "required": ["job_ids", "user_id"],
+      "properties": {
+        "job_ids": { "type": "array", "items": { "type": "string", "format": "uuid" } },
+        "user_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "GenerateDocsJob": {
+      "type": "object",
+      "required": ["application_id", "user_id", "job_id"],
+      "properties": {
+        "application_id": { "type": "string", "format": "uuid" },
+        "user_id": { "type": "string", "format": "uuid" },
+        "job_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "SubmitApplicationJob": {
+      "type": "object",
+      "required": ["application_id", "user_id", "approved_at"],
+      "properties": {
+        "application_id": { "type": "string", "format": "uuid" },
+        "user_id": { "type": "string", "format": "uuid" },
+        "approved_at": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
