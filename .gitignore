@@ -82,6 +82,5 @@ contracts/
 docker-compose.yml
 docs/
 project-backlog.md
-web/
 workers/
 .github/
