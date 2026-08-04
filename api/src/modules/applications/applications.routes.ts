@@ -5,6 +5,7 @@ import {
   applicationDownloadParamSchema,
   applicationIdParamSchema,
   createApplicationBodySchema,
+  updateStageBodySchema,
 } from "./applications.schema.js";
 import * as applicationsService from "./applications.service.js";
 
@@ -115,6 +116,30 @@ applicationsRoutes.post(
         await applicationsService.approveApplication(
           userId,
           c.req.valid("param").id,
+        ),
+        200,
+      );
+    } catch (err) {
+      if (isAppError(err)) {
+        return c.json({ error: err.message }, err.statusCode);
+      }
+      throw err;
+    }
+  },
+);
+
+applicationsRoutes.patch(
+  "/:id/stage",
+  zValidator("param", applicationIdParamSchema),
+  zValidator("json", updateStageBodySchema),
+  async (c) => {
+    const { userId } = c.get("auth");
+    try {
+      return c.json(
+        await applicationsService.updateApplicationStage(
+          userId,
+          c.req.valid("param").id,
+          c.req.valid("json"),
         ),
         200,
       );

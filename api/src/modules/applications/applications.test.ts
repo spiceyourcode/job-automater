@@ -14,6 +14,7 @@ vi.mock("./applications.service.js", async (importOriginal) => {
     regenerateDocuments: vi.fn(),
     markDocumentsReviewed: vi.fn(),
     approveApplication: vi.fn(),
+    updateApplicationStage: vi.fn(),
     getDocumentDownloadUrl: vi.fn(),
     ApplicationError: actual.ApplicationError,
   };
@@ -51,6 +52,10 @@ const sampleApp = {
   ],
   documentsReviewedAt: null,
   approvedAt: null,
+  submittedAt: null,
+  submittedVia: null,
+  submitError: null,
+  pipelineStage: null,
   generationModel: "heuristic-docs-v1",
   createdAt: new Date(),
   updatedAt: new Date(),
@@ -221,5 +226,53 @@ describe("POST /api/v1/applications/:id/approve", () => {
       },
     );
     expect(res.status).toBe(404);
+  });
+});
+
+describe("PATCH /api/v1/applications/:id/stage", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("200 moves to screening", async () => {
+    mockService.updateApplicationStage.mockResolvedValue({
+      application: {
+        ...sampleApp,
+        status: "screening",
+        pipelineStage: "screening",
+        canApply: false,
+        canApprove: false,
+      },
+    });
+    const res = await buildApp().request(
+      `/api/v1/applications/${sampleApp.id}/stage`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: await authHeader(),
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ stage: "screening" }),
+      },
+    );
+    expect(res.status).toBe(200);
+    expect(mockService.updateApplicationStage).toHaveBeenCalledWith(
+      "user-a",
+      sampleApp.id,
+      { stage: "screening" },
+    );
+  });
+
+  it("400 rejects unknown stage", async () => {
+    const res = await buildApp().request(
+      `/api/v1/applications/${sampleApp.id}/stage`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: await authHeader(),
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ stage: "nope" }),
+      },
+    );
+    expect(res.status).toBe(400);
   });
 });

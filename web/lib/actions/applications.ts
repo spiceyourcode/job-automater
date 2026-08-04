@@ -18,10 +18,30 @@ export type ApplicationPublic = {
   coverLetterContent: string | null;
   documentsReviewedAt: string | null;
   approvedAt?: string | null;
+  submittedAt?: string | null;
+  submittedVia?: string | null;
+  submitError?: string | null;
+  pipelineStage?:
+    | "applied"
+    | "screening"
+    | "interviewing"
+    | "offer"
+    | "archived"
+    | null;
   canApply: boolean;
   canApprove?: boolean;
   bulletTraces: Array<{ text: string; chunkId: string; section: string }>;
+  jobTitle?: string;
+  jobCompany?: string;
 };
+
+export type PipelineStage =
+  | "applied"
+  | "screening"
+  | "interviewing"
+  | "offer"
+  | "archived";
+
 
 async function authHeaders(): Promise<HeadersInit | null> {
   const cookieStore = await cookies();
@@ -152,6 +172,51 @@ export async function downloadDocAction(
     );
     if (!res.ok) return { ok: false, error: "Download unavailable" };
     return { ok: true, data: (await res.json()) as { url: string } };
+  } catch {
+    return { ok: false, error: "Network error" };
+  }
+}
+
+export async function listApplicationsAction(): Promise<
+  ActionResult<{ applications: ApplicationPublic[] }>
+> {
+  const headers = await authHeaders();
+  if (!headers) return { ok: false, error: "Unauthorized" };
+  try {
+    const res = await fetch(`${API_URL}/api/v1/applications`, {
+      headers,
+      cache: "no-store",
+    });
+    if (!res.ok) return { ok: false, error: "Failed to load applications" };
+    return {
+      ok: true,
+      data: (await res.json()) as { applications: ApplicationPublic[] },
+    };
+  } catch {
+    return { ok: false, error: "Network error — is the API running?" };
+  }
+}
+
+export async function updateApplicationStageAction(
+  id: string,
+  stage: PipelineStage,
+): Promise<ActionResult<{ application: ApplicationPublic }>> {
+  const headers = await authHeaders();
+  if (!headers) return { ok: false, error: "Unauthorized" };
+  try {
+    const res = await fetch(`${API_URL}/api/v1/applications/${id}/stage`, {
+      method: "PATCH",
+      headers: { ...headers, "content-type": "application/json" },
+      body: JSON.stringify({ stage }),
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      return { ok: false, error: body.error ?? "Could not move stage" };
+    }
+    const data = (await res.json()) as { application: ApplicationPublic };
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/pipeline");
+    return { ok: true, data };
   } catch {
     return { ok: false, error: "Network error" };
   }

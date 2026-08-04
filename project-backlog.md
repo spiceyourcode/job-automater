@@ -62,7 +62,7 @@
 | 4.1 | Approve endpoint + pending_approval state | api | [x] |
 | 4.2 | SubmitVerify agent (Playwright) | workers | [x] |
 | 4.3 | ATS API integrations (Greenhouse, Lever) | workers | [x] |
-| 4.4 | Kanban pipeline UI | web | [ ] |
+| 4.4 | Kanban pipeline UI | web | [x] |
 
 ---
 

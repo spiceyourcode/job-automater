@@ -83,9 +83,11 @@ Full matrix + per-task AUTO SKILLS: **`AGENT-PROMPTS.md`**
 
 **Phase 3 — Documents** ✅ complete (P3.1–P3.3)
 
-**Next:** **P4.1** — Approval flow  
-Prompt: `AGENT-PROMPTS.md` → Phase 4 → P4.1  
-Contract: `docs/contracts/phase-4-apply.md`
+**Phase 4 — Apply** ✅ complete (P4.1–P4.4 — one commit each)
+
+**Next:** **P5.1** — Email monitor  
+Prompt: `AGENT-PROMPTS.md` → Phase 5 → P5.1  
+Contract: `docs/contracts/phase-5-monitoring.md`
 
 ---
 

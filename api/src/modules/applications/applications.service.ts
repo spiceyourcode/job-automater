@@ -11,7 +11,15 @@ import {
   enqueueSubmitApplication,
 } from "../../lib/queue.js";
 import { getPresignedGetUrl, uploadObject } from "../../lib/s3.js";
-import type { CreateApplicationBody } from "./applications.schema.js";
+import type {
+  CreateApplicationBody,
+  PipelineStage,
+  UpdateStageBody,
+} from "./applications.schema.js";
+import {
+  STAGE_TO_STATUS,
+  statusToStage,
+} from "./applications.schema.js";
 
 /** Contract state machine: draft → pending_approval → approved → submitted */
 const APPROVABLE_STATUSES = new Set(["draft"]);
@@ -44,6 +52,10 @@ function toPublic(app: Application) {
     bulletTraces: app.bulletTraces,
     documentsReviewedAt: app.documentsReviewedAt,
     approvedAt: app.approvedAt,
+    submittedAt: app.submittedAt,
+    submittedVia: app.submittedVia,
+    submitError: app.submitError,
+    pipelineStage: statusToStage(app.status),
     generationModel: app.generationModel,
     createdAt: app.createdAt,
     updatedAt: app.updatedAt,
@@ -68,11 +80,23 @@ async function getOwned(
 
 export async function listApplications(userId: string) {
   const rows = await db
-    .select()
+    .select({
+      app: applications,
+      jobTitle: jobs.title,
+      jobCompany: jobs.company,
+    })
     .from(applications)
+    .leftJoin(jobs, eq(applications.jobId, jobs.id))
     .where(eq(applications.userId, userId))
-    .orderBy(desc(applications.createdAt));
-  return { applications: rows.map(toPublic) };
+    .orderBy(desc(applications.updatedAt));
+
+  return {
+    applications: rows.map(({ app, jobTitle, jobCompany }) => ({
+      ...toPublic(app),
+      jobTitle: jobTitle ?? "Unknown role",
+      jobCompany: jobCompany ?? "Unknown company",
+    })),
+  };
 }
 
 export async function getApplication(userId: string, id: string) {
@@ -301,4 +325,35 @@ export async function approveApplication(userId: string, id: string) {
   }
 
   return { application: toPublic(updated), status: "approved" as const };
+}
+
+/**
+ * P4.4 — move application across Kanban stages (AppFlow §2.4).
+ * Drafts cannot enter the pipeline until they leave draft.
+ */
+export async function updateApplicationStage(
+  userId: string,
+  id: string,
+  body: UpdateStageBody,
+) {
+  const app = await getOwned(userId, id);
+  if (statusToStage(app.status) === null && app.status === "draft") {
+    throw new ApplicationError(
+      "Draft applications are not on the pipeline yet",
+      400,
+    );
+  }
+
+  const nextStatus = STAGE_TO_STATUS[body.stage as PipelineStage];
+  const [updated] = await db
+    .update(applications)
+    .set({
+      status: nextStatus,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(applications.id, id), eq(applications.userId, userId)))
+    .returning();
+
+  if (!updated) throw new ApplicationError("Application not found", 404);
+  return { application: toPublic(updated) };
 }
