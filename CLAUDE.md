@@ -69,19 +69,14 @@ Full matrix + per-task AUTO SKILLS: **`AGENT-PROMPTS.md`**
 
 **Phase 1 — Foundation** ✅ complete (P1.1–P1.8)
 
+**Phase 2 — Collection** (in progress)
+
 | Done | Task |
 |------|------|
-| ✓ | P1.1 API scaffold + health |
-| ✓ | P1.2 Drizzle schema (users/profiles/sessions) |
-| ✓ | P1.3 Auth (register/login/refresh/JWT) |
-| ✓ | P1.4 Web scaffold (login/register/dashboard) |
-| ✓ | P1.5 Celery workers + health.ping |
-| ✓ | P1.6 Profile CRUD + CV → MinIO |
-| ✓ | P1.7 Onboarding wizard (5 steps) |
-| ✓ | P1.8 Dashboard empty state + sources CTA |
+| ✓ | P2.1 Source CRUD API + Settings UI |
 
-**Next:** **Phase 2 — Collection** → **P2.1** Source CRUD API + Settings UI  
-Prompt: `AGENT-PROMPTS.md` → Phase 2 → P2.1  
+**Next:** **P2.2** — Collector plugins (RSS, API, IMAP)  
+Prompt: `AGENT-PROMPTS.md` → Phase 2 → P2.2  
 Contract: `docs/contracts/phase-2-collection.md`
 
 ---

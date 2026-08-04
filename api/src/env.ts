@@ -25,6 +25,7 @@ const envSchema = z
     S3_SECRET_KEY: z.string().min(1),
     S3_BUCKET: z.string().min(1),
     S3_REGION: z.string().min(1).default("us-east-1"),
+    REDIS_URL: z.string().url().default("redis://localhost:6379"),
   })
   .strict();
 
@@ -45,6 +46,7 @@ const parsed = envSchema.safeParse({
     process.env.S3_SECRET_KEY ?? (isProd ? undefined : "minioadmin"),
   S3_BUCKET: process.env.S3_BUCKET ?? (isProd ? undefined : "jobautomater"),
   S3_REGION: process.env.S3_REGION ?? "us-east-1",
+  REDIS_URL: process.env.REDIS_URL ?? process.env.CELERY_BROKER_URL,
 });
 
 if (!parsed.success) {
@@ -66,4 +68,5 @@ export const env = {
   s3SecretKey: parsed.data.S3_SECRET_KEY,
   s3Bucket: parsed.data.S3_BUCKET,
   s3Region: parsed.data.S3_REGION,
+  redisUrl: parsed.data.REDIS_URL,
 } as const;

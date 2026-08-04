@@ -2,9 +2,10 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { jwtVerify } from "jose";
 import Link from "next/link";
-import { ArrowLeft, Radio } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/empty-state";
+import { SourcesManager } from "@/components/sources-manager";
+import { listSourcesAction } from "@/lib/actions/sources";
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET ?? "");
 
@@ -24,6 +25,9 @@ export default async function SourcesSettingsPage() {
   if (cookieStore.get("onboarding_complete")?.value !== "1") {
     redirect("/onboarding");
   }
+
+  const listed = await listSourcesAction();
+  const sources = listed.ok && listed.data ? listed.data.sources : [];
 
   return (
     <div className="min-h-screen bg-background">
@@ -45,20 +49,17 @@ export default async function SourcesSettingsPage() {
             Job sources
           </h1>
           <p className="text-sm text-muted-foreground">
-            RSS, email, and career-page collectors will live here (Phase 2).
+            Add feeds and mailboxes, then use Run now to enqueue collection.
           </p>
         </div>
 
-        <EmptyState
-          icon={<Radio className="h-8 w-8" aria-hidden />}
-          title="No sources connected"
-          description="You haven’t added a job source yet. Source CRUD and Run Now ship in Phase 2 — your onboarding picks are saved for when that lands."
-          action={{
-            label: "Back to dashboard",
-            href: "/dashboard",
-            icon: <ArrowLeft className="mr-2 h-4 w-4" aria-hidden />,
-          }}
-        />
+        {!listed.ok && (
+          <p className="mb-4 text-sm text-destructive" role="alert">
+            {listed.error}
+          </p>
+        )}
+
+        <SourcesManager initialSources={sources} />
       </main>
     </div>
   );

@@ -11,6 +11,11 @@ export {
   type NewCvDocument,
 } from "./cv-documents.js";
 export {
+  sourceConfigs,
+  type SourceConfig,
+  type NewSourceConfig,
+} from "./source-configs.js";
+export {
   salaryCentsSchema,
   userInsertSchema,
   profileInsertSchema,
