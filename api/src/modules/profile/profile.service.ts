@@ -55,9 +55,9 @@ export async function patchProfile(userId: string, body: PatchProfileBody) {
   if (
     nextMin != null &&
     nextMax != null &&
-    nextMin > nextMax
+    nextMin >= nextMax
   ) {
-    throw new ProfileError("salaryMin must be <= salaryMax", 400);
+    throw new ProfileError("salaryMin must be < salaryMax", 400);
   }
 
   const [updated] = await db

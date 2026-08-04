@@ -137,6 +137,18 @@ describe("PATCH /api/v1/profile", () => {
     expect(res.status).toBe(400);
   });
 
+  it("400 when salaryMin equals salaryMax", async () => {
+    const res = await buildApp().request("/api/v1/profile", {
+      method: "PATCH",
+      headers: {
+        Authorization: await authHeader(),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ salaryMin: 100, salaryMax: 100 }),
+    });
+    expect(res.status).toBe(400);
+  });
+
   it("400 rejects unknown fields (strict)", async () => {
     const res = await buildApp().request("/api/v1/profile", {
       method: "PATCH",

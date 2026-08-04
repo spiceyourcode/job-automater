@@ -51,8 +51,8 @@ export const profileInsertSchema = z
     (data) =>
       data.salaryMin == null ||
       data.salaryMax == null ||
-      data.salaryMin <= data.salaryMax,
-    { message: "salaryMin must be <= salaryMax", path: ["salaryMax"] },
+      data.salaryMin < data.salaryMax,
+    { message: "salaryMin must be < salaryMax", path: ["salaryMax"] },
   );
 
 export const userSessionInsertSchema = z

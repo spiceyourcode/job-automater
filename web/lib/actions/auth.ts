@@ -71,7 +71,20 @@ export async function loginAction(input: {
     tokens: { accessToken: string; refreshToken: string };
   };
   await setAuthCookies(data.tokens);
-  redirect("/dashboard");
+
+  // Incomplete onboarding → wizard; complete → dashboard
+  const { fetchOwnProfile, profileMeetsOnboardingRequirements, setOnboardingCompleteCookie } =
+    await import("./profile");
+  const profileResult = await fetchOwnProfile();
+  if (profileResult.ok && profileResult.data) {
+    const gate = profileMeetsOnboardingRequirements(profileResult.data);
+    if (gate.ok) {
+      await setOnboardingCompleteCookie(true);
+      redirect("/dashboard");
+    }
+  }
+  await setOnboardingCompleteCookie(false);
+  redirect("/onboarding");
 }
 
 export async function registerAction(input: {
