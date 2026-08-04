@@ -29,7 +29,7 @@
 | 1.5 | Celery scaffold + health task | workers | [x] | phase-1-foundation |
 | 1.6 | Profile CRUD + CV upload → MinIO | api | [x] | — |
 | 1.7 | Onboarding wizard (5 steps) | web | [x] | AppFlow §2.1 |
-| 1.8 | Dashboard empty state | web | [ ] | — |
+| 1.8 | Dashboard empty state | web | [x] | — |
 
 ---
 

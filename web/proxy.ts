@@ -14,15 +14,16 @@ export function proxy(request: NextRequest) {
   const isAuthPath = pathname === "/login" || pathname === "/register";
   const isDashboard = pathname.startsWith("/dashboard");
   const isOnboarding = pathname.startsWith("/onboarding");
+  const isSettings = pathname.startsWith("/settings");
 
-  if ((isDashboard || isOnboarding) && !token) {
+  if ((isDashboard || isOnboarding || isSettings) && !token) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("from", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  // Authenticated but incomplete onboarding cannot use dashboard
-  if (isDashboard && token && !onboardingDone) {
+  // Authenticated but incomplete onboarding cannot use dashboard/settings
+  if ((isDashboard || isSettings) && token && !onboardingDone) {
     return NextResponse.redirect(new URL("/onboarding", request.url));
   }
 
@@ -37,7 +38,7 @@ export function proxy(request: NextRequest) {
     );
   }
 
-  if (!isPublicPath && !isDashboard && !isOnboarding && !token) {
+  if (!isPublicPath && !isDashboard && !isOnboarding && !isSettings && !token) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 

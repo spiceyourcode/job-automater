@@ -67,7 +67,7 @@ Full matrix + per-task AUTO SKILLS: **`AGENT-PROMPTS.md`**
 
 ## Current phase
 
-**Phase 1 — Foundation** (P1.1–P1.7 done)
+**Phase 1 — Foundation** ✅ complete (P1.1–P1.8)
 
 | Done | Task |
 |------|------|
@@ -78,9 +78,11 @@ Full matrix + per-task AUTO SKILLS: **`AGENT-PROMPTS.md`**
 | ✓ | P1.5 Celery workers + health.ping |
 | ✓ | P1.6 Profile CRUD + CV → MinIO |
 | ✓ | P1.7 Onboarding wizard (5 steps) |
+| ✓ | P1.8 Dashboard empty state + sources CTA |
 
-**Next:** **P1.8** — Dashboard empty state polish in `.agent-settings/phase-orchestrator.md`  
-Prompt: `AGENT-PROMPTS.md` → Phase 1 → P1.8
+**Next:** **Phase 2 — Collection** → **P2.1** Source CRUD API + Settings UI  
+Prompt: `AGENT-PROMPTS.md` → Phase 2 → P2.1  
+Contract: `docs/contracts/phase-2-collection.md`
 
 ---
 
