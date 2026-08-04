@@ -15,8 +15,9 @@ Deploy API + client to a staging environment for closed beta / E2E.
 1. Provision API service; set env vars from staging template.  
 2. Run migrations + seed / admin setup.  
 3. Deploy frontend; set public API base URL to the staging API.  
-4. Smoke: `/health` → login → critical path.  
-5. Record URLs and any OPEN blockers in `.agent-settings/blockers.md`.
+4. Smoke: `/health` → login → critical path.
+5. Run API E2E: `cd api && npm test` (includes `e2e/happy-path.test.ts` — register → onboard → source → match → generate → **approve** → submit).
+6. Record URLs and any OPEN blockers in `.agent-settings/blockers.md`.
 
 ## Rollback
 

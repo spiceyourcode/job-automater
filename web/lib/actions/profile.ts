@@ -230,3 +230,54 @@ export async function completeOnboardingAction(
   await setOnboardingCompleteCookie(true);
   return { ok: true };
 }
+
+/** GDPR — download structured JSON export of the caller's data. */
+export async function exportOwnDataAction(): Promise<
+  ActionResult<Record<string, unknown>>
+> {
+  const headers = await authHeaders();
+  if (!headers) return { ok: false, error: "Unauthorized" };
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/api/v1/profile/export`, {
+      headers,
+      cache: "no-store",
+    });
+  } catch {
+    return { ok: false, error: "Network error — is the API running?" };
+  }
+
+  if (!res.ok) {
+    return { ok: false, error: "Failed to export data" };
+  }
+
+  const data = (await res.json()) as Record<string, unknown>;
+  return { ok: true, data };
+}
+
+/** GDPR — permanently delete account + cascading PII (including cv_chunks). */
+export async function deleteOwnAccountAction(): Promise<ActionResult> {
+  const headers = await authHeaders();
+  if (!headers) return { ok: false, error: "Unauthorized" };
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/api/v1/profile`, {
+      method: "DELETE",
+      headers,
+    });
+  } catch {
+    return { ok: false, error: "Network error — is the API running?" };
+  }
+
+  if (!res.ok) {
+    return { ok: false, error: "Failed to delete account" };
+  }
+
+  const cookieStore = await cookies();
+  cookieStore.delete("access_token");
+  cookieStore.delete("refresh_token");
+  cookieStore.delete("onboarding_complete");
+  return { ok: true };
+}

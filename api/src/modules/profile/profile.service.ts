@@ -2,7 +2,17 @@ import { createHash, randomUUID } from "node:crypto";
 import { extname } from "node:path";
 import { and, desc, eq, max, sql } from "drizzle-orm";
 import { db } from "../../db/index.js";
-import { profiles, cvDocuments } from "../../db/schema/index.js";
+import {
+  applications,
+  cvChunks,
+  cvDocuments,
+  emails,
+  jobScores,
+  notifications,
+  profiles,
+  users,
+  userSessions,
+} from "../../db/schema/index.js";
 import { getPresignedGetUrl, uploadObject } from "../../lib/s3.js";
 import {
   ALLOWED_CV_EXTENSIONS,
@@ -254,4 +264,91 @@ export async function getCvDocumentForUser(userId: string, cvId: string) {
     ...doc,
     fileUrl: await getPresignedGetUrl(doc.fileUrl),
   };
+}
+
+/** GDPR data export — structured JSON of user PII (no secrets). */
+export async function exportUserData(userId: string) {
+  const [user] = await db
+    .select({
+      id: users.id,
+      email: users.email,
+      name: users.name,
+      timezone: users.timezone,
+      locale: users.locale,
+      createdAt: users.createdAt,
+    })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  if (!user) throw new ProfileError("Profile not found", 404);
+
+  const [profile] = await db
+    .select()
+    .from(profiles)
+    .where(eq(profiles.userId, userId))
+    .limit(1);
+
+  const cvs = await db
+    .select({
+      id: cvDocuments.id,
+      version: cvDocuments.version,
+      originalFilename: cvDocuments.originalFilename,
+      createdAt: cvDocuments.createdAt,
+    })
+    .from(cvDocuments)
+    .where(eq(cvDocuments.userId, userId));
+
+  const apps = await db
+    .select({
+      id: applications.id,
+      jobId: applications.jobId,
+      status: applications.status,
+      createdAt: applications.createdAt,
+    })
+    .from(applications)
+    .where(eq(applications.userId, userId));
+
+  const notifs = await db
+    .select({
+      id: notifications.id,
+      type: notifications.type,
+      title: notifications.title,
+      createdAt: notifications.createdAt,
+    })
+    .from(notifications)
+    .where(eq(notifications.userId, userId));
+
+  return {
+    exportedAt: new Date().toISOString(),
+    user,
+    profile: profile ?? null,
+    cvDocuments: cvs,
+    applications: apps,
+    notifications: notifs,
+  };
+}
+
+/**
+ * GDPR erase — remove CV chunks (pgvector) then cascade-delete the user.
+ * Soft-delete alone is insufficient (FAILURE: leftover chunks).
+ */
+export async function deleteUserAccount(userId: string) {
+  return await db.transaction(async (tx) => {
+    // Explicit pgvector purge (contract FAILURE if left behind)
+    await tx.delete(cvChunks).where(eq(cvChunks.userId, userId));
+    await tx.delete(emails).where(eq(emails.userId, userId));
+    await tx.delete(notifications).where(eq(notifications.userId, userId));
+    await tx.delete(jobScores).where(eq(jobScores.userId, userId));
+    await tx.delete(userSessions).where(eq(userSessions.userId, userId));
+
+    // Hard-delete user — FKs cascade remaining owned rows
+    const removed = await tx
+      .delete(users)
+      .where(eq(users.id, userId))
+      .returning({ id: users.id });
+
+    if (removed.length === 0) throw new ProfileError("Profile not found", 404);
+
+    return { deleted: true as const, userId };
+  });
 }

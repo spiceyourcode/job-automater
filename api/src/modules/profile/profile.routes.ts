@@ -82,3 +82,28 @@ profileRoutes.get("/cv/versions", async (c) => {
   const result = await profileService.listCvVersions(userId);
   return c.json(result, 200);
 });
+
+profileRoutes.get("/export", async (c) => {
+  const { userId } = c.get("auth");
+  try {
+    return c.json(await profileService.exportUserData(userId), 200);
+  } catch (err) {
+    if (isProfileError(err)) {
+      return c.json({ error: err.message }, err.statusCode);
+    }
+    throw err;
+  }
+});
+
+profileRoutes.delete("/", async (c) => {
+  const { userId } = c.get("auth");
+  try {
+    const result = await profileService.deleteUserAccount(userId);
+    return c.json(result, 200);
+  } catch (err) {
+    if (isProfileError(err)) {
+      return c.json({ error: err.message }, err.statusCode);
+    }
+    throw err;
+  }
+});

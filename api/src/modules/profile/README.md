@@ -8,6 +8,8 @@
 | PATCH | `/api/v1/profile` | Bearer | Update own profile fields |
 | POST | `/api/v1/profile/cv` | Bearer | Upload PDF/DOCX (≤10MB) to MinIO |
 | GET | `/api/v1/profile/cv/versions` | Bearer | List own CV versions |
+| GET | `/api/v1/profile/export` | Bearer | GDPR JSON export of own PII |
+| DELETE | `/api/v1/profile` | Bearer | GDPR erase — deletes `cv_chunks` then cascades user |
 
 ## Ownership (HG-2 / IDOR)
 
@@ -23,6 +25,12 @@ A user can never read or write another user's profile or CV.
 - DB stores object key; API responses return time-limited presigned GET URLs
 - Metadata logged only (filename, size, mime) — never file body (HG-8)
 - Salary fields remain integer cents (HG-3); partial PATCH merges against stored min/max
+
+## GDPR (P6.2)
+
+- `GET /export` returns structured JSON (user, profile, CV metadata, applications, notifications) — never passwords or session secrets
+- `DELETE /` explicitly deletes `cv_chunks` (pgvector) then hard-deletes the user so FKs cascade remaining owned rows
+- Soft-delete alone is insufficient (contract FAILURE if chunks remain)
 
 ## Dependencies
 

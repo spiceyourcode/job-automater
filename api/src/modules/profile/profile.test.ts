@@ -15,6 +15,8 @@ vi.mock("./profile.service.js", () => ({
   uploadCv: vi.fn(),
   listCvVersions: vi.fn(),
   getCvDocumentForUser: vi.fn(),
+  exportUserData: vi.fn(),
+  deleteUserAccount: vi.fn(),
   ProfileError: class ProfileError extends Error {
     constructor(
       message: string,
@@ -286,6 +288,63 @@ describe("GET /api/v1/profile/cv/versions", () => {
     });
     expect(res.status).toBe(200);
     expect(mockService.listCvVersions).toHaveBeenCalledWith("user-a");
+  });
+});
+
+describe("GET /api/v1/profile/export (GDPR)", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("401 without auth", async () => {
+    const res = await buildApp().request("/api/v1/profile/export");
+    expect(res.status).toBe(401);
+  });
+
+  it("200 exports caller data only (IDOR)", async () => {
+    mockService.exportUserData.mockResolvedValue({
+      exportedAt: "2026-08-05T00:00:00.000Z",
+      user: {
+        id: "user-a",
+        email: "a@example.com",
+        name: "A",
+        timezone: "UTC",
+        locale: "en",
+        createdAt: new Date("2026-01-01"),
+      },
+      profile: null,
+      cvDocuments: [],
+      applications: [],
+      notifications: [],
+    });
+    const res = await buildApp().request("/api/v1/profile/export?userId=user-b", {
+      headers: { Authorization: await authHeader("user-a") },
+    });
+    expect(res.status).toBe(200);
+    expect(mockService.exportUserData).toHaveBeenCalledWith("user-a");
+    expect(mockService.exportUserData).not.toHaveBeenCalledWith("user-b");
+  });
+});
+
+describe("DELETE /api/v1/profile (GDPR)", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("401 without auth", async () => {
+    const res = await buildApp().request("/api/v1/profile", { method: "DELETE" });
+    expect(res.status).toBe(401);
+  });
+
+  it("200 erases caller account only", async () => {
+    mockService.deleteUserAccount.mockResolvedValue({
+      deleted: true,
+      userId: "user-a",
+    });
+    const res = await buildApp().request("/api/v1/profile", {
+      method: "DELETE",
+      headers: { Authorization: await authHeader("user-a") },
+    });
+    expect(res.status).toBe(200);
+    expect(mockService.deleteUserAccount).toHaveBeenCalledWith("user-a");
+    const body = (await res.json()) as { deleted: boolean };
+    expect(body.deleted).toBe(true);
   });
 });
 
