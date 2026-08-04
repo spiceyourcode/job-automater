@@ -48,9 +48,12 @@ export const applications = pgTable(
     }),
     submittedVia: varchar("submitted_via", { length: 50 }),
     externalApplicationId: varchar("external_application_id", { length: 255 }),
+    /** MinIO key for confirmation screenshot (P4.2 — required on submit). */
+    confirmationScreenshotUrl: text("confirmation_screenshot_url"),
     submittedAt: timestamp("submitted_at", { withTimezone: true }),
     approvedAt: timestamp("approved_at", { withTimezone: true }),
     userNotes: text("user_notes"),
+    submitError: varchar("submit_error", { length: 100 }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),

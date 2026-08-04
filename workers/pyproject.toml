@@ -26,9 +26,12 @@ dev = [
     "fakeredis>=2.26",
     "respx>=0.21",
 ]
+playwright = [
+    "playwright>=1.40",
+]
 
 [tool.setuptools]
-py-modules = ["celery_app", "config", "db"]
+py-modules = ["celery_app", "config", "db", "storage"]
 
 [tool.setuptools.packages.find]
 where = ["."]

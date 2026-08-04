@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 COLLECT_QUEUE_KEY = "jobautomater:collect_source"
 GENERATE_DOCS_KEY = "jobautomater:generate_docs"
+SUBMIT_APPLICATION_KEY = "jobautomater:submit_application"
 
 _stop = threading.Event()
 _thread: threading.Thread | None = None
@@ -42,6 +43,18 @@ def _dispatch(key: str, payload: dict[str, Any]) -> None:
             "bridge_generate_docs application_id=%s",
             payload.get("application_id"),
         )
+    elif key == SUBMIT_APPLICATION_KEY:
+        from tasks.submit_application import submit_application
+
+        # HG-4: only dispatch when approved_at present
+        if not payload.get("approved_at"):
+            logger.warning("bridge_submit_rejected reason=missing_approved_at")
+            return
+        submit_application.delay(payload)
+        logger.info(
+            "bridge_submit_application application_id=%s",
+            payload.get("application_id"),
+        )
 
 
 def _loop() -> None:
@@ -49,7 +62,10 @@ def _loop() -> None:
     logger.info("queue_bridge_started")
     while not _stop.is_set():
         try:
-            item = client.brpop([COLLECT_QUEUE_KEY, GENERATE_DOCS_KEY], timeout=2)
+            item = client.brpop(
+                [COLLECT_QUEUE_KEY, GENERATE_DOCS_KEY, SUBMIT_APPLICATION_KEY],
+                timeout=2,
+            )
             if not item:
                 continue
             key, raw = item

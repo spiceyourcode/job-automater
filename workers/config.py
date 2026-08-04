@@ -20,6 +20,13 @@ class Settings(BaseSettings):
     database_url: str = (
         "postgresql://jobautomater:jobautomater@127.0.0.1:5432/jobautomater"
     )
+    # When True, skip real browser and write a synthetic proof PNG (tests/dev).
+    submit_dry_run: bool = True
+    s3_endpoint: str = "http://127.0.0.1:9000"
+    s3_access_key: str = "minioadmin"
+    s3_secret_key: str = "minioadmin"
+    s3_bucket: str = "jobautomater"
+    s3_region: str = "us-east-1"
 
 
 settings = Settings()

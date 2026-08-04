@@ -457,7 +457,7 @@ def load_job_for_user(
         cur.execute(
             """
             SELECT id, user_id, title, company, location, description, requirements,
-                   is_remote, employment_type, source
+                   is_remote, employment_type, source, application_url, source_url
             FROM jobs
             WHERE id = %s::uuid AND user_id = %s::uuid
             LIMIT 1
@@ -499,6 +499,65 @@ def save_application_documents(
                 json.dumps(bullet_traces),
                 model_used,
                 duration_ms,
+                application_id,
+                user_id,
+            ),
+        )
+
+
+def mark_application_submitted(
+    conn: psycopg.Connection,
+    *,
+    application_id: str,
+    user_id: str,
+    submitted_via: str,
+    external_application_id: str | None,
+    confirmation_screenshot_url: str,
+) -> None:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE applications SET
+                status = 'submitted',
+                submitted_via = %s,
+                external_application_id = %s,
+                confirmation_screenshot_url = %s,
+                submitted_at = NOW(),
+                submit_error = NULL,
+                updated_at = NOW()
+            WHERE id = %s::uuid AND user_id = %s::uuid
+            """,
+            (
+                submitted_via,
+                external_application_id,
+                confirmation_screenshot_url,
+                application_id,
+                user_id,
+            ),
+        )
+
+
+def mark_application_submit_failed(
+    conn: psycopg.Connection,
+    *,
+    application_id: str,
+    user_id: str,
+    error_code: str,
+    confirmation_screenshot_url: str | None = None,
+) -> None:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE applications SET
+                status = 'submit_failed',
+                submit_error = %s,
+                confirmation_screenshot_url = COALESCE(%s, confirmation_screenshot_url),
+                updated_at = NOW()
+            WHERE id = %s::uuid AND user_id = %s::uuid
+            """,
+            (
+                error_code[:100],
+                confirmation_screenshot_url,
                 application_id,
                 user_id,
             ),

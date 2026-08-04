@@ -14,6 +14,7 @@ app = Celery(
         "tasks.normalize_jobs",
         "tasks.match_score",
         "tasks.generate_docs",
+        "tasks.submit_application",
     ],
 )
 
