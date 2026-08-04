@@ -3,6 +3,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { db } from "../../db/index.js";
 import { sourceConfigs, type SourceConfig } from "../../db/schema/index.js";
 import { enqueueCollectSource } from "../../lib/queue.js";
+import { assertPublicHttpUrl } from "../../lib/safe-url.js";
 import {
   sourceConfigByType,
   type CreateSourceBody,
@@ -10,10 +11,12 @@ import {
   type SourceType,
 } from "./sources.schema.js";
 
+const REDACTED = "***";
+
 export class SourceError extends Error {
   constructor(
     message: string,
-    readonly statusCode: 400 | 403 | 404,
+    readonly statusCode: 400 | 403 | 404 | 503,
   ) {
     super(message);
     this.name = "SourceError";
@@ -27,7 +30,7 @@ export function redactConfig(
 ): Record<string, unknown> {
   const clone = { ...config };
   if (sourceType === "imap" && "password" in clone) {
-    clone.password = "***";
+    clone.password = REDACTED;
   }
   if (
     sourceType === "api" &&
@@ -40,13 +43,74 @@ export function redactConfig(
       auth.credentials = Object.fromEntries(
         Object.keys(auth.credentials as Record<string, string>).map((k) => [
           k,
-          "***",
+          REDACTED,
         ]),
       );
     }
     clone.auth = auth;
   }
   return clone;
+}
+
+/**
+ * When clients round-trip redacted GET config on PATCH, keep stored secrets.
+ */
+export function mergePreservedSecrets(
+  sourceType: string,
+  incoming: Record<string, unknown>,
+  existing: Record<string, unknown>,
+): Record<string, unknown> {
+  const merged = { ...incoming };
+
+  if (sourceType === "imap" && merged.password === REDACTED) {
+    merged.password = existing.password;
+  }
+
+  if (
+    sourceType === "api" &&
+    merged.auth &&
+    typeof merged.auth === "object" &&
+    merged.auth !== null
+  ) {
+    const auth = { ...(merged.auth as Record<string, unknown>) };
+    const existingAuth =
+      existing.auth && typeof existing.auth === "object" && existing.auth !== null
+        ? (existing.auth as Record<string, unknown>)
+        : {};
+    const existingCreds =
+      existingAuth.credentials &&
+      typeof existingAuth.credentials === "object" &&
+      existingAuth.credentials !== null
+        ? (existingAuth.credentials as Record<string, string>)
+        : {};
+
+    if (auth.credentials && typeof auth.credentials === "object") {
+      auth.credentials = Object.fromEntries(
+        Object.entries(auth.credentials as Record<string, string>).map(
+          ([k, v]) => [k, v === REDACTED ? (existingCreds[k] ?? v) : v],
+        ),
+      );
+    }
+    merged.auth = auth;
+  }
+
+  return merged;
+}
+
+function parseTypedConfig(
+  sourceType: SourceType,
+  config: Record<string, unknown>,
+): Record<string, unknown> {
+  const schema = sourceConfigByType[sourceType];
+  if (!schema) throw new SourceError("Unsupported source type", 400);
+  const parsed = schema.safeParse(config);
+  if (!parsed.success) {
+    throw new SourceError(
+      parsed.error.issues[0]?.message ?? "Invalid config",
+      400,
+    );
+  }
+  return parsed.data as Record<string, unknown>;
 }
 
 export function toPublicSource(row: SourceConfig) {
@@ -81,6 +145,8 @@ export async function getSource(userId: string, id: string) {
 }
 
 export async function createSource(userId: string, body: CreateSourceBody) {
+  const config = parseTypedConfig(body.sourceType, body.config);
+
   const [created] = await db
     .insert(sourceConfigs)
     .values({
@@ -88,7 +154,7 @@ export async function createSource(userId: string, body: CreateSourceBody) {
       sourceType: body.sourceType,
       name: body.name,
       description: body.description ?? null,
-      config: body.config,
+      config,
       scheduleCron: body.scheduleCron ?? null,
       timezone: body.timezone ?? "UTC",
       isActive: body.isActive ?? true,
@@ -112,22 +178,22 @@ export async function patchSource(
   body: PatchSourceBody,
 ) {
   const existing = await getOwnedSource(userId, id);
+  const sourceType = existing.sourceType as SourceType;
+
+  const updates: Record<string, unknown> = { ...body, updatedAt: new Date() };
 
   if (body.config) {
-    const schema = sourceConfigByType[existing.sourceType as SourceType];
-    if (!schema) throw new SourceError("Unsupported source type", 400);
-    const parsed = schema.safeParse(body.config);
-    if (!parsed.success) {
-      throw new SourceError(
-        parsed.error.issues[0]?.message ?? "Invalid config",
-        400,
-      );
-    }
+    const merged = mergePreservedSecrets(
+      sourceType,
+      body.config,
+      existing.config as Record<string, unknown>,
+    );
+    updates.config = parseTypedConfig(sourceType, merged);
   }
 
   const [updated] = await db
     .update(sourceConfigs)
-    .set({ ...body, updatedAt: new Date() })
+    .set(updates)
     .where(and(eq(sourceConfigs.id, id), eq(sourceConfigs.userId, userId)))
     .returning();
 
@@ -158,12 +224,16 @@ export async function testSource(userId: string, id: string) {
   if (source.sourceType === "rss") {
     const feedUrl = String(config.feedUrl ?? "");
     try {
+      await assertPublicHttpUrl(feedUrl);
       const res = await fetch(feedUrl, {
         method: "GET",
         signal: AbortSignal.timeout(8000),
         headers: { "user-agent": "JobAutomater/1.0 source-test" },
+        redirect: "manual",
       });
-      if (!res.ok) {
+      if (res.status >= 300 && res.status < 400) {
+        errors.push("Redirects are not followed for source tests");
+      } else if (!res.ok) {
         errors.push(`Feed returned HTTP ${res.status}`);
       } else {
         const text = await res.text();
@@ -180,18 +250,30 @@ export async function testSource(userId: string, id: string) {
           }
         }
       }
-    } catch {
-      errors.push("Could not reach feed URL");
+    } catch (err) {
+      errors.push(
+        err instanceof Error && err.message.includes("not allowed")
+          ? err.message
+          : err instanceof Error && err.message.includes("Private")
+            ? err.message
+            : err instanceof Error && err.message.includes("Host")
+              ? err.message
+              : "Could not reach feed URL",
+      );
     }
   } else if (source.sourceType === "api") {
     const baseUrl = String(config.baseUrl ?? "");
     try {
+      await assertPublicHttpUrl(baseUrl);
       const res = await fetch(baseUrl, {
         method: "GET",
         signal: AbortSignal.timeout(8000),
         headers: { "user-agent": "JobAutomater/1.0 source-test" },
+        redirect: "manual",
       });
-      if (!res.ok) {
+      if (res.status >= 300 && res.status < 400) {
+        errors.push("Redirects are not followed for source tests");
+      } else if (!res.ok) {
         errors.push(`API returned HTTP ${res.status}`);
       } else {
         sampleJobs.push({
@@ -200,8 +282,16 @@ export async function testSource(userId: string, id: string) {
           url: baseUrl,
         });
       }
-    } catch {
-      errors.push("Could not reach API base URL");
+    } catch (err) {
+      errors.push(
+        err instanceof Error &&
+          (err.message.includes("not allowed") ||
+            err.message.includes("Private") ||
+            err.message.includes("Host") ||
+            err.message.includes("credentials"))
+          ? err.message
+          : "Could not reach API base URL",
+      );
     }
   } else if (source.sourceType === "imap") {
     const parsed = sourceConfigByType.imap.safeParse(config);
@@ -222,7 +312,7 @@ export async function testSource(userId: string, id: string) {
   };
 }
 
-/** Enqueue CollectSourceJob; mark source as queued. */
+/** Enqueue CollectSourceJob; mark source as queued before publish. */
 export async function runSource(userId: string, id: string) {
   const source = await getOwnedSource(userId, id);
   if (!source.isActive) {
@@ -230,12 +320,8 @@ export async function runSource(userId: string, id: string) {
   }
 
   const pipelineRunId = randomUUID();
-  await enqueueCollectSource({
-    source_id: source.id,
-    user_id: userId,
-    source_type: source.sourceType,
-  });
 
+  // Persist queued first so UI never lags a published job
   await db
     .update(sourceConfigs)
     .set({
@@ -245,6 +331,24 @@ export async function runSource(userId: string, id: string) {
       updatedAt: new Date(),
     })
     .where(and(eq(sourceConfigs.id, id), eq(sourceConfigs.userId, userId)));
+
+  try {
+    await enqueueCollectSource({
+      source_id: source.id,
+      user_id: userId,
+      source_type: source.sourceType,
+    });
+  } catch {
+    await db
+      .update(sourceConfigs)
+      .set({
+        lastRunStatus: "failed",
+        lastError: "Failed to enqueue collection job",
+        updatedAt: new Date(),
+      })
+      .where(and(eq(sourceConfigs.id, id), eq(sourceConfigs.userId, userId)));
+    throw new SourceError("Failed to enqueue collection job", 503);
+  }
 
   return { pipelineRunId, status: "started" as const };
 }

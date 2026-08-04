@@ -3,7 +3,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { signAccessToken } from "../../lib/jwt.js";
 import { sourcesRoutes } from "./sources.routes.js";
 import { createSourceBodySchema } from "./sources.schema.js";
-import { redactConfig as redactFromService } from "./sources.service.js";
+import {
+  isPrivateOrReservedIp,
+  assertPublicHttpUrl,
+} from "../../lib/safe-url.js";
+import {
+  mergePreservedSecrets,
+  redactConfig as redactFromService,
+} from "./sources.service.js";
 
 vi.mock("./sources.service.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./sources.service.js")>();
@@ -203,6 +210,65 @@ describe("redactConfig", () => {
   });
 });
 
+describe("mergePreservedSecrets", () => {
+  it("keeps stored IMAP password when PATCH sends ***", () => {
+    const merged = mergePreservedSecrets(
+      "imap",
+      {
+        imapServer: "mail.example.com",
+        username: "u",
+        password: "***",
+        port: 993,
+        folder: "INBOX",
+      },
+      {
+        imapServer: "mail.example.com",
+        username: "u",
+        password: "real-secret",
+        port: 993,
+        folder: "INBOX",
+      },
+    );
+    expect(merged.password).toBe("real-secret");
+  });
+
+  it("keeps API credentials when PATCH sends ***", () => {
+    const merged = mergePreservedSecrets(
+      "api",
+      {
+        baseUrl: "https://api.example.com",
+        auth: { type: "bearer", credentials: { token: "***" } },
+      },
+      {
+        baseUrl: "https://api.example.com",
+        auth: { type: "bearer", credentials: { token: "live-token" } },
+      },
+    );
+    const auth = merged.auth as { credentials: { token: string } };
+    expect(auth.credentials.token).toBe("live-token");
+  });
+});
+
+describe("assertPublicHttpUrl", () => {
+  it("blocks private IP literals", async () => {
+    expect(isPrivateOrReservedIp("127.0.0.1")).toBe(true);
+    expect(isPrivateOrReservedIp("10.0.0.5")).toBe(true);
+    expect(isPrivateOrReservedIp("169.254.169.254")).toBe(true);
+    await expect(assertPublicHttpUrl("http://127.0.0.1/")).rejects.toThrow(
+      /Private|not allowed/,
+    );
+    await expect(
+      assertPublicHttpUrl("http://169.254.169.254/latest/meta-data"),
+    ).rejects.toThrow();
+  });
+
+  it("allows public https URL host parsing", async () => {
+    // example.com resolves publicly in most environments
+    const url = await assertPublicHttpUrl("https://example.com/feed.xml");
+    expect(url.hostname).toBe("example.com");
+  });
+});
+
 describe("createSourceBodySchema", () => {
   it("accepts valid imap config", () => {
     const r = createSourceBodySchema.safeParse({
@@ -217,5 +283,24 @@ describe("createSourceBodySchema", () => {
       },
     });
     expect(r.success).toBe(true);
+  });
+
+  it("applies IMAP defaults for omitted port/folder", () => {
+    const r = createSourceBodySchema.safeParse({
+      sourceType: "imap",
+      name: "Alerts",
+      config: {
+        imapServer: "imap.gmail.com",
+        username: "a@b.com",
+        password: "app-pass",
+      },
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.config).toMatchObject({
+        port: 993,
+        folder: "INBOX",
+      });
+    }
   });
 });

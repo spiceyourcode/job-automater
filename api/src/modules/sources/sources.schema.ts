@@ -61,16 +61,20 @@ export const createSourceBodySchema = z
     experienceLevels: z.array(z.unknown()).optional(),
   })
   .strict()
-  .superRefine((data, ctx) => {
+  .transform((data, ctx) => {
     const schema = sourceConfigByType[data.sourceType];
     const parsed = schema.safeParse(data.config);
     if (!parsed.success) {
       ctx.addIssue({
         code: "custom",
         path: ["config"],
-        message: parsed.error.issues[0]?.message ?? "Invalid config for source type",
+        message:
+          parsed.error.issues[0]?.message ?? "Invalid config for source type",
       });
+      return z.NEVER;
     }
+    // Persist Zod defaults (e.g. IMAP port/folder), not the raw request body
+    return { ...data, config: parsed.data as Record<string, unknown> };
   });
 
 export const patchSourceBodySchema = z
