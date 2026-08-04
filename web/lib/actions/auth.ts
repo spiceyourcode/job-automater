@@ -73,8 +73,8 @@ export async function loginAction(input: {
   await setAuthCookies(data.tokens);
 
   // Incomplete onboarding → wizard; complete → dashboard
-  const { fetchOwnProfile, profileMeetsOnboardingRequirements, setOnboardingCompleteCookie } =
-    await import("./profile");
+  const { fetchOwnProfile, setOnboardingCompleteCookie } = await import("./profile");
+  const { profileMeetsOnboardingRequirements } = await import("../onboarding");
   const profileResult = await fetchOwnProfile();
   if (profileResult.ok && profileResult.data) {
     const gate = profileMeetsOnboardingRequirements(profileResult.data);
