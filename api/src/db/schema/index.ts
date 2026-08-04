@@ -6,6 +6,11 @@ export {
 } from "./user-sessions.js";
 export { profiles, type Profile, type NewProfile } from "./profiles.js";
 export {
+  cvDocuments,
+  type CvDocument,
+  type NewCvDocument,
+} from "./cv-documents.js";
+export {
   salaryCentsSchema,
   userInsertSchema,
   profileInsertSchema,
