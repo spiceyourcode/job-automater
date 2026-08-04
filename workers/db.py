@@ -279,6 +279,24 @@ def load_profile_for_user(
         return dict(row) if row else None
 
 
+def load_user_contact(
+    conn: psycopg.Connection, user_id: str
+) -> dict[str, Any] | None:
+    """Email + display name for ATS apply — never log values (HG-8)."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT id, email, name
+            FROM users
+            WHERE id = %s::uuid AND deleted_at IS NULL
+            LIMIT 1
+            """,
+            (user_id,),
+        )
+        row = cur.fetchone()
+        return dict(row) if row else None
+
+
 def load_jobs_for_user(
     conn: psycopg.Connection,
     *,

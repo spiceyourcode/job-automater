@@ -14,6 +14,8 @@ from db import (
     connect,
     load_application,
     load_job_for_user,
+    load_profile_for_user,
+    load_user_contact,
     mark_application_submit_failed,
     mark_application_submitted,
 )
@@ -64,10 +66,24 @@ def process_submit_application(payload: dict[str, Any]) -> dict[str, Any]:
         if job_row is None:
             return {"status": "error", "error": "job_not_found"}
 
+        profile = load_profile_for_user(conn, job.user_id) or {}
+        contact = load_user_contact(conn, job.user_id) or {}
+        # Merge contact onto profile for ATS (email lives on users)
+        if contact.get("email"):
+            profile = {
+                **profile,
+                "email": contact["email"],
+                "full_name": contact.get("name") or profile.get("full_name"),
+            }
+            parts = str(contact.get("name") or "").split()
+            if parts and not profile.get("first_name"):
+                profile["first_name"] = parts[0]
+                profile["last_name"] = " ".join(parts[1:]) if len(parts) > 1 else ""
         result = run_submit_verify(
             application=app_row,
             job=job_row,
             approved_at=job.approved_at,
+            profile=profile,
         )
         if result is None:
             return {"status": "error", "error": "empty_result"}

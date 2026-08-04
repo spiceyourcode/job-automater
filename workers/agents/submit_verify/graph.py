@@ -1,4 +1,4 @@
-"""LangGraph submit_verify — approve gate → portal submit → screenshot proof."""
+"""LangGraph submit_verify — approve gate → ATS → portal → screenshot proof."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from typing import Any, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
+from agents.submit_verify.ats import try_ats_submit
 from agents.submit_verify.portal import SubmitFn, default_submitter
 from agents.submit_verify.schema import SubmitResult
 
@@ -16,6 +17,7 @@ logger = logging.getLogger(__name__)
 class SubmitState(TypedDict, total=False):
     application: dict[str, Any]
     job: dict[str, Any]
+    profile: dict[str, Any] | None
     approved_at: str
     result: dict[str, Any] | None
     error: str | None
@@ -39,11 +41,27 @@ def _gate_node(state: SubmitState) -> dict[str, Any]:
     return {"error": None}
 
 
+def _ats_node(state: SubmitState) -> dict[str, Any]:
+    if state.get("error"):
+        return {}
+    result = try_ats_submit(
+        job=state["job"],
+        profile=state.get("profile"),
+        application=state["application"],
+    )
+    if result and result.status == "submitted":
+        logger.info("submit_verify_ats status=submitted via=%s", result.submitted_via)
+        return {"result": result.model_dump(mode="python"), "error": None}
+    return {}
+
+
 def _submit_node(state: SubmitState, submit_fn: SubmitFn) -> dict[str, Any]:
     if state.get("error"):
         return {}
+    # Skip portal when ATS already succeeded
+    if state.get("result") and state["result"].get("status") == "submitted":
+        return {}
     result = submit_fn(state["application"], state["job"])
-    # Never log CV / form field values (HG-8)
     logger.info(
         "submit_verify_result status=%s via=%s",
         result.status,
@@ -60,9 +78,11 @@ def build_graph(submit_fn: SubmitFn | None = None) -> Any:
 
     graph = StateGraph(SubmitState)
     graph.add_node("gate", _gate_node)
+    graph.add_node("ats", _ats_node)
     graph.add_node("submit", submit_node)
     graph.add_edge(START, "gate")
-    graph.add_edge("gate", "submit")
+    graph.add_edge("gate", "ats")
+    graph.add_edge("ats", "submit")
     graph.add_edge("submit", END)
     return graph.compile()
 
@@ -72,6 +92,7 @@ def run_submit_verify(
     application: dict[str, Any],
     job: dict[str, Any],
     approved_at: str,
+    profile: dict[str, Any] | None = None,
     submit_fn: SubmitFn | None = None,
 ) -> SubmitResult | None:
     compiled = build_graph(submit_fn)
@@ -79,6 +100,7 @@ def run_submit_verify(
         {
             "application": application,
             "job": job,
+            "profile": profile,
             "approved_at": approved_at,
         }
     )

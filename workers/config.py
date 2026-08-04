@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     )
     # When True, skip real browser and write a synthetic proof PNG (tests/dev).
     submit_dry_run: bool = True
+    greenhouse_job_board_api_key: str = ""
+    lever_api_key: str = ""
     s3_endpoint: str = "http://127.0.0.1:9000"
     s3_access_key: str = "minioadmin"
     s3_secret_key: str = "minioadmin"
