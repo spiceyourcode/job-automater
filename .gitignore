@@ -82,5 +82,9 @@ contracts/
 docker-compose.yml
 docs/
 project-backlog.md
-workers/
+workers/.venv/
+workers/__pycache__/
+workers/**/__pycache__/
+workers/*.egg-info/
+workers/.pytest_cache/
 .github/

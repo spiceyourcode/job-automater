@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jobautomater-workers"
+version = "0.1.0"
+description = "Celery workers for JobAutomater (collectors, agents, tasks)"
+requires-python = ">=3.12"
+dependencies = [
+    "celery[redis]>=5.4",
+    "kombu>=5.4",
+    "python-dotenv>=1.0",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "fakeredis>=2.26",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["tasks*", "agents*", "collectors*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
