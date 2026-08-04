@@ -143,9 +143,11 @@ def test_process_normalize_inserts_only_validated():
         patch("tasks.normalize_jobs.run_extract_normalize", return_value=validated),
         patch("tasks.normalize_jobs.insert_normalized_job", return_value="job-1") as insert,
         patch("tasks.normalize_jobs.mark_jobs_raw_processed") as mark,
+        patch("tasks.match_score.match_score") as match_task,
     ):
         result = process_normalize_jobs({"job_ids": [raw_id], "user_id": user_id})
 
     assert result["normalized"] == 1
     insert.assert_called_once()
     mark.assert_called_once_with(mock_conn, jobs_raw_id=raw_id, error=None)
+    match_task.delay.assert_called_once()

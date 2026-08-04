@@ -26,6 +26,16 @@ export {
   type NewJob,
 } from "./jobs.js";
 export {
+  jobScores,
+  type JobScore,
+  type NewJobScore,
+} from "./job-scores.js";
+export {
+  cvChunks,
+  type CvChunk,
+  type NewCvChunk,
+} from "./cv-chunks.js";
+export {
   salaryCentsSchema,
   userInsertSchema,
   profileInsertSchema,

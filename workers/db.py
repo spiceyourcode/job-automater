@@ -260,3 +260,157 @@ def mark_source_failed(
             """,
             (duration_ms, safe_error, source_id, user_id),
         )
+
+
+def load_profile_for_user(
+    conn: psycopg.Connection, user_id: str
+) -> dict[str, Any] | None:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT *
+            FROM profiles
+            WHERE user_id = %s::uuid
+            LIMIT 1
+            """,
+            (user_id,),
+        )
+        row = cur.fetchone()
+        return dict(row) if row else None
+
+
+def load_jobs_for_user(
+    conn: psycopg.Connection,
+    *,
+    user_id: str,
+    job_ids: list[str] | None = None,
+) -> list[dict[str, Any]]:
+    with conn.cursor() as cur:
+        if job_ids:
+            cur.execute(
+                """
+                SELECT id, user_id, source, source_id, title, company, location,
+                       is_remote, remote_type, employment_type, experience_level,
+                       salary_min, salary_max, salary_currency, description,
+                       requirements, tags, tech_stack, keywords, is_duplicate,
+                       duplicate_of, status
+                FROM jobs
+                WHERE user_id = %s::uuid
+                  AND id = ANY(%s::uuid[])
+                """,
+                (user_id, job_ids),
+            )
+        else:
+            cur.execute(
+                """
+                SELECT id, user_id, source, source_id, title, company, location,
+                       is_remote, remote_type, employment_type, experience_level,
+                       salary_min, salary_max, salary_currency, description,
+                       requirements, tags, tech_stack, keywords, is_duplicate,
+                       duplicate_of, status
+                FROM jobs
+                WHERE user_id = %s::uuid
+                  AND is_duplicate = false
+                ORDER BY collected_at DESC
+                LIMIT 500
+                """,
+                (user_id,),
+            )
+        return [dict(r) for r in cur.fetchall()]
+
+
+def mark_job_duplicate(
+    conn: psycopg.Connection,
+    *,
+    job_id: str,
+    user_id: str,
+    duplicate_of: str,
+) -> None:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE jobs SET
+                is_duplicate = true,
+                duplicate_of = %s::uuid,
+                status = 'archived',
+                updated_at = NOW()
+            WHERE id = %s::uuid AND user_id = %s::uuid
+            """,
+            (duplicate_of, job_id, user_id),
+        )
+
+
+def upsert_job_score(
+    conn: psycopg.Connection,
+    *,
+    user_id: str,
+    job_id: str,
+    score: dict[str, Any],
+) -> str:
+    """Insert/update score. Caller must ensure job belongs to user_id."""
+    reasoning = (score.get("reasoning") or "").strip()
+    if len(reasoning) < 20:
+        raise ValueError("reasoning required before persist")
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO job_scores (
+                job_id, user_id, overall_score, skill_match, experience_match,
+                location_match, salary_match, culture_match, weights,
+                matched_skills, missing_skills, nice_to_have_skills,
+                reasoning, confidence, model_used, prompt_version
+            ) VALUES (
+                %s::uuid, %s::uuid, %s, %s, %s,
+                %s, %s, %s, %s::jsonb,
+                %s::jsonb, %s::jsonb, %s::jsonb,
+                %s, %s, %s, %s
+            )
+            ON CONFLICT (job_id, user_id) DO UPDATE SET
+                overall_score = EXCLUDED.overall_score,
+                skill_match = EXCLUDED.skill_match,
+                experience_match = EXCLUDED.experience_match,
+                location_match = EXCLUDED.location_match,
+                salary_match = EXCLUDED.salary_match,
+                culture_match = EXCLUDED.culture_match,
+                weights = EXCLUDED.weights,
+                matched_skills = EXCLUDED.matched_skills,
+                missing_skills = EXCLUDED.missing_skills,
+                nice_to_have_skills = EXCLUDED.nice_to_have_skills,
+                reasoning = EXCLUDED.reasoning,
+                confidence = EXCLUDED.confidence,
+                model_used = EXCLUDED.model_used,
+                scored_at = NOW()
+            RETURNING id
+            """,
+            (
+                job_id,
+                user_id,
+                score["overall_score"],
+                score.get("skill_match"),
+                score.get("experience_match"),
+                score.get("location_match"),
+                score.get("salary_match"),
+                score.get("culture_match"),
+                json.dumps(score.get("weights") or {}),
+                json.dumps(score.get("matched_skills") or []),
+                json.dumps(score.get("missing_skills") or []),
+                json.dumps(score.get("nice_to_have_skills") or []),
+                reasoning,
+                score.get("confidence"),
+                score.get("model_used") or "heuristic-v1",
+                score.get("prompt_version"),
+            ),
+        )
+        row = cur.fetchone()
+        return str(row["id"])
+
+
+def mark_job_scored(conn: psycopg.Connection, *, job_id: str, user_id: str) -> None:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE jobs SET status = 'scored', updated_at = NOW()
+            WHERE id = %s::uuid AND user_id = %s::uuid
+            """,
+            (job_id, user_id),
+        )

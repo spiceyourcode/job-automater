@@ -1,55 +1,34 @@
 # Workers — Celery + collectors + agents
 
-**Status:** P1.5 scaffold + P2.2 collectors + **P2.3 extract_normalize**.
+**Status:** P1.5 + P2.2 collectors + P2.3 extract_normalize + **P2.4 match_score**.
 
 ## Contract
 
 - `docs/contracts/phase-2-collection.md`
 - `08-skills/job-agent-skill.md`
-- `contracts/queue-payloads.schema.json` → `CollectSourceJob`, `NormalizeJobsJob`
+- `contracts/queue-payloads.schema.json` → Collect / Normalize / MatchScore
 
 ## Structure
 
 ```
 workers/
-├── celery_app.py
-├── config.py
-├── db.py
-├── collectors/           # rss, api, imap
+├── collectors/
 ├── agents/
-│   └── extract_normalize/  # LangGraph: extract → validate (HG-9)
+│   ├── extract_normalize/
+│   └── match_score/          # dedup → score → validate (reasoning required)
 ├── tasks/
-│   ├── health.py
 │   ├── collect_source.py
-│   ├── collect_bridge.py
-│   └── normalize_jobs.py
+│   ├── normalize_jobs.py
+│   └── match_score.py
 └── tests/
 ```
 
-## Run
+Weights (TRD): skills 40%, experience 25%, location 15%, salary 10%, culture 10%.
 
-```bash
-cd workers
-python -m venv .venv
-.venv\Scripts\activate   # Windows
-pip install -e ".[dev]"
-celery -A celery_app worker --loglevel=info
-```
+Pipeline: collect → normalize → match_score. Scores are user-scoped (IDOR-safe).
 
-Via WSL + [rtk](https://github.com/rtk-ai/rtk) (Homebrew):
+## Tests (WSL + rtk)
 
 ```bash
 wsl -d Debian -- bash -lc 'export PATH=/home/linuxbrew/.linuxbrew/bin:$PATH; cd /mnt/c/.../workers && rtk proxy ./.venv/Scripts/python.exe -m pytest -q'
 ```
-
-API `POST /sources/:id/run` → Redis list → `tasks.collect_source` → `tasks.normalize_jobs`.
-
-On failure, `source_configs.last_run_status` / `jobs_raw.processing_error` is set (never silent).
-
-## Tests
-
-```bash
-rtk proxy ./.venv/Scripts/python.exe -m pytest -q
-```
-
-Fixtures: `tests/fixtures/normalize_samples.json` (10 postings), golden RSS.

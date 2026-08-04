@@ -28,6 +28,7 @@ def process_normalize_jobs(payload: dict[str, Any]) -> dict[str, Any]:
     ok = 0
     failed = 0
     skipped = 0
+    normalized_job_ids: list[str] = []
 
     with connect() as conn:
         rows = load_jobs_raw(conn, user_id=job.user_id, job_ids=job.job_ids)
@@ -82,8 +83,14 @@ def process_normalize_jobs(payload: dict[str, Any]) -> dict[str, Any]:
             mark_jobs_raw_processed(conn, jobs_raw_id=str(row["id"]), error=None)
             if inserted:
                 ok += 1
+                normalized_job_ids.append(inserted)
             else:
                 skipped += 1
+
+    if normalized_job_ids:
+        from tasks.match_score import match_score
+
+        match_score.delay({"job_ids": normalized_job_ids, "user_id": job.user_id})
 
     logger.info(
         "normalize_jobs_done user_jobs=%s ok=%s failed=%s skipped=%s",
@@ -92,7 +99,13 @@ def process_normalize_jobs(payload: dict[str, Any]) -> dict[str, Any]:
         failed,
         skipped,
     )
-    return {"status": "ok", "normalized": ok, "failed": failed, "skipped": skipped}
+    return {
+        "status": "ok",
+        "normalized": ok,
+        "failed": failed,
+        "skipped": skipped,
+        "job_ids": normalized_job_ids,
+    }
 
 
 @app.task(name="tasks.normalize_jobs", bind=True, max_retries=1, default_retry_delay=20)
