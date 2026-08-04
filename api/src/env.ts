@@ -14,6 +14,9 @@ const envSchema = z
     DATABASE_URL: z.string().min(1),
     API_PORT: z.coerce.number().int().min(1).max(65535).default(3001),
     NODE_ENV: z.string().default("development"),
+    JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 chars"),
+    JWT_ACCESS_TTL: z.string().default("15m"),
+    JWT_REFRESH_TTL: z.string().default("7d"),
   })
   .strict();
 
@@ -21,6 +24,9 @@ const parsed = envSchema.safeParse({
   DATABASE_URL: process.env.DATABASE_URL,
   API_PORT: process.env.API_PORT ?? "3001",
   NODE_ENV: process.env.NODE_ENV ?? "development",
+  JWT_SECRET: process.env.JWT_SECRET ?? "",
+  JWT_ACCESS_TTL: process.env.JWT_ACCESS_TTL ?? "15m",
+  JWT_REFRESH_TTL: process.env.JWT_REFRESH_TTL ?? "7d",
 });
 
 if (!parsed.success) {
@@ -34,4 +40,7 @@ export const env = {
   databaseUrl: parsed.data.DATABASE_URL,
   apiPort: parsed.data.API_PORT,
   nodeEnv: parsed.data.NODE_ENV,
+  jwtSecret: parsed.data.JWT_SECRET,
+  jwtAccessTtl: parsed.data.JWT_ACCESS_TTL,
+  jwtRefreshTtl: parsed.data.JWT_REFRESH_TTL,
 } as const;
