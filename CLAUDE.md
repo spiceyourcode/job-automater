@@ -89,7 +89,21 @@ Full matrix + per-task AUTO SKILLS: **`AGENT-PROMPTS.md`**
 
 **Phase 6 — Hardening** ✅ complete (P6.1–P6.2 — one commit each)
 
-**Next:** Production runbooks / beta launch per `docs/runbooks/`
+**Phase 7 — Product shell** (next)
+
+| Done | Task |
+|------|------|
+| | P7.1 Email verification + password reset |
+| | P7.2 OAuth Google / GitHub / LinkedIn |
+| | P7.3 Sessions + `/auth/me` |
+| | P7.4 CV activate / delete / reindex |
+| | P7.5 Profile + CV settings UI |
+| | P7.6 App shell + dashboard widgets |
+
+**Next:** **P7.1** — Email verification + password reset  
+Prompt: `AGENT-PROMPTS.md` → Phase 7 → P7.1  
+Contract: `docs/contracts/phase-7-product-shell.md`  
+Backlog: Phases 7–13 added 2026-08-12 (docs gap sync)
 
 ---
 
