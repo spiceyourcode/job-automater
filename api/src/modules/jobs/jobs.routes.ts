@@ -23,6 +23,12 @@ jobsRoutes.get("/", zValidator("query", listJobsQuerySchema), async (c) => {
   return c.json(result, 200);
 });
 
+jobsRoutes.get("/stats", async (c) => {
+  const { userId } = c.get("auth");
+  const result = await jobsService.getJobStats(userId);
+  return c.json(result, 200);
+});
+
 jobsRoutes.post(
   "/import",
   zValidator("json", importJobBodySchema),

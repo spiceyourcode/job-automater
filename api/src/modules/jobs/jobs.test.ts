@@ -9,6 +9,7 @@ vi.mock("./jobs.service.js", async (importOriginal) => {
     ...actual,
     listJobs: vi.fn(),
     getJob: vi.fn(),
+    getJobStats: vi.fn(),
     importJob: vi.fn(),
     listSimilarJobs: vi.fn(),
     saveJob: vi.fn(),
@@ -247,5 +248,30 @@ describe("POST|DELETE /api/v1/jobs/:id/save (IDOR)", () => {
       },
     );
     expect(res.status).toBe(404);
+  });
+});
+
+describe("GET /api/v1/jobs/stats", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("401 without auth", async () => {
+    const res = await buildApp().request("/api/v1/jobs/stats");
+    expect(res.status).toBe(401);
+  });
+
+  it("200 returns caller-scoped stats", async () => {
+    mockService.getJobStats.mockResolvedValue({
+      total: 10,
+      remote: 4,
+      scored: 7,
+      saved: 2,
+      bySource: [{ source: "rss", count: 8 }],
+      byStatus: [{ status: "scored", count: 7 }],
+    });
+    const res = await buildApp().request("/api/v1/jobs/stats", {
+      headers: { Authorization: await authHeader("user-a") },
+    });
+    expect(res.status).toBe(200);
+    expect(mockService.getJobStats).toHaveBeenCalledWith("user-a");
   });
 });

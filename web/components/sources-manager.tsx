@@ -10,6 +10,7 @@ import {
   Radio,
   Trash2,
   FlaskConical,
+  History,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,9 +26,11 @@ import {
 import {
   createSourceAction,
   deleteSourceAction,
+  listSourceRunsAction,
   runSourceAction,
   testSourceAction,
   type SourcePublic,
+  type SourceRunPublic,
 } from "@/lib/actions/sources";
 
 type Props = {
@@ -55,6 +58,8 @@ export function SourcesManager({ initialSources }: Props) {
   const [botToken, setBotToken] = useState("");
   const [channelId, setChannelId] = useState("");
   const [messageFilter, setMessageFilter] = useState("");
+  const [runsFor, setRunsFor] = useState<string | null>(null);
+  const [runs, setRuns] = useState<SourceRunPublic[]>([]);
 
   function refresh() {
     router.refresh();
@@ -473,6 +478,27 @@ export function SourcesManager({ initialSources }: Props) {
                     <Button
                       type="button"
                       size="sm"
+                      variant="outline"
+                      className="cursor-pointer"
+                      disabled={isPending}
+                      onClick={() => {
+                        startTransition(async () => {
+                          const res = await listSourceRunsAction(s.id);
+                          if (!res.ok) {
+                            toast.error(res.error);
+                            return;
+                          }
+                          setRunsFor(s.id);
+                          setRuns(res.data?.runs ?? []);
+                        });
+                      }}
+                    >
+                      <History className="mr-1 h-4 w-4" aria-hidden />
+                      Runs
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
                       className="cursor-pointer"
                       disabled={isPending || !s.isActive}
                       onClick={() => onRun(s.id)}
@@ -494,6 +520,33 @@ export function SourcesManager({ initialSources }: Props) {
                   </div>
                 </CardContent>
               </Card>
+              {runsFor === s.id && (
+                <div className="mt-2 rounded-md border p-3 text-sm">
+                  <p className="mb-2 font-medium">Recent runs</p>
+                  {runs.length === 0 ? (
+                    <p className="text-muted-foreground">No runs yet.</p>
+                  ) : (
+                    <ul className="space-y-1" aria-label={`Runs for ${s.name}`}>
+                      {runs.map((r) => (
+                        <li
+                          key={r.id}
+                          className="flex flex-wrap gap-2 text-muted-foreground"
+                        >
+                          <Badge variant="outline">{r.status}</Badge>
+                          <span>
+                            {new Date(r.startedAt).toLocaleString()}
+                          </span>
+                          <span>{r.jobsFound} jobs</span>
+                          {r.durationMs != null && <span>{r.durationMs}ms</span>}
+                          {r.error && (
+                            <span className="text-destructive">{r.error}</span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
             </li>
           ))}
         </ul>

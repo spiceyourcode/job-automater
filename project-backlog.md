@@ -115,7 +115,7 @@ Phases **0–6** are the shipped MVP slice (contracts `phase-1` … `phase-6`). 
 | 8.2 | Telegram channel collector | workers, api, web | [x] | PRD G1, AppFlow §2.7 |
 | 8.3 | Manual URL import, similar jobs, save/unsave | api, web | [x] | PRD §10.1, Schema §2.5 |
 | 8.4 | Daily collect cron (BullMQ, user TZ) + company enrichment | api, workers | [x] | AppFlow §2.2, TRD FR-NE-03 |
-| 8.5 | Source run history + templates; jobs filters/stats UI | api, web | [ ] | Schema §2.4–2.5, UIUX jobs list |
+| 8.5 | Source run history + templates; jobs filters/stats UI | api, web | [x] | Schema §2.4–2.5, UIUX jobs list |
 
 **Contract:** [`docs/contracts/phase-8-collection-complete.md`](./docs/contracts/phase-8-collection-complete.md)
 

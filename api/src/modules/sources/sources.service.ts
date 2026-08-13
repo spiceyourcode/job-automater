@@ -3,6 +3,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { db } from "../../db/index.js";
 import {
   sourceConfigs,
+  sourceRuns,
   users,
   type SourceConfig,
 } from "../../db/schema/index.js";
@@ -12,6 +13,7 @@ import {
   sourceConfigByType,
   type CreateSourceBody,
   type PatchSourceBody,
+  type SourceRunsQuery,
   type SourceType,
 } from "./sources.schema.js";
 
@@ -434,7 +436,16 @@ export async function runSource(
     throw new SourceError("Source is inactive", 400);
   }
 
-  const pipelineRunId = randomUUID();
+  const [run] = await db
+    .insert(sourceRuns)
+    .values({
+      sourceConfigId: source.id,
+      userId,
+      status: "queued",
+    })
+    .returning({ id: sourceRuns.id });
+
+  const pipelineRunId = run?.id ?? randomUUID();
 
   // Persist queued first so UI never lags a published job
   await db
@@ -469,8 +480,92 @@ export async function runSource(
           eq(sourceConfigs.workspaceId, workspaceId),
         ),
       );
+    if (run) {
+      await db
+        .update(sourceRuns)
+        .set({
+          status: "failed",
+          error: "Failed to enqueue collection job",
+          completedAt: new Date(),
+        })
+        .where(eq(sourceRuns.id, run.id));
+    }
     throw new SourceError("Failed to enqueue collection job", 503);
   }
 
   return { status: "queued" as const, pipelineRunId };
+}
+
+/** Workspace-scoped run history — never leak other users' runs (IDOR). */
+export async function listSourceRuns(
+  workspaceId: string,
+  sourceId: string,
+  query: SourceRunsQuery,
+) {
+  await getWorkspaceSource(workspaceId, sourceId);
+  const rows = await db
+    .select({
+      id: sourceRuns.id,
+      status: sourceRuns.status,
+      jobsFound: sourceRuns.jobsFound,
+      durationMs: sourceRuns.durationMs,
+      error: sourceRuns.error,
+      startedAt: sourceRuns.startedAt,
+      completedAt: sourceRuns.completedAt,
+    })
+    .from(sourceRuns)
+    .where(eq(sourceRuns.sourceConfigId, sourceId))
+    .orderBy(desc(sourceRuns.startedAt))
+    .limit(query.limit)
+    .offset(query.offset);
+
+  return { runs: rows };
+}
+
+/** Static templates for source types (no secrets). */
+export function listSourceTemplates() {
+  return {
+    templates: [
+      {
+        sourceType: "rss",
+        name: "RSS / Atom feed",
+        description: "Poll a public job feed URL",
+        requiredConfig: ["feedUrl"],
+      },
+      {
+        sourceType: "api",
+        name: "Jobs API",
+        description: "HTTP JSON API with optional bearer/basic auth",
+        requiredConfig: ["baseUrl"],
+      },
+      {
+        sourceType: "imap",
+        name: "IMAP mailbox",
+        description: "Parse job alerts from email",
+        requiredConfig: ["imapServer", "username", "password"],
+      },
+      {
+        sourceType: "career_page",
+        name: "Career page",
+        description: "Scrape a company careers listing",
+        requiredConfig: ["baseUrl", "jobCardSelector", "titleSelector"],
+      },
+      {
+        sourceType: "playwright",
+        name: "Playwright scrape",
+        description: "Browser scrape with optional login",
+        requiredConfig: [
+          "startUrl",
+          "jobCardSelector",
+          "titleSelector",
+        ],
+      },
+      {
+        sourceType: "telegram",
+        name: "Telegram channel",
+        description: "Bot token + channel filter",
+        requiredConfig: ["botToken", "channelId"],
+      },
+    ],
+  };
 }

@@ -69,6 +69,11 @@ export {
   type NewSavedJob,
 } from "./saved-jobs.js";
 export {
+  sourceRuns,
+  type SourceRun,
+  type NewSourceRun,
+} from "./source-runs.js";
+export {
   salaryCentsSchema,
   userInsertSchema,
   profileInsertSchema,

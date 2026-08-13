@@ -234,6 +234,25 @@ def mark_source_success(
             """,
             (jobs_found, duration_ms, jobs_inserted, source_id, user_id),
         )
+        cur.execute(
+            """
+            UPDATE source_runs SET
+                status = 'success',
+                jobs_found = %s,
+                duration_ms = %s,
+                error = NULL,
+                completed_at = NOW()
+            WHERE id = (
+                SELECT id FROM source_runs
+                WHERE source_config_id = %s::uuid
+                  AND user_id = %s::uuid
+                  AND status IN ('queued', 'running')
+                ORDER BY started_at DESC
+                LIMIT 1
+            )
+            """,
+            (jobs_found, duration_ms, source_id, user_id),
+        )
 
 
 def mark_source_failed(
@@ -257,6 +276,24 @@ def mark_source_failed(
                 consecutive_failures = consecutive_failures + 1,
                 updated_at = NOW()
             WHERE id = %s::uuid AND user_id = %s::uuid
+            """,
+            (duration_ms, safe_error, source_id, user_id),
+        )
+        cur.execute(
+            """
+            UPDATE source_runs SET
+                status = 'failed',
+                duration_ms = %s,
+                error = %s,
+                completed_at = NOW()
+            WHERE id = (
+                SELECT id FROM source_runs
+                WHERE source_config_id = %s::uuid
+                  AND user_id = %s::uuid
+                  AND status IN ('queued', 'running')
+                ORDER BY started_at DESC
+                LIMIT 1
+            )
             """,
             (duration_ms, safe_error, source_id, user_id),
         )

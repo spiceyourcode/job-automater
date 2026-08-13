@@ -1,7 +1,7 @@
 import { Queue, Worker, type ConnectionOptions } from "bullmq";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { sourceConfigs, users } from "../db/schema/index.js";
+import { sourceConfigs, sourceRuns, users } from "../db/schema/index.js";
 import { env } from "../env.js";
 import { enqueueCollectSource, enqueueEnrichCompany } from "./queue.js";
 
@@ -149,6 +149,12 @@ export async function runDailyCollectForUser(userId: string): Promise<{
   let skipped = 0;
   for (const source of sources) {
     try {
+      await db.insert(sourceRuns).values({
+        sourceConfigId: source.id,
+        userId,
+        status: "queued",
+      });
+
       await db
         .update(sourceConfigs)
         .set({

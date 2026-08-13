@@ -232,3 +232,32 @@ export async function deleteSourceAction(id: string): Promise<ActionResult> {
     return { ok: false, error: "Network error — is the API running?" };
   }
 }
+
+export type SourceRunPublic = {
+  id: string;
+  status: string;
+  jobsFound: number;
+  durationMs: number | null;
+  error: string | null;
+  startedAt: string;
+  completedAt: string | null;
+};
+
+export async function listSourceRunsAction(
+  id: string,
+): Promise<ActionResult<{ runs: SourceRunPublic[] }>> {
+  const headers = await authHeaders();
+  if (!headers) return { ok: false, error: "Unauthorized" };
+  try {
+    const res = await fetch(`${API_URL}/api/v1/sources/${id}/runs?limit=20`, {
+      headers,
+      cache: "no-store",
+    });
+    if (res.status === 404) return { ok: false, error: "Source not found" };
+    if (!res.ok) return { ok: false, error: "Failed to load runs" };
+    const data = (await res.json()) as { runs: SourceRunPublic[] };
+    return { ok: true, data };
+  } catch {
+    return { ok: false, error: "Network error — is the API running?" };
+  }
+}

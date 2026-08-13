@@ -91,19 +91,20 @@ Full matrix + per-task AUTO SKILLS: **`AGENT-PROMPTS.md`**
 
 **Phase 7 — Product shell** ✅ complete (P7.1–P7.6 — one commit each)
 
-**Phase 8 — Collection completeness** (in progress)
+**Phase 8 — Collection completeness** ✅ complete (P8.1–P8.5 — one commit each)
+
+**Phase 9 — Document completeness** (next)
 
 | Done | Task |
 |------|------|
-| ✓ | P8.1 Playwright collector + career_page |
-| ✓ | P8.2 Telegram collector |
-| ✓ | P8.3 Manual import / similar / save |
-| ✓ | P8.4 Daily collect cron + enrichment |
-| | P8.5 Source runs + jobs filters UI |
+| | P9.1 CV/CL templates |
+| | P9.2 Bullet accept/reject |
+| | P9.3 Bulk generate |
+| | P9.4 PDF/ZIP download |
 
-**Next:** **P8.5** — Source runs + jobs filters UI  
-Prompt: `AGENT-PROMPTS.md` → Phase 8 → P8.5  
-Contract: `docs/contracts/phase-8-collection-complete.md`  
+**Next:** **P9.1** — modern/classic/minimal CV+CL templates  
+Prompt: `AGENT-PROMPTS.md` → Phase 9 → P9.1  
+Contract: `docs/contracts/phase-9-documents-complete.md`  
 Backlog: Phases 7–13 added 2026-08-12 (docs gap sync)
 
 ---

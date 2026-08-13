@@ -23,6 +23,7 @@ vi.mock("./sources.service.js", async (importOriginal) => {
     deleteSource: vi.fn(),
     testSource: vi.fn(),
     runSource: vi.fn(),
+    listSourceRuns: vi.fn(),
     SourceError: actual.SourceError,
   };
 });
@@ -39,7 +40,8 @@ const buildApp = () => {
 const authHeader = (
   userId = "user-a",
   role: "owner" | "member" | "viewer" = "owner",
-) => testAuthHeader(userId, role);
+  workspaceId = "w0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+) => testAuthHeader(userId, role, workspaceId);
 
 const sampleSource = {
   id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
@@ -392,5 +394,75 @@ describe("createSourceBodySchema", () => {
       },
     });
     expect(r.success).toBe(true);
+  });
+});
+
+describe("GET /api/v1/sources/templates", () => {
+  it("200 returns templates without secrets", async () => {
+    const res = await buildApp().request("/api/v1/sources/templates", {
+      headers: {
+        Authorization: await authHeader("user-a", "owner"),
+      },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      templates: Array<{ sourceType: string; requiredConfig: string[] }>;
+    };
+    expect(body.templates.length).toBeGreaterThanOrEqual(6);
+    expect(body.templates.some((t) => t.sourceType === "telegram")).toBe(true);
+    // No credential values — only field names in requiredConfig
+    expect(JSON.stringify(body)).not.toMatch(/123456:|sk_|Bearer /);
+  });
+});
+
+describe("GET /api/v1/sources/:id/runs (IDOR)", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("404 when source not in workspace", async () => {
+    mockService.listSourceRuns.mockRejectedValue(
+      new sourcesService.SourceError("Source not found", 404),
+    );
+    const otherWs = "b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22";
+    const res = await buildApp().request(
+      "/api/v1/sources/a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11/runs",
+      {
+        headers: {
+          Authorization: await authHeader("user-b", "owner", otherWs),
+        },
+      },
+    );
+    expect(res.status).toBe(404);
+    expect(mockService.listSourceRuns).toHaveBeenCalledWith(
+      otherWs,
+      "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+      expect.objectContaining({ limit: 20 }),
+    );
+  });
+
+  it("200 lists runs for owned source", async () => {
+    mockService.listSourceRuns.mockResolvedValue({
+      runs: [
+        {
+          id: "c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33",
+          status: "success",
+          jobsFound: 3,
+          durationMs: 1200,
+          error: null,
+          startedAt: new Date(),
+          completedAt: new Date(),
+        },
+      ],
+    });
+    const res = await buildApp().request(
+      "/api/v1/sources/a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11/runs",
+      {
+        headers: {
+          Authorization: await authHeader("user-a", "owner"),
+        },
+      },
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { runs: unknown[] };
+    expect(body.runs).toHaveLength(1);
   });
 });

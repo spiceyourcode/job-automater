@@ -161,6 +161,14 @@ export const sourceIdParamSchema = z.object({
   id: z.string().uuid(),
 });
 
+export const sourceRunsQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(100).default(20),
+    offset: z.coerce.number().int().min(0).default(0),
+  })
+  .strict();
+
 export type CreateSourceBody = z.infer<typeof createSourceBodySchema>;
 export type PatchSourceBody = z.infer<typeof patchSourceBodySchema>;
 export type SourceType = z.infer<typeof sourceTypeSchema>;
+export type SourceRunsQuery = z.infer<typeof sourceRunsQuerySchema>;

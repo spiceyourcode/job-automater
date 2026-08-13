@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { Inbox, Plus, Search } from "lucide-react";
 import type { JobPublic } from "@/lib/jobs";
 import {
+  getJobStatsAction,
   importJobAction,
   listJobsAction,
   listSimilarJobsAction,
@@ -35,6 +36,14 @@ export function JobsBoard({ initialJobs }: Props) {
   const [minScore, setMinScore] = useState<string>("0");
   const [q, setQ] = useState("");
   const [remoteOnly, setRemoteOnly] = useState(false);
+  const [source, setSource] = useState<string>("all");
+  const [location, setLocation] = useState("");
+  const [salaryMinK, setSalaryMinK] = useState("");
+  const [status, setStatus] = useState<string>("all");
+  const [savedOnly, setSavedOnly] = useState(false);
+  const [moreFilters, setMoreFilters] = useState(false);
+  const [statsLine, setStatsLine] = useState<string | null>(null);
+  const [sourceOptions, setSourceOptions] = useState<string[]>([]);
   const [importUrl, setImportUrl] = useState("");
   const [selected, setSelected] = useState<JobPublic | null>(null);
   const [similar, setSimilar] = useState<JobPublic[]>([]);
@@ -48,18 +57,37 @@ export function JobsBoard({ initialJobs }: Props) {
     minScore?: string;
     q?: string;
     remoteOnly?: boolean;
+    source?: string;
+    location?: string;
+    salaryMinK?: string;
+    status?: string;
+    savedOnly?: boolean;
   }) => {
     const s = next?.sort ?? sort;
     const ms = next?.minScore ?? minScore;
     const query = next?.q ?? q;
     const remote = next?.remoteOnly ?? remoteOnly;
+    const src = next?.source ?? source;
+    const loc = next?.location ?? location;
+    const salK = next?.salaryMinK ?? salaryMinK;
+    const st = next?.status ?? status;
+    const saved = next?.savedOnly ?? savedOnly;
     startTransition(async () => {
       const min = Number(ms);
+      const salMin = Number(salK);
       const result = await listJobsAction({
         sort: s,
         minScore: Number.isFinite(min) && min > 0 ? min : undefined,
         q: query.trim() || undefined,
         remoteOnly: remote || undefined,
+        source: src !== "all" ? src : undefined,
+        location: loc.trim() || undefined,
+        salaryMin:
+          Number.isFinite(salMin) && salMin > 0
+            ? Math.round(salMin * 1000 * 100)
+            : undefined,
+        status: st !== "all" ? st : undefined,
+        savedOnly: saved || undefined,
       });
       if (!result.ok) {
         setError(result.error);
@@ -67,6 +95,13 @@ export function JobsBoard({ initialJobs }: Props) {
       }
       setError(null);
       setJobs(result.data?.jobs ?? []);
+      const stats = await getJobStatsAction();
+      if (stats.ok && stats.data) {
+        setStatsLine(
+          `${stats.data.total} jobs · ${stats.data.scored} scored · ${stats.data.saved} saved`,
+        );
+        setSourceOptions(stats.data.bySource.map((x) => x.source));
+      }
     });
   };
 
@@ -264,10 +299,99 @@ export function JobsBoard({ initialJobs }: Props) {
             Remote only
           </Label>
         </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="cursor-pointer"
+          onClick={() => setMoreFilters((v) => !v)}
+        >
+          {moreFilters ? "Fewer filters" : "More filters"}
+        </Button>
         <Button type="submit" size="sm" className="cursor-pointer" disabled={pending}>
           {pending ? "Updating…" : "Apply"}
         </Button>
       </form>
+
+      {moreFilters && (
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+          <div className="w-full space-y-1.5 sm:w-40">
+            <Label htmlFor="jobs-source">Source</Label>
+            <Select
+              value={source}
+              onValueChange={(v) => {
+                setSource(v);
+                refresh({ source: v });
+              }}
+            >
+              <SelectTrigger id="jobs-source" className="w-full cursor-pointer">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Any source</SelectItem>
+                {sourceOptions.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {s}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="min-w-[10rem] flex-1 space-y-1.5">
+            <Label htmlFor="jobs-location">Location</Label>
+            <Input
+              id="jobs-location"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="City or region"
+            />
+          </div>
+          <div className="w-full space-y-1.5 sm:w-36">
+            <Label htmlFor="jobs-salary-min">Min salary ($k)</Label>
+            <Input
+              id="jobs-salary-min"
+              inputMode="numeric"
+              value={salaryMinK}
+              onChange={(e) => setSalaryMinK(e.target.value)}
+              placeholder="80"
+            />
+          </div>
+          <div className="w-full space-y-1.5 sm:w-36">
+            <Label htmlFor="jobs-status">Status</Label>
+            <Select
+              value={status}
+              onValueChange={(v) => {
+                setStatus(v);
+                refresh({ status: v });
+              }}
+            >
+              <SelectTrigger id="jobs-status" className="w-full cursor-pointer">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Any</SelectItem>
+                <SelectItem value="new">New</SelectItem>
+                <SelectItem value="scored">Scored</SelectItem>
+                <SelectItem value="archived">Archived</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2 pb-2">
+            <Checkbox
+              id="jobs-saved"
+              checked={savedOnly}
+              onCheckedChange={(c) => {
+                const next = c === true;
+                setSavedOnly(next);
+                refresh({ savedOnly: next });
+              }}
+            />
+            <Label htmlFor="jobs-saved" className="cursor-pointer font-normal">
+              Saved only
+            </Label>
+          </div>
+        </div>
+      )}
 
       {error && (
         <p className="text-sm text-destructive" role="alert">
@@ -276,7 +400,7 @@ export function JobsBoard({ initialJobs }: Props) {
       )}
 
       <p className="text-sm text-muted-foreground" aria-live="polite">
-        {heading}
+        {statsLine ?? heading}
       </p>
 
       {jobs.length === 0 ? (

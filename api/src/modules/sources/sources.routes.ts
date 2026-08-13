@@ -5,6 +5,7 @@ import {
   createSourceBodySchema,
   patchSourceBodySchema,
   sourceIdParamSchema,
+  sourceRunsQuerySchema,
 } from "./sources.schema.js";
 import * as sourcesService from "./sources.service.js";
 
@@ -21,6 +22,10 @@ sourcesRoutes.get("/", requireRole("owner", "member"), async (c) => {
   return c.json(result, 200);
 });
 
+sourcesRoutes.get("/templates", requireRole("owner", "member"), (c) => {
+  return c.json(sourcesService.listSourceTemplates(), 200);
+});
+
 sourcesRoutes.post(
   "/",
   requireRole("owner"),
@@ -30,6 +35,27 @@ sourcesRoutes.post(
     const body = c.req.valid("json");
     const result = await sourcesService.createSource(userId, workspaceId, body);
     return c.json(result, 201);
+  },
+);
+
+sourcesRoutes.get(
+  "/:id/runs",
+  requireRole("owner", "member"),
+  zValidator("param", sourceIdParamSchema),
+  zValidator("query", sourceRunsQuerySchema),
+  async (c) => {
+    const { workspaceId } = c.get("auth");
+    const { id } = c.req.valid("param");
+    const query = c.req.valid("query");
+    try {
+      const result = await sourcesService.listSourceRuns(workspaceId, id, query);
+      return c.json(result, 200);
+    } catch (err) {
+      if (isSourceError(err)) {
+        return c.json({ error: err.message }, err.statusCode);
+      }
+      throw err;
+    }
   },
 );
 

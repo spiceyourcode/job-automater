@@ -15,6 +15,12 @@ export type ListJobsParams = {
   minScore?: number;
   q?: string;
   remoteOnly?: boolean;
+  source?: string;
+  location?: string;
+  salaryMin?: number;
+  salaryMax?: number;
+  status?: string;
+  savedOnly?: boolean;
 };
 
 async function authHeaders(): Promise<HeadersInit | null> {
@@ -35,6 +41,12 @@ export async function listJobsAction(
   if (params.minScore != null) qs.set("minScore", String(params.minScore));
   if (params.q) qs.set("q", params.q);
   if (params.remoteOnly) qs.set("remoteOnly", "true");
+  if (params.source) qs.set("source", params.source);
+  if (params.location) qs.set("location", params.location);
+  if (params.salaryMin != null) qs.set("salaryMin", String(params.salaryMin));
+  if (params.salaryMax != null) qs.set("salaryMax", String(params.salaryMax));
+  if (params.status) qs.set("status", params.status);
+  if (params.savedOnly) qs.set("savedOnly", "true");
 
   try {
     const res = await fetch(`${API_URL}/api/v1/jobs?${qs}`, {
@@ -148,6 +160,31 @@ export async function unsaveJobAction(id: string): Promise<ActionResult> {
     if (res.status === 404) return { ok: false, error: "Job not found" };
     if (!res.ok) return { ok: false, error: "Failed to unsave job" };
     return { ok: true };
+  } catch {
+    return { ok: false, error: "Network error — is the API running?" };
+  }
+}
+
+export type JobStats = {
+  total: number;
+  remote: number;
+  scored: number;
+  saved: number;
+  bySource: Array<{ source: string; count: number }>;
+  byStatus: Array<{ status: string; count: number }>;
+};
+
+export async function getJobStatsAction(): Promise<ActionResult<JobStats>> {
+  const headers = await authHeaders();
+  if (!headers) return { ok: false, error: "Unauthorized" };
+  try {
+    const res = await fetch(`${API_URL}/api/v1/jobs/stats`, {
+      headers,
+      cache: "no-store",
+    });
+    if (!res.ok) return { ok: false, error: "Failed to load stats" };
+    const data = (await res.json()) as JobStats;
+    return { ok: true, data };
   } catch {
     return { ok: false, error: "Network error — is the API running?" };
   }

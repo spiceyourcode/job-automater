@@ -13,6 +13,17 @@ export const listJobsQuerySchema = z
       .enum(["true", "false"])
       .optional()
       .transform((v) => v === "true"),
+    source: z.string().max(50).optional(),
+    location: z.string().max(255).optional(),
+    salaryMin: z.coerce.number().int().nonnegative().optional(),
+    salaryMax: z.coerce.number().int().nonnegative().optional(),
+    status: z.string().max(30).optional(),
+    employmentType: z.string().max(50).optional(),
+    experienceLevel: z.string().max(30).optional(),
+    savedOnly: z
+      .enum(["true", "false"])
+      .optional()
+      .transform((v) => v === "true"),
     limit: z.coerce.number().int().min(1).max(100).default(50),
   })
   .strict();

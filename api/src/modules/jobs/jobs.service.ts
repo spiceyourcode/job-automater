@@ -1,10 +1,11 @@
 import { createHash, randomUUID } from "node:crypto";
-import { and, desc, eq, ilike, ne, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, isNotNull, lte, ne, or, sql } from "drizzle-orm";
 import { db } from "../../db/index.js";
 import { jobs, jobScores, savedJobs } from "../../db/schema/index.js";
 import { enqueueMatchScore } from "../../lib/queue.js";
 import { assertPublicHttpUrl } from "../../lib/safe-url.js";
 import type { ImportJobBody, ListJobsQuery } from "./jobs.schema.js";
+
 
 export class JobError extends Error {
   constructor(
@@ -88,6 +89,37 @@ export async function listJobs(userId: string, query: ListJobsQuery) {
       or(ilike(jobs.title, term), ilike(jobs.company, term))!,
     );
   }
+  if (query.source) {
+    conditions.push(eq(jobs.source, query.source));
+  }
+  if (query.location) {
+    conditions.push(ilike(jobs.location, `%${query.location}%`));
+  }
+  if (query.salaryMin != null) {
+    conditions.push(
+      or(
+        gte(jobs.salaryMin, query.salaryMin),
+        gte(jobs.salaryMax, query.salaryMin),
+      )!,
+    );
+  }
+  if (query.salaryMax != null) {
+    conditions.push(
+      or(
+        lte(jobs.salaryMin, query.salaryMax),
+        lte(jobs.salaryMax, query.salaryMax),
+      )!,
+    );
+  }
+  if (query.status) {
+    conditions.push(eq(jobs.status, query.status));
+  }
+  if (query.employmentType) {
+    conditions.push(eq(jobs.employmentType, query.employmentType));
+  }
+  if (query.experienceLevel) {
+    conditions.push(eq(jobs.experienceLevel, query.experienceLevel));
+  }
 
   const rows = await db
     .select({
@@ -104,7 +136,11 @@ export async function listJobs(userId: string, query: ListJobsQuery) {
       savedJobs,
       and(eq(savedJobs.jobId, jobs.id), eq(savedJobs.userId, userId)),
     )
-    .where(and(...conditions))
+    .where(
+      query.savedOnly
+        ? and(...conditions, isNotNull(savedJobs.id))
+        : and(...conditions),
+    )
     .orderBy(
       query.sort === "date"
         ? desc(jobs.collectedAt)
@@ -122,6 +158,50 @@ export async function listJobs(userId: string, query: ListJobsQuery) {
   }
 
   return { jobs: items, total: items.length };
+}
+
+/** Aggregate stats for the authenticated user only (IDOR-safe). */
+export async function getJobStats(userId: string) {
+  const [totals] = await db
+    .select({
+      total: sql<number>`count(*)::int`,
+      remote: sql<number>`count(*) filter (where ${jobs.isRemote})::int`,
+      scored: sql<number>`count(*) filter (where ${jobs.status} = 'scored')::int`,
+      saved: sql<number>`(
+        select count(*)::int from ${savedJobs}
+        where ${savedJobs.userId} = ${userId}
+      )`,
+    })
+    .from(jobs)
+    .where(and(eq(jobs.userId, userId), eq(jobs.isDuplicate, false)));
+
+  const bySource = await db
+    .select({
+      source: jobs.source,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(jobs)
+    .where(and(eq(jobs.userId, userId), eq(jobs.isDuplicate, false)))
+    .groupBy(jobs.source)
+    .orderBy(sql`count(*) DESC`);
+
+  const byStatus = await db
+    .select({
+      status: jobs.status,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(jobs)
+    .where(and(eq(jobs.userId, userId), eq(jobs.isDuplicate, false)))
+    .groupBy(jobs.status);
+
+  return {
+    total: totals?.total ?? 0,
+    remote: totals?.remote ?? 0,
+    scored: totals?.scored ?? 0,
+    saved: totals?.saved ?? 0,
+    bySource,
+    byStatus,
+  };
 }
 
 export async function getJob(userId: string, id: string) {
