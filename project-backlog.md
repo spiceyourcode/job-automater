@@ -98,7 +98,7 @@ Phases **0–6** are the shipped MVP slice (contracts `phase-1` … `phase-6`). 
 | 7.2 | OAuth: Google, GitHub, LinkedIn | api, web | [x] | Schema §2.2, AppFlow §2.1 |
 | 7.3 | Sessions list/revoke + `GET/PATCH /auth/me` | api | [x] | Schema §2.2, Impl Plan W2 |
 | 7.4 | CV activate / delete / diff / reindex / chunks | api, workers | [x] | Schema §2.3, TRD FR-CV-05/06 |
-| 7.5 | Settings: profile tabs + CV manager UI | web | [ ] | AppFlow §2.6, UIUX settings |
+| 7.5 | Settings: profile tabs + CV manager UI | web | [x] | AppFlow §2.6, UIUX settings |
 | 7.6 | App shell: Sidebar, TopBar, theme, dashboard widgets | web | [ ] | UIUX §5.1–5.2 |
 
 **Contract:** [`docs/contracts/phase-7-product-shell.md`](./docs/contracts/phase-7-product-shell.md)
