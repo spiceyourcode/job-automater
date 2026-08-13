@@ -68,6 +68,19 @@ export const jobs = pgTable(
       .notNull(),
     qualityScore: numeric("quality_score", { precision: 4, scale: 1 }),
     completenessScore: numeric("completeness_score", { precision: 4, scale: 1 }),
+    /** Optional company enrichment (FR-NE-03 / P8.4). */
+    companySize: varchar("company_size", { length: 30 }),
+    companyIndustry: varchar("company_industry", { length: 100 }),
+    companyDomain: varchar("company_domain", { length: 255 }),
+    companyLogoUrl: text("company_logo_url"),
+    companyDescription: text("company_description"),
+    companyFoundedYear: integer("company_founded_year"),
+    companyEmployeeCount: integer("company_employee_count"),
+    companyFundingStage: varchar("company_funding_stage", { length: 30 }),
+    companyTechStack: jsonb("company_tech_stack")
+      .$type<string[]>()
+      .default(sql`'[]'::jsonb`)
+      .notNull(),
     status: varchar("status", { length: 30 }).default("new").notNull(),
     isDuplicate: boolean("is_duplicate").default(false).notNull(),
     duplicateOf: uuid("duplicate_of"),

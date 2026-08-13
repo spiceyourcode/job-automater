@@ -20,6 +20,7 @@ SUBMIT_APPLICATION_KEY = "jobautomater:submit_application"
 MONITOR_EMAIL_KEY = "jobautomater:monitor_email"
 REINDEX_CV_KEY = "jobautomater:reindex_cv"
 MATCH_SCORE_KEY = "jobautomater:match_score"
+ENRICH_COMPANY_KEY = "jobautomater:enrich_company"
 
 _stop = threading.Event()
 _thread: threading.Thread | None = None
@@ -85,6 +86,15 @@ def _dispatch(key: str, payload: dict[str, Any]) -> None:
             payload.get("user_id"),
             len(payload.get("job_ids") or []),
         )
+    elif key == ENRICH_COMPANY_KEY:
+        from tasks.enrich_company import enrich_company
+
+        enrich_company.delay(payload)
+        logger.info(
+            "bridge_enrich_company user_id=%s jobs=%s",
+            payload.get("user_id"),
+            len(payload.get("job_ids") or []),
+        )
 
 
 def _loop() -> None:
@@ -100,6 +110,7 @@ def _loop() -> None:
                     MONITOR_EMAIL_KEY,
                     REINDEX_CV_KEY,
                     MATCH_SCORE_KEY,
+                    ENRICH_COMPANY_KEY,
                 ],
                 timeout=2,
             )

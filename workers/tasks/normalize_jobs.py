@@ -88,9 +88,11 @@ def process_normalize_jobs(payload: dict[str, Any]) -> dict[str, Any]:
                 skipped += 1
 
     if normalized_job_ids:
+        from tasks.enrich_company import enrich_company
         from tasks.match_score import match_score
 
         match_score.delay({"job_ids": normalized_job_ids, "user_id": job.user_id})
+        enrich_company.delay({"job_ids": normalized_job_ids, "user_id": job.user_id})
 
     logger.info(
         "normalize_jobs_done user_jobs=%s ok=%s failed=%s skipped=%s",

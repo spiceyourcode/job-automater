@@ -35,6 +35,18 @@
       },
       "additionalProperties": false
     },
+    "EnrichCompanyJob": {
+      "type": "object",
+      "required": ["user_id"],
+      "properties": {
+        "user_id": { "type": "string", "format": "uuid" },
+        "job_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" }
+        }
+      },
+      "additionalProperties": false
+    },
     "GenerateDocsJob": {
       "type": "object",
       "required": ["application_id", "user_id", "job_id"],

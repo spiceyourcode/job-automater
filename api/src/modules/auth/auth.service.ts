@@ -476,6 +476,12 @@ export const patchMe = async (
     });
 
   if (!updated) throw new AuthError();
+  if (body.timezone !== undefined) {
+    const { ensureUserDailySchedule } = await import(
+      "../../lib/daily-collect.js"
+    );
+    await ensureUserDailySchedule(userId, updated.timezone).catch(() => {});
+  }
   const membership = await db.transaction(async (tx) =>
     resolveMembership(tx, updated.id, updated.email),
   );

@@ -1,7 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "../../db/index.js";
-import { sourceConfigs, type SourceConfig } from "../../db/schema/index.js";
+import {
+  sourceConfigs,
+  users,
+  type SourceConfig,
+} from "../../db/schema/index.js";
 import { enqueueCollectSource } from "../../lib/queue.js";
 import { assertPublicHttpUrl } from "../../lib/safe-url.js";
 import {
@@ -213,6 +217,21 @@ export async function createSource(
     .returning();
 
   if (!created) throw new Error("Failed to create source");
+
+  try {
+    const { ensureUserDailySchedule } = await import(
+      "../../lib/daily-collect.js"
+    );
+    const [u] = await db
+      .select({ timezone: users.timezone })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    await ensureUserDailySchedule(userId, u?.timezone ?? "UTC");
+  } catch {
+    // Schedule sync is best-effort; collect still works via Run Now
+  }
+
   return { sourceConfig: toPublicSource(created) };
 }
 

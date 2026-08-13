@@ -16,6 +16,8 @@ app = Celery(
         "tasks.generate_docs",
         "tasks.submit_application",
         "tasks.monitor_email",
+        "tasks.enrich_company",
+        "tasks.reindex_cv",
     ],
 )
 

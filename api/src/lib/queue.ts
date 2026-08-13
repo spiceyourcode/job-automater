@@ -143,3 +143,25 @@ export async function enqueueMatchScore(
     await client.quit().catch(() => {});
   }
 }
+
+export type EnrichCompanyPayload = {
+  user_id: string;
+  /** Empty = enrich recent jobs for user missing company_domain. */
+  job_ids: string[];
+};
+
+/** Optional company enrichment (FR-NE-03) — never logs secrets. */
+export async function enqueueEnrichCompany(
+  payload: EnrichCompanyPayload,
+): Promise<void> {
+  const client = createClient({ url: env.redisUrl });
+  try {
+    await client.connect();
+    await client.lPush(
+      "jobautomater:enrich_company",
+      JSON.stringify(payload),
+    );
+  } finally {
+    await client.quit().catch(() => {});
+  }
+}
