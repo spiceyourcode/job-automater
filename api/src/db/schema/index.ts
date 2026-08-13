@@ -59,6 +59,11 @@ export {
   type WorkspaceRole,
 } from "./workspaces.js";
 export {
+  authTokens,
+  type AuthToken,
+  type NewAuthToken,
+} from "./auth-tokens.js";
+export {
   salaryCentsSchema,
   userInsertSchema,
   profileInsertSchema,

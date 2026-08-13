@@ -17,6 +17,10 @@ const parseTtlDate = (ttl: string): Date => {
 export const generateRefreshToken = (): string =>
   randomBytes(40).toString("hex");
 
+/** Opaque single-use token for email verify / password reset. */
+export const generateAuthActionToken = (): string =>
+  randomBytes(32).toString("hex");
+
 /** Returns the SHA-256 hex digest of a token (for DB storage). */
 export const hashToken = (token: string): string =>
   createHash("sha256").update(token).digest("hex");
@@ -24,3 +28,9 @@ export const hashToken = (token: string): string =>
 /** Returns the expiry Date for a new refresh token based on env config. */
 export const refreshTokenExpiry = (): Date =>
   parseTtlDate(env.jwtRefreshTtl);
+
+export const emailVerifyExpiry = (): Date =>
+  parseTtlDate(env.emailVerifyTtl);
+
+export const passwordResetExpiry = (): Date =>
+  parseTtlDate(env.passwordResetTtl);

@@ -26,6 +26,11 @@ const envSchema = z
     S3_BUCKET: z.string().min(1),
     S3_REGION: z.string().min(1).default("us-east-1"),
     REDIS_URL: z.string().url().default("redis://localhost:6379"),
+    APP_URL: z.string().url().default("http://localhost:3000"),
+    EMAIL_FROM: z.string().email().default("noreply@jobautomater.local"),
+    SMTP_WEBHOOK_URL: z.string().url().optional(),
+    EMAIL_VERIFY_TTL: z.string().default("24h"),
+    PASSWORD_RESET_TTL: z.string().default("1h"),
   })
   .strict();
 
@@ -47,6 +52,11 @@ const parsed = envSchema.safeParse({
   S3_BUCKET: process.env.S3_BUCKET ?? (isProd ? undefined : "jobautomater"),
   S3_REGION: process.env.S3_REGION ?? "us-east-1",
   REDIS_URL: process.env.REDIS_URL ?? process.env.CELERY_BROKER_URL,
+  APP_URL: process.env.APP_URL ?? "http://localhost:3000",
+  EMAIL_FROM: process.env.EMAIL_FROM ?? "noreply@jobautomater.local",
+  SMTP_WEBHOOK_URL: process.env.SMTP_WEBHOOK_URL || undefined,
+  EMAIL_VERIFY_TTL: process.env.EMAIL_VERIFY_TTL ?? "24h",
+  PASSWORD_RESET_TTL: process.env.PASSWORD_RESET_TTL ?? "1h",
 });
 
 if (!parsed.success) {
@@ -69,4 +79,9 @@ export const env = {
   s3Bucket: parsed.data.S3_BUCKET,
   s3Region: parsed.data.S3_REGION,
   redisUrl: parsed.data.REDIS_URL,
+  appUrl: parsed.data.APP_URL,
+  emailFrom: parsed.data.EMAIL_FROM,
+  smtpWebhookUrl: parsed.data.SMTP_WEBHOOK_URL,
+  emailVerifyTtl: parsed.data.EMAIL_VERIFY_TTL,
+  passwordResetTtl: parsed.data.PASSWORD_RESET_TTL,
 } as const;

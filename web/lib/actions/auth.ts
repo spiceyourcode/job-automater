@@ -140,3 +140,82 @@ export async function logoutAction(): Promise<void> {
   cookieStore.delete("onboarding_complete");
   redirect("/login");
 }
+
+export async function forgotPasswordAction(input: {
+  email: string;
+}): Promise<ActionState> {
+  const parsed = z.object({ email: z.string().email() }).safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Validation failed" };
+  }
+  try {
+    const res = await fetch(`${API_URL}/api/v1/auth/forgot-password`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(parsed.data),
+      cache: "no-store",
+    });
+    if (!res.ok) return { error: "Could not start password reset" };
+    return undefined;
+  } catch {
+    return { error: "Network error — is the API running?" };
+  }
+}
+
+export async function resetPasswordAction(input: {
+  token: string;
+  password: string;
+}): Promise<ActionState> {
+  const parsed = z
+    .object({
+      token: z.string().min(20),
+      password: z.string().min(8),
+    })
+    .safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Validation failed" };
+  }
+  try {
+    const res = await fetch(`${API_URL}/api/v1/auth/reset-password`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(parsed.data),
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      return {
+        error: (body?.error as string | undefined) ?? "Reset failed",
+      };
+    }
+    return undefined;
+  } catch {
+    return { error: "Network error — is the API running?" };
+  }
+}
+
+export async function verifyEmailAction(input: {
+  token: string;
+}): Promise<ActionState> {
+  const parsed = z.object({ token: z.string().min(20) }).safeParse(input);
+  if (!parsed.success) {
+    return { error: "Invalid verification link" };
+  }
+  try {
+    const res = await fetch(`${API_URL}/api/v1/auth/verify-email`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(parsed.data),
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      return {
+        error: (body?.error as string | undefined) ?? "Verification failed",
+      };
+    }
+    return undefined;
+  } catch {
+    return { error: "Network error — is the API running?" };
+  }
+}

@@ -5,6 +5,9 @@ import {
   registerBodySchema,
   loginBodySchema,
   refreshBodySchema,
+  forgotPasswordBodySchema,
+  resetPasswordBodySchema,
+  verifyEmailBodySchema,
 } from "./auth.schema.js";
 import * as authService from "./auth.service.js";
 
@@ -85,6 +88,60 @@ authRoutes.get("/me", requireAuth, async (c) => {
   try {
     const user = await authService.getMe(userId);
     return c.json(user, 200);
+  } catch (err) {
+    if (isAuthError(err)) {
+      return c.json({ error: "unauthorized" }, 401);
+    }
+    throw err;
+  }
+});
+
+authRoutes.post(
+  "/forgot-password",
+  zValidator("json", forgotPasswordBodySchema),
+  async (c) => {
+    const result = await authService.forgotPassword(c.req.valid("json"));
+    return c.json(result, 200);
+  },
+);
+
+authRoutes.post(
+  "/reset-password",
+  zValidator("json", resetPasswordBodySchema),
+  async (c) => {
+    try {
+      const result = await authService.resetPassword(c.req.valid("json"));
+      return c.json(result, 200);
+    } catch (err) {
+      if (err instanceof authService.BadRequestError) {
+        return c.json({ error: err.message }, 400);
+      }
+      throw err;
+    }
+  },
+);
+
+authRoutes.post(
+  "/verify-email",
+  zValidator("json", verifyEmailBodySchema),
+  async (c) => {
+    try {
+      const result = await authService.verifyEmail(c.req.valid("json"));
+      return c.json(result, 200);
+    } catch (err) {
+      if (err instanceof authService.BadRequestError) {
+        return c.json({ error: err.message }, 400);
+      }
+      throw err;
+    }
+  },
+);
+
+authRoutes.post("/resend-verification", requireAuth, async (c) => {
+  const { userId } = c.get("auth");
+  try {
+    const result = await authService.resendVerification(userId);
+    return c.json(result, 200);
   } catch (err) {
     if (isAuthError(err)) {
       return c.json({ error: "unauthorized" }, 401);

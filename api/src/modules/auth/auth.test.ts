@@ -9,6 +9,10 @@ vi.mock("./auth.service.js", () => ({
   refresh: vi.fn(),
   logout: vi.fn(),
   getMe: vi.fn(),
+  forgotPassword: vi.fn(),
+  resetPassword: vi.fn(),
+  verifyEmail: vi.fn(),
+  resendVerification: vi.fn(),
   parseClientIp: vi.fn(() => null),
   ConflictError: class ConflictError extends Error {
     statusCode = 409;
@@ -22,6 +26,13 @@ vi.mock("./auth.service.js", () => ({
     constructor() {
       super("Invalid credentials");
       this.name = "AuthError";
+    }
+  },
+  BadRequestError: class BadRequestError extends Error {
+    statusCode = 400;
+    constructor(msg: string) {
+      super(msg);
+      this.name = "BadRequestError";
     }
   },
 }));
@@ -87,6 +98,7 @@ describe("POST /api/v1/auth/register", () => {
         id: "uid",
         email: "a@b.com",
         name: null,
+        emailVerified: false,
         role: "owner",
         workspaceId: "w0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
       },
@@ -141,6 +153,7 @@ describe("POST /api/v1/auth/login", () => {
         id: "uid",
         email: "a@b.com",
         name: null,
+        emailVerified: true,
         role: "owner",
         workspaceId: "w0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
       },
@@ -230,6 +243,7 @@ describe("GET /api/v1/auth/me", () => {
       id: "uid",
       email: "test@example.com",
       name: null,
+      emailVerified: true,
       role: "owner",
       workspaceId: "w0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
     });
@@ -251,5 +265,94 @@ describe("GET /api/v1/auth/me", () => {
       headers: { Authorization: "Bearer eyJhbGciOiJIUzI1NiJ9.bad.bad" },
     });
     expect(res.status).toBe(401);
+  });
+});
+
+describe("POST /api/v1/auth/forgot-password", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("200 always (no email enumeration)", async () => {
+    mockService.forgotPassword.mockResolvedValue({
+      ok: true,
+      message: "If an account exists for that email, a reset link has been sent.",
+    });
+    const res = await buildApp().request("/api/v1/auth/forgot-password", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "anyone@example.com" }),
+    });
+    expect(res.status).toBe(200);
+  });
+
+  it("400 rejects userId in body (strict schema)", async () => {
+    const res = await buildApp().request("/api/v1/auth/forgot-password", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "a@b.com", userId: "x" }),
+    });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("POST /api/v1/auth/reset-password", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("200 on valid token+password", async () => {
+    mockService.resetPassword.mockResolvedValue({ ok: true });
+    const res = await buildApp().request("/api/v1/auth/reset-password", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        token: "a".repeat(40),
+        password: "newpassword1",
+      }),
+    });
+    expect(res.status).toBe(200);
+    expect(mockService.resetPassword).toHaveBeenCalledWith({
+      token: "a".repeat(40),
+      password: "newpassword1",
+    });
+  });
+
+  it("400 when token invalid", async () => {
+    mockService.resetPassword.mockRejectedValue(
+      new authService.BadRequestError("Invalid or expired reset token"),
+    );
+    const res = await buildApp().request("/api/v1/auth/reset-password", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        token: "b".repeat(40),
+        password: "newpassword1",
+      }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("400 rejects userId from body", async () => {
+    const res = await buildApp().request("/api/v1/auth/reset-password", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        token: "c".repeat(40),
+        password: "newpassword1",
+        userId: "should-not-work",
+      }),
+    });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("POST /api/v1/auth/verify-email", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("200 verifies with token only", async () => {
+    mockService.verifyEmail.mockResolvedValue({ ok: true });
+    const res = await buildApp().request("/api/v1/auth/verify-email", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token: "d".repeat(40) }),
+    });
+    expect(res.status).toBe(200);
   });
 });

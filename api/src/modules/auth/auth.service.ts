@@ -10,19 +10,32 @@ import {
   userSessions,
   workspaces,
   workspaceMembers,
+  authTokens,
 } from "../../db/schema/index.js";
 import type { WorkspaceRole } from "../../db/schema/workspaces.js";
+import { env } from "../../env.js";
 import { signAccessToken } from "../../lib/jwt.js";
 import {
+  generateAuthActionToken,
   generateRefreshToken,
   hashToken,
   refreshTokenExpiry,
+  emailVerifyExpiry,
+  passwordResetExpiry,
 } from "../../lib/token.js";
+import {
+  passwordResetEmail,
+  sendMail,
+  verificationEmail,
+} from "../../lib/mailer.js";
 import type {
   RegisterBody,
   LoginBody,
   TokenPair,
   AuthUser,
+  ForgotPasswordBody,
+  ResetPasswordBody,
+  VerifyEmailBody,
 } from "./auth.schema.js";
 
 type Tx = PgTransaction<
@@ -53,6 +66,42 @@ export class ConflictError extends Error {
     super(message);
     this.name = "ConflictError";
   }
+}
+
+export class BadRequestError extends Error {
+  readonly statusCode = 400;
+  constructor(message: string) {
+    super(message);
+    this.name = "BadRequestError";
+  }
+}
+
+async function issueAuthToken(
+  tx: Tx,
+  userId: string,
+  type: "email_verify" | "password_reset",
+  expiresAt: Date,
+): Promise<string> {
+  // Invalidate prior unused tokens of this type
+  await tx
+    .update(authTokens)
+    .set({ usedAt: new Date() })
+    .where(
+      and(
+        eq(authTokens.userId, userId),
+        eq(authTokens.type, type),
+        isNull(authTokens.usedAt),
+      ),
+    );
+
+  const raw = generateAuthActionToken();
+  await tx.insert(authTokens).values({
+    userId,
+    tokenHash: hashToken(raw),
+    type,
+    expiresAt,
+  });
+  return raw;
 }
 
 async function createPersonalWorkspace(
@@ -157,6 +206,12 @@ export const register = async (
       if (!user) throw new Error("Failed to create user");
 
       const membership = await createPersonalWorkspace(tx, user.id, user.email);
+      const verifyRaw = await issueAuthToken(
+        tx,
+        user.id,
+        "email_verify",
+        emailVerifyExpiry(),
+      );
       const tokens = await issueTokens(
         tx,
         user.id,
@@ -166,11 +221,21 @@ export const register = async (
         userAgent,
         ipAddress,
       );
+
+      // Send after commit path — fire inside tx is ok for local outbox
+      await sendMail(
+        verificationEmail({
+          to: user.email,
+          verifyUrl: `${env.appUrl}/verify-email?token=${verifyRaw}`,
+        }),
+      );
+
       return {
         user: {
           id: user.id,
           email: user.email,
           name: user.name ?? null,
+          emailVerified: false,
           role: membership.role,
           workspaceId: membership.workspaceId,
         },
@@ -203,6 +268,7 @@ export const login = async (
       email: users.email,
       name: users.name,
       passwordHash: users.passwordHash,
+      emailVerified: users.emailVerified,
       deletedAt: users.deletedAt,
     })
     .from(users)
@@ -235,6 +301,7 @@ export const login = async (
         id: user.id,
         email: user.email,
         name: user.name ?? null,
+        emailVerified: user.emailVerified,
         role: membership.role,
         workspaceId: membership.workspaceId,
       },
@@ -326,7 +393,12 @@ export const logout = async (userId: string): Promise<void> => {
 
 export const getMe = async (userId: string): Promise<AuthUser> => {
   const [user] = await db
-    .select({ id: users.id, email: users.email, name: users.name })
+    .select({
+      id: users.id,
+      email: users.email,
+      name: users.name,
+      emailVerified: users.emailVerified,
+    })
     .from(users)
     .where(and(eq(users.id, userId), isNull(users.deletedAt)))
     .limit(1);
@@ -339,7 +411,144 @@ export const getMe = async (userId: string): Promise<AuthUser> => {
     id: user.id,
     email: user.email,
     name: user.name ?? null,
+    emailVerified: user.emailVerified,
     role: membership.role,
     workspaceId: membership.workspaceId,
   };
+};
+
+/**
+ * Mark email verified via single-use token.
+ * Token alone identifies the user — never accept userId from body (FAILURE clause).
+ */
+export const verifyEmail = async (body: VerifyEmailBody): Promise<{ ok: true }> => {
+  const tokenHash = hashToken(body.token);
+  const now = new Date();
+
+  return await db.transaction(async (tx) => {
+    const [row] = await tx
+      .update(authTokens)
+      .set({ usedAt: now })
+      .where(
+        and(
+          eq(authTokens.tokenHash, tokenHash),
+          eq(authTokens.type, "email_verify"),
+          isNull(authTokens.usedAt),
+          sql`${authTokens.expiresAt} > ${now}`,
+        ),
+      )
+      .returning({ userId: authTokens.userId });
+
+    if (!row) throw new BadRequestError("Invalid or expired verification token");
+
+    await tx
+      .update(users)
+      .set({ emailVerified: true })
+      .where(eq(users.id, row.userId));
+
+    return { ok: true as const };
+  });
+};
+
+/** Always returns the same message — no email enumeration. */
+export const forgotPassword = async (
+  body: ForgotPasswordBody,
+): Promise<{ ok: true; message: string }> => {
+  const message =
+    "If an account exists for that email, a reset link has been sent.";
+
+  const [user] = await db
+    .select({ id: users.id, email: users.email })
+    .from(users)
+    .where(and(eq(users.email, body.email), isNull(users.deletedAt)))
+    .limit(1);
+
+  if (!user) return { ok: true, message };
+
+  const raw = await db.transaction(async (tx) =>
+    issueAuthToken(tx, user.id, "password_reset", passwordResetExpiry()),
+  );
+
+  await sendMail(
+    passwordResetEmail({
+      to: user.email,
+      resetUrl: `${env.appUrl}/reset-password?token=${raw}`,
+    }),
+  );
+
+  return { ok: true, message };
+};
+
+/**
+ * Reset password with single-use token. Token identifies user (no userId in body).
+ * Marks token used and revokes all sessions.
+ */
+export const resetPassword = async (
+  body: ResetPasswordBody,
+): Promise<{ ok: true }> => {
+  const tokenHash = hashToken(body.token);
+  const now = new Date();
+  const passwordHash = await hash(body.password, BCRYPT_ROUNDS);
+
+  return await db.transaction(async (tx) => {
+    const [row] = await tx
+      .update(authTokens)
+      .set({ usedAt: now })
+      .where(
+        and(
+          eq(authTokens.tokenHash, tokenHash),
+          eq(authTokens.type, "password_reset"),
+          isNull(authTokens.usedAt),
+          sql`${authTokens.expiresAt} > ${now}`,
+        ),
+      )
+      .returning({ userId: authTokens.userId });
+
+    if (!row) throw new BadRequestError("Invalid or expired reset token");
+
+    await tx
+      .update(users)
+      .set({ passwordHash, emailVerified: true })
+      .where(eq(users.id, row.userId));
+
+    // Force re-login everywhere
+    await tx
+      .update(userSessions)
+      .set({ revokedAt: now })
+      .where(
+        and(eq(userSessions.userId, row.userId), isNull(userSessions.revokedAt)),
+      );
+
+    return { ok: true as const };
+  });
+};
+
+export const resendVerification = async (
+  userId: string,
+): Promise<{ ok: true }> => {
+  const [user] = await db
+    .select({
+      id: users.id,
+      email: users.email,
+      emailVerified: users.emailVerified,
+    })
+    .from(users)
+    .where(and(eq(users.id, userId), isNull(users.deletedAt)))
+    .limit(1);
+
+  if (!user) throw new AuthError();
+  if (user.emailVerified) return { ok: true };
+
+  const raw = await db.transaction(async (tx) =>
+    issueAuthToken(tx, user.id, "email_verify", emailVerifyExpiry()),
+  );
+
+  await sendMail(
+    verificationEmail({
+      to: user.email,
+      verifyUrl: `${env.appUrl}/verify-email?token=${raw}`,
+    }),
+  );
+
+  return { ok: true };
 };

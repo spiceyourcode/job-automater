@@ -94,7 +94,7 @@ Phases **0–6** are the shipped MVP slice (contracts `phase-1` … `phase-6`). 
 
 | # | Task | Service | Status | Source |
 |---|------|---------|--------|--------|
-| 7.1 | Email verification + forgot/reset password | api, web | [ ] | Schema §2.2, Impl Plan W2 |
+| 7.1 | Email verification + forgot/reset password | api, web | [x] | Schema §2.2, Impl Plan W2 |
 | 7.2 | OAuth: Google, GitHub, LinkedIn | api, web | [ ] | Schema §2.2, AppFlow §2.1 |
 | 7.3 | Sessions list/revoke + `GET/PATCH /auth/me` | api | [ ] | Schema §2.2, Impl Plan W2 |
 | 7.4 | CV activate / delete / diff / reindex / chunks | api, workers | [ ] | Schema §2.3, TRD FR-CV-05/06 |
