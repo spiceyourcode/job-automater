@@ -219,3 +219,52 @@ export async function verifyEmailAction(input: {
     return { error: "Network error — is the API running?" };
   }
 }
+
+/** One-time OAuth exchange code → httpOnly cookies (HG-1). */
+export async function completeOAuthAction(input: {
+  code: string;
+}): Promise<ActionState> {
+  const parsed = z.object({ code: z.string().min(20).max(128) }).safeParse(input);
+  if (!parsed.success) {
+    return { error: "Invalid OAuth session" };
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/api/v1/auth/oauth/exchange`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ code: parsed.data.code }),
+      cache: "no-store",
+    });
+  } catch {
+    return { error: "Network error — is the API running?" };
+  }
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    return {
+      error: (body?.error as string | undefined) ?? "OAuth sign-in failed",
+    };
+  }
+
+  const data = (await res.json()) as {
+    tokens: { accessToken: string; refreshToken: string };
+  };
+  await setAuthCookies(data.tokens);
+
+  const { fetchOwnProfile, setOnboardingCompleteCookie } = await import(
+    "./profile"
+  );
+  const { profileMeetsOnboardingRequirements } = await import("../onboarding");
+  const profileResult = await fetchOwnProfile();
+  if (profileResult.ok && profileResult.data) {
+    const gate = profileMeetsOnboardingRequirements(profileResult.data);
+    if (gate.ok) {
+      await setOnboardingCompleteCookie(true);
+      redirect("/dashboard");
+    }
+  }
+  await setOnboardingCompleteCookie(false);
+  redirect("/onboarding");
+}

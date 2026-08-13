@@ -94,14 +94,14 @@ Full matrix + per-task AUTO SKILLS: **`AGENT-PROMPTS.md`**
 | Done | Task |
 |------|------|
 | ✓ | P7.1 Email verification + password reset |
-| | P7.2 OAuth Google / GitHub / LinkedIn |
+| ✓ | P7.2 OAuth Google / GitHub / LinkedIn |
 | | P7.3 Sessions + `/auth/me` |
 | | P7.4 CV activate / delete / reindex |
 | | P7.5 Profile + CV settings UI |
 | | P7.6 App shell + dashboard widgets |
 
-**Next:** **P7.2** — OAuth Google / GitHub / LinkedIn  
-Prompt: `AGENT-PROMPTS.md` → Phase 7 → P7.2  
+**Next:** **P7.3** — Sessions + `/auth/me`  
+Prompt: `AGENT-PROMPTS.md` → Phase 7 → P7.3  
 Contract: `docs/contracts/phase-7-product-shell.md`  
 Backlog: Phases 7–13 added 2026-08-12 (docs gap sync)
 

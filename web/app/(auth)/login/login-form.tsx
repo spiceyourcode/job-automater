@@ -2,6 +2,7 @@
 
 import { useTransition } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -26,37 +27,37 @@ import {
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { OAuthButtons } from "@/components/auth/oauth-buttons";
-import { registerAction } from "@/lib/actions/auth";
+import { loginAction } from "@/lib/actions/auth";
 
-const schema = z
-  .object({
-    name: z.string().min(2, "Name must be at least 2 characters"),
-    email: z.string().email("Enter a valid email"),
-    password: z.string().min(8, "Password must be at least 8 characters"),
-    confirm: z.string(),
-  })
-  .refine((d) => d.password === d.confirm, {
-    message: "Passwords do not match",
-    path: ["confirm"],
-  });
+const schema = z.object({
+  email: z.string().email("Enter a valid email"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+});
 
 type FormValues = z.infer<typeof schema>;
 
-export default function RegisterPage() {
+const OAUTH_ERRORS: Record<string, string> = {
+  provider_denied: "OAuth was cancelled. You can sign in with email instead.",
+  email_collision:
+    "That email is already registered. Verify your email or sign in with password first.",
+  invalid_state: "OAuth session expired. Please try again.",
+  missing_code: "OAuth response was incomplete. Please try again.",
+  oauth_failed: "OAuth sign-in failed. Try email/password instead.",
+};
+
+export function LoginForm() {
   const [isPending, startTransition] = useTransition();
+  const searchParams = useSearchParams();
+  const oauthError = searchParams.get("oauth_error");
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { name: "", email: "", password: "", confirm: "" },
+    defaultValues: { email: "", password: "" },
   });
 
   function onSubmit(values: FormValues) {
     startTransition(async () => {
-      const result = await registerAction({
-        name: values.name,
-        email: values.email,
-        password: values.password,
-      });
+      const result = await loginAction(values);
       if (result?.error) {
         toast.error(result.error);
       }
@@ -66,12 +67,17 @@ export default function RegisterPage() {
   return (
     <Card className="w-full max-w-sm">
       <CardHeader>
-        <CardTitle>Create account</CardTitle>
+        <CardTitle>Sign in</CardTitle>
         <CardDescription>
-          Start automating your job search today
+          Enter your credentials to access your account
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {oauthError ? (
+          <p className="text-sm text-destructive" role="alert">
+            {OAUTH_ERRORS[oauthError] ?? OAUTH_ERRORS.oauth_failed}
+          </p>
+        ) : null}
         <OAuthButtons />
         <div className="flex items-center gap-3">
           <Separator className="flex-1" />
@@ -80,24 +86,6 @@ export default function RegisterPage() {
         </div>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Full name</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="text"
-                      placeholder="Jane Smith"
-                      autoComplete="name"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
             <FormField
               control={form.control}
               name="email"
@@ -126,25 +114,7 @@ export default function RegisterPage() {
                     <Input
                       type="password"
                       placeholder="••••••••"
-                      autoComplete="new-password"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="confirm"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Confirm password</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="password"
-                      placeholder="••••••••"
-                      autoComplete="new-password"
+                      autoComplete="current-password"
                       {...field}
                     />
                   </FormControl>
@@ -158,22 +128,27 @@ export default function RegisterPage() {
               disabled={isPending}
             >
               {isPending && (
-                <Loader2
-                  className="mr-2 h-4 w-4 animate-spin"
-                  aria-hidden
-                />
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
               )}
-              Create account
+              Sign in
             </Button>
           </form>
         </Form>
-        <p className="text-center text-sm text-muted-foreground">
-          Already have an account?{" "}
+        <p className="text-center text-sm">
           <Link
-            href="/login"
+            href="/forgot-password"
+            className="text-muted-foreground underline underline-offset-4 hover:text-foreground"
+          >
+            Forgot password?
+          </Link>
+        </p>
+        <p className="text-center text-sm text-muted-foreground">
+          No account?{" "}
+          <Link
+            href="/register"
             className="underline underline-offset-4 hover:text-foreground"
           >
-            Sign in
+            Create one
           </Link>
         </p>
       </CardContent>

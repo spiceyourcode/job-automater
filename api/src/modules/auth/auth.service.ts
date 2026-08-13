@@ -28,6 +28,16 @@ import {
   sendMail,
   verificationEmail,
 } from "../../lib/mailer.js";
+import {
+  buildAuthorizeUrl,
+  createOAuthState,
+  fetchOAuthProfile,
+  isOAuthConfigured,
+  pkcePair,
+  type OAuthProvider,
+} from "../../lib/oauth.js";
+import { saveOAuthState, takeOAuthState } from "../../lib/oauth-state.js";
+import { createClient } from "redis";
 import type {
   RegisterBody,
   LoginBody,
@@ -552,3 +562,176 @@ export const resendVerification = async (
 
   return { ok: true };
 };
+
+const providerColumn = {
+  google: users.googleId,
+  github: users.githubId,
+  linkedin: users.linkedinId,
+} as const;
+
+export async function startOAuth(
+  provider: OAuthProvider,
+): Promise<{ url: string }> {
+  if (!isOAuthConfigured(provider)) {
+    throw new BadRequestError(`OAuth provider '${provider}' is not configured`);
+  }
+  const state = createOAuthState();
+  const usePkce = provider === "google" || provider === "linkedin";
+  const pkce = usePkce ? pkcePair() : undefined;
+  await saveOAuthState(state, {
+    provider,
+    codeVerifier: pkce?.verifier,
+  });
+  const url = buildAuthorizeUrl(provider, {
+    state,
+    codeChallenge: pkce?.challenge,
+  });
+  return { url };
+}
+
+/**
+ * Complete OAuth: link or create user. Refuse email collision without verified link.
+ */
+export async function completeOAuth(
+  provider: OAuthProvider,
+  params: { code: string; state: string },
+  userAgent?: string | null,
+  rawIp?: string | null,
+): Promise<{ exchangeCode: string }> {
+  const saved = await takeOAuthState(params.state);
+  if (!saved || saved.provider !== provider) {
+    throw new BadRequestError("Invalid OAuth state");
+  }
+
+  const profile = await fetchOAuthProfile(
+    provider,
+    params.code,
+    saved.codeVerifier,
+  );
+
+  const col = providerColumn[provider];
+  const ipAddress = parseClientIp(rawIp);
+
+  const result = await db.transaction(async (tx) => {
+    const [byProvider] = await tx
+      .select({
+        id: users.id,
+        email: users.email,
+        name: users.name,
+        emailVerified: users.emailVerified,
+      })
+      .from(users)
+      .where(and(eq(col, profile.providerUserId), isNull(users.deletedAt)))
+      .limit(1);
+
+    let user = byProvider;
+
+    if (!user) {
+      const [byEmail] = await tx
+        .select({
+          id: users.id,
+          email: users.email,
+          name: users.name,
+          emailVerified: users.emailVerified,
+        })
+        .from(users)
+        .where(and(eq(users.email, profile.email), isNull(users.deletedAt)))
+        .limit(1);
+
+      if (byEmail) {
+        if (!byEmail.emailVerified) {
+          throw new ConflictError(
+            "Email already registered — verify email or sign in with password to link",
+          );
+        }
+        const patch: {
+          emailVerified: boolean;
+          googleId?: string;
+          githubId?: string;
+          linkedinId?: string;
+          avatarUrl?: string | null;
+          name?: string | null;
+        } = { emailVerified: true };
+        if (provider === "google") patch.googleId = profile.providerUserId;
+        if (provider === "github") patch.githubId = profile.providerUserId;
+        if (provider === "linkedin") patch.linkedinId = profile.providerUserId;
+        if (profile.avatarUrl) patch.avatarUrl = profile.avatarUrl;
+        if (!byEmail.name && profile.name) patch.name = profile.name;
+        await tx.update(users).set(patch).where(eq(users.id, byEmail.id));
+        user = {
+          id: byEmail.id,
+          email: byEmail.email,
+          name: patch.name ?? byEmail.name,
+          emailVerified: true,
+        };
+      } else {
+        const [created] = await tx
+          .insert(users)
+          .values({
+            email: profile.email,
+            name: profile.name,
+            avatarUrl: profile.avatarUrl,
+            emailVerified: true,
+            passwordHash: null,
+            googleId: provider === "google" ? profile.providerUserId : null,
+            githubId: provider === "github" ? profile.providerUserId : null,
+            linkedinId:
+              provider === "linkedin" ? profile.providerUserId : null,
+          })
+          .returning({
+            id: users.id,
+            email: users.email,
+            name: users.name,
+            emailVerified: users.emailVerified,
+          });
+        if (!created) throw new Error("Failed to create OAuth user");
+        await createPersonalWorkspace(tx, created.id, created.email);
+        user = created;
+      }
+    }
+
+    const membership = await resolveMembership(tx, user.id, user.email);
+    const tokens = await issueTokens(
+      tx,
+      user.id,
+      user.email,
+      membership.role,
+      membership.workspaceId,
+      userAgent,
+      ipAddress,
+    );
+    await tx
+      .update(users)
+      .set({ lastLoginAt: new Date() })
+      .where(eq(users.id, user.id));
+    return tokens;
+  });
+
+  const exchangeCode = generateAuthActionToken();
+  const redis = createClient({ url: env.redisUrl });
+  await redis.connect();
+  try {
+    await redis.set(`oauth:exchange:${exchangeCode}`, JSON.stringify(result), {
+      EX: 60,
+    });
+  } finally {
+    await redis.quit().catch(() => {});
+  }
+  return { exchangeCode };
+}
+
+export async function exchangeOAuthCode(code: string): Promise<TokenPair> {
+  const redis = createClient({ url: env.redisUrl });
+  await redis.connect();
+  try {
+    const key = `oauth:exchange:${code}`;
+    const raw = await redis.get(key);
+    if (!raw) {
+      throw new BadRequestError("Invalid or expired OAuth exchange code");
+    }
+    await redis.del(key);
+    return JSON.parse(raw) as TokenPair;
+  } finally {
+    await redis.quit().catch(() => {});
+  }
+}

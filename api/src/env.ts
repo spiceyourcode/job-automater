@@ -31,6 +31,13 @@ const envSchema = z
     SMTP_WEBHOOK_URL: z.string().url().optional(),
     EMAIL_VERIFY_TTL: z.string().default("24h"),
     PASSWORD_RESET_TTL: z.string().default("1h"),
+    OAUTH_GOOGLE_CLIENT_ID: z.string().optional(),
+    OAUTH_GOOGLE_CLIENT_SECRET: z.string().optional(),
+    OAUTH_GITHUB_CLIENT_ID: z.string().optional(),
+    OAUTH_GITHUB_CLIENT_SECRET: z.string().optional(),
+    OAUTH_LINKEDIN_CLIENT_ID: z.string().optional(),
+    OAUTH_LINKEDIN_CLIENT_SECRET: z.string().optional(),
+    API_PUBLIC_URL: z.string().url().default("http://localhost:3001"),
   })
   .strict();
 
@@ -57,6 +64,18 @@ const parsed = envSchema.safeParse({
   SMTP_WEBHOOK_URL: process.env.SMTP_WEBHOOK_URL || undefined,
   EMAIL_VERIFY_TTL: process.env.EMAIL_VERIFY_TTL ?? "24h",
   PASSWORD_RESET_TTL: process.env.PASSWORD_RESET_TTL ?? "1h",
+  OAUTH_GOOGLE_CLIENT_ID: process.env.OAUTH_GOOGLE_CLIENT_ID || undefined,
+  OAUTH_GOOGLE_CLIENT_SECRET:
+    process.env.OAUTH_GOOGLE_CLIENT_SECRET || undefined,
+  OAUTH_GITHUB_CLIENT_ID: process.env.OAUTH_GITHUB_CLIENT_ID || undefined,
+  OAUTH_GITHUB_CLIENT_SECRET:
+    process.env.OAUTH_GITHUB_CLIENT_SECRET || undefined,
+  OAUTH_LINKEDIN_CLIENT_ID: process.env.OAUTH_LINKEDIN_CLIENT_ID || undefined,
+  OAUTH_LINKEDIN_CLIENT_SECRET:
+    process.env.OAUTH_LINKEDIN_CLIENT_SECRET || undefined,
+  API_PUBLIC_URL:
+    process.env.API_PUBLIC_URL ??
+    `http://localhost:${process.env.API_PORT ?? "3001"}`,
 });
 
 if (!parsed.success) {
@@ -84,4 +103,11 @@ export const env = {
   smtpWebhookUrl: parsed.data.SMTP_WEBHOOK_URL,
   emailVerifyTtl: parsed.data.EMAIL_VERIFY_TTL,
   passwordResetTtl: parsed.data.PASSWORD_RESET_TTL,
+  oauthGoogleClientId: parsed.data.OAUTH_GOOGLE_CLIENT_ID,
+  oauthGoogleClientSecret: parsed.data.OAUTH_GOOGLE_CLIENT_SECRET,
+  oauthGithubClientId: parsed.data.OAUTH_GITHUB_CLIENT_ID,
+  oauthGithubClientSecret: parsed.data.OAUTH_GITHUB_CLIENT_SECRET,
+  oauthLinkedinClientId: parsed.data.OAUTH_LINKEDIN_CLIENT_ID,
+  oauthLinkedinClientSecret: parsed.data.OAUTH_LINKEDIN_CLIENT_SECRET,
+  apiPublicUrl: parsed.data.API_PUBLIC_URL,
 } as const;

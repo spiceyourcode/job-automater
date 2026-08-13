@@ -40,12 +40,34 @@ export const verifyEmailBodySchema = z
   })
   .strict();
 
+export const oauthProviderParamSchema = z
+  .object({
+    provider: z.enum(["google", "github", "linkedin"]),
+  })
+  .strict();
+
+export const oauthCallbackQuerySchema = z
+  .object({
+    code: z.string().min(1).optional(),
+    state: z.string().min(1).optional(),
+    error: z.string().optional(),
+    error_description: z.string().optional(),
+  })
+  .strict();
+
+export const oauthExchangeBodySchema = z
+  .object({
+    code: z.string().min(20).max(128),
+  })
+  .strict();
+
 export type RegisterBody = z.infer<typeof registerBodySchema>;
 export type LoginBody = z.infer<typeof loginBodySchema>;
 export type RefreshBody = z.infer<typeof refreshBodySchema>;
 export type ForgotPasswordBody = z.infer<typeof forgotPasswordBodySchema>;
 export type ResetPasswordBody = z.infer<typeof resetPasswordBodySchema>;
 export type VerifyEmailBody = z.infer<typeof verifyEmailBodySchema>;
+export type OAuthExchangeBody = z.infer<typeof oauthExchangeBodySchema>;
 
 export interface TokenPair {
   accessToken: string;

@@ -13,6 +13,9 @@ vi.mock("./auth.service.js", () => ({
   resetPassword: vi.fn(),
   verifyEmail: vi.fn(),
   resendVerification: vi.fn(),
+  startOAuth: vi.fn(),
+  completeOAuth: vi.fn(),
+  exchangeOAuthCode: vi.fn(),
   parseClientIp: vi.fn(() => null),
   ConflictError: class ConflictError extends Error {
     statusCode = 409;
@@ -354,5 +357,98 @@ describe("POST /api/v1/auth/verify-email", () => {
       body: JSON.stringify({ token: "d".repeat(40) }),
     });
     expect(res.status).toBe(200);
+  });
+});
+
+describe("GET /api/v1/auth/oauth/:provider", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("302 redirects to provider authorize URL", async () => {
+    mockService.startOAuth.mockResolvedValue({
+      url: "https://accounts.google.com/o/oauth2/v2/auth?x=1",
+    });
+    const res = await buildApp().request("/api/v1/auth/oauth/google", {
+      method: "GET",
+      redirect: "manual",
+    });
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toContain("accounts.google.com");
+  });
+
+  it("400 for unconfigured provider", async () => {
+    mockService.startOAuth.mockRejectedValue(
+      new authService.BadRequestError("OAuth provider 'linkedin' is not configured"),
+    );
+    const res = await buildApp().request("/api/v1/auth/oauth/linkedin");
+    expect(res.status).toBe(400);
+  });
+
+  it("400 for unknown provider param", async () => {
+    const res = await buildApp().request("/api/v1/auth/oauth/facebook");
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("GET /api/v1/auth/oauth/:provider/callback", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("302 to web with exchange code on success", async () => {
+    mockService.completeOAuth.mockResolvedValue({
+      exchangeCode: "e".repeat(40),
+    });
+    const res = await buildApp().request(
+      "/api/v1/auth/oauth/google/callback?code=abc&state=xyz",
+      { method: "GET", redirect: "manual" },
+    );
+    expect(res.status).toBe(302);
+    const loc = res.headers.get("location") ?? "";
+    expect(loc).toContain("/oauth/complete");
+    expect(loc).toContain("code=");
+  });
+
+  it("302 to login on email collision (no takeover)", async () => {
+    mockService.completeOAuth.mockRejectedValue(
+      new authService.ConflictError(
+        "Email already registered — verify email or sign in with password to link",
+      ),
+    );
+    const res = await buildApp().request(
+      "/api/v1/auth/oauth/github/callback?code=abc&state=xyz",
+      { method: "GET", redirect: "manual" },
+    );
+    expect(res.status).toBe(302);
+    const loc = res.headers.get("location") ?? "";
+    expect(loc).toContain("/login");
+    expect(loc).toContain("oauth_error=email_collision");
+  });
+});
+
+describe("POST /api/v1/auth/oauth/exchange", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("200 returns tokens for valid code", async () => {
+    mockService.exchangeOAuthCode.mockResolvedValue({
+      accessToken: "access",
+      refreshToken: "refresh",
+    });
+    const res = await buildApp().request("/api/v1/auth/oauth/exchange", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ code: "f".repeat(40) }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      tokens: { accessToken: string; refreshToken: string };
+    };
+    expect(body.tokens.accessToken).toBe("access");
+  });
+
+  it("400 rejects short code", async () => {
+    const res = await buildApp().request("/api/v1/auth/oauth/exchange", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ code: "short" }),
+    });
+    expect(res.status).toBe(400);
   });
 });
