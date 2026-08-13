@@ -5,7 +5,7 @@ import { AppShell } from "@/components/app-shell";
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET ?? "");
 
-export default async function AnalyticsLayout({
+export default async function SettingsLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -28,5 +28,5 @@ export default async function AnalyticsLayout({
     redirect("/onboarding");
   }
 
-  return <AppShell title="Analytics">{children}</AppShell>;
+  return <AppShell title="Settings">{children}</AppShell>;
 }

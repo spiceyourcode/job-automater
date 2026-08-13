@@ -89,20 +89,21 @@ Full matrix + per-task AUTO SKILLS: **`AGENT-PROMPTS.md`**
 
 **Phase 6 — Hardening** ✅ complete (P6.1–P6.2 — one commit each)
 
-**Phase 7 — Product shell** (in progress)
+**Phase 7 — Product shell** ✅ complete (P7.1–P7.6 — one commit each)
+
+**Phase 8 — Collection completeness** (next)
 
 | Done | Task |
 |------|------|
-| ✓ | P7.1 Email verification + password reset |
-| ✓ | P7.2 OAuth Google / GitHub / LinkedIn |
-| ✓ | P7.3 Sessions + `/auth/me` |
-| ✓ | P7.4 CV activate / delete / reindex |
-| ✓ | P7.5 Profile + CV settings UI |
-| | P7.6 App shell + dashboard widgets |
+| | P8.1 Playwright collector + career_page |
+| | P8.2 Telegram collector |
+| | P8.3 Manual import / similar / save |
+| | P8.4 Daily collect cron + enrichment |
+| | P8.5 Source runs + jobs filters UI |
 
-**Next:** **P7.6** — App shell + dashboard widgets  
-Prompt: `AGENT-PROMPTS.md` → Phase 7 → P7.6  
-Contract: `docs/contracts/phase-7-product-shell.md`  
+**Next:** **P8.1** — Playwright collector + career_page source type  
+Prompt: `AGENT-PROMPTS.md` → Phase 8 → P8.1  
+Contract: `docs/contracts/phase-8-collection-complete.md`  
 Backlog: Phases 7–13 added 2026-08-12 (docs gap sync)
 
 ---
