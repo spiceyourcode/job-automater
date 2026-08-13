@@ -35,6 +35,7 @@ export type JobPublic = {
   isDuplicate: boolean;
   collectedAt: string;
   postedAt: string | null;
+  isSaved?: boolean;
   score: JobScorePublic | null;
 };
 

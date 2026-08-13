@@ -125,3 +125,21 @@ export async function enqueueReindexCv(
     await client.quit().catch(() => {});
   }
 }
+
+export type MatchScorePayload = {
+  job_ids: string[];
+  user_id: string;
+};
+
+/** Publish MatchScoreJob for imported / rescored jobs. */
+export async function enqueueMatchScore(
+  payload: MatchScorePayload,
+): Promise<void> {
+  const client = createClient({ url: env.redisUrl });
+  try {
+    await client.connect();
+    await client.lPush("jobautomater:match_score", JSON.stringify(payload));
+  } finally {
+    await client.quit().catch(() => {});
+  }
+}

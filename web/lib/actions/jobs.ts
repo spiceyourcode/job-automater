@@ -67,3 +67,88 @@ export async function getJobAction(
     return { ok: false, error: "Network error — is the API running?" };
   }
 }
+
+export async function importJobAction(
+  url: string,
+): Promise<
+  ActionResult<{ job: JobPublic; taskId: string | null; deduped: boolean }>
+> {
+  const headers = await authHeaders();
+  if (!headers) return { ok: false, error: "Unauthorized" };
+  try {
+    const res = await fetch(`${API_URL}/api/v1/jobs/import`, {
+      method: "POST",
+      headers: { ...headers, "content-type": "application/json" },
+      body: JSON.stringify({ url }),
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      return { ok: false, error: body?.error ?? "Import failed" };
+    }
+    const data = (await res.json()) as {
+      job: JobPublic;
+      taskId: string | null;
+      deduped: boolean;
+    };
+    return { ok: true, data };
+  } catch {
+    return { ok: false, error: "Network error — is the API running?" };
+  }
+}
+
+export async function listSimilarJobsAction(
+  id: string,
+  limit = 5,
+): Promise<ActionResult<{ jobs: JobPublic[] }>> {
+  const headers = await authHeaders();
+  if (!headers) return { ok: false, error: "Unauthorized" };
+  try {
+    const res = await fetch(
+      `${API_URL}/api/v1/jobs/${id}/similar?limit=${limit}`,
+      { headers, cache: "no-store" },
+    );
+    if (res.status === 404) return { ok: false, error: "Job not found" };
+    if (!res.ok) return { ok: false, error: "Failed to load similar jobs" };
+    const data = (await res.json()) as { jobs: JobPublic[] };
+    return { ok: true, data };
+  } catch {
+    return { ok: false, error: "Network error — is the API running?" };
+  }
+}
+
+export async function saveJobAction(id: string): Promise<ActionResult> {
+  const headers = await authHeaders();
+  if (!headers) return { ok: false, error: "Unauthorized" };
+  try {
+    const res = await fetch(`${API_URL}/api/v1/jobs/${id}/save`, {
+      method: "POST",
+      headers,
+      cache: "no-store",
+    });
+    if (res.status === 404) return { ok: false, error: "Job not found" };
+    if (!res.ok) return { ok: false, error: "Failed to save job" };
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "Network error — is the API running?" };
+  }
+}
+
+export async function unsaveJobAction(id: string): Promise<ActionResult> {
+  const headers = await authHeaders();
+  if (!headers) return { ok: false, error: "Unauthorized" };
+  try {
+    const res = await fetch(`${API_URL}/api/v1/jobs/${id}/save`, {
+      method: "DELETE",
+      headers,
+      cache: "no-store",
+    });
+    if (res.status === 404) return { ok: false, error: "Job not found" };
+    if (!res.ok) return { ok: false, error: "Failed to unsave job" };
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "Network error — is the API running?" };
+  }
+}

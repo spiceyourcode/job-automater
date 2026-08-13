@@ -19,6 +19,7 @@ GENERATE_DOCS_KEY = "jobautomater:generate_docs"
 SUBMIT_APPLICATION_KEY = "jobautomater:submit_application"
 MONITOR_EMAIL_KEY = "jobautomater:monitor_email"
 REINDEX_CV_KEY = "jobautomater:reindex_cv"
+MATCH_SCORE_KEY = "jobautomater:match_score"
 
 _stop = threading.Event()
 _thread: threading.Thread | None = None
@@ -75,6 +76,15 @@ def _dispatch(key: str, payload: dict[str, Any]) -> None:
             payload.get("cv_document_id"),
             payload.get("task_id"),
         )
+    elif key == MATCH_SCORE_KEY:
+        from tasks.match_score import match_score
+
+        match_score.delay(payload)
+        logger.info(
+            "bridge_match_score user_id=%s jobs=%s",
+            payload.get("user_id"),
+            len(payload.get("job_ids") or []),
+        )
 
 
 def _loop() -> None:
@@ -89,6 +99,7 @@ def _loop() -> None:
                     SUBMIT_APPLICATION_KEY,
                     MONITOR_EMAIL_KEY,
                     REINDEX_CV_KEY,
+                    MATCH_SCORE_KEY,
                 ],
                 timeout=2,
             )

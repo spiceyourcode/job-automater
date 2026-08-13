@@ -21,4 +21,18 @@ export const jobIdParamSchema = z.object({
   id: z.string().uuid(),
 });
 
+export const importJobBodySchema = z
+  .object({
+    url: z.string().url().max(2048),
+    sourceType: z.string().max(50).optional(),
+  })
+  .strict();
+
+export const similarJobsQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(50).default(10),
+  })
+  .strict();
+
 export type ListJobsQuery = z.infer<typeof listJobsQuerySchema>;
+export type ImportJobBody = z.infer<typeof importJobBodySchema>;

@@ -64,6 +64,11 @@ export {
   type NewAuthToken,
 } from "./auth-tokens.js";
 export {
+  savedJobs,
+  type SavedJob,
+  type NewSavedJob,
+} from "./saved-jobs.js";
+export {
   salaryCentsSchema,
   userInsertSchema,
   profileInsertSchema,

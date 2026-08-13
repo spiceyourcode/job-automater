@@ -97,12 +97,12 @@ Full matrix + per-task AUTO SKILLS: **`AGENT-PROMPTS.md`**
 |------|------|
 | ✓ | P8.1 Playwright collector + career_page |
 | ✓ | P8.2 Telegram collector |
-| | P8.3 Manual import / similar / save |
+| ✓ | P8.3 Manual import / similar / save |
 | | P8.4 Daily collect cron + enrichment |
 | | P8.5 Source runs + jobs filters UI |
 
-**Next:** **P8.3** — Manual import / similar / save  
-Prompt: `AGENT-PROMPTS.md` → Phase 8 → P8.3  
+**Next:** **P8.4** — Daily collect cron + enrichment  
+Prompt: `AGENT-PROMPTS.md` → Phase 8 → P8.4  
 Contract: `docs/contracts/phase-8-collection-complete.md`  
 Backlog: Phases 7–13 added 2026-08-12 (docs gap sync)
 

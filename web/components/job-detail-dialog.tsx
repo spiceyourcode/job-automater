@@ -1,6 +1,12 @@
 "use client";
 
-import { MapPin, Banknote, ExternalLink } from "lucide-react";
+import {
+  Banknote,
+  Bookmark,
+  BookmarkCheck,
+  ExternalLink,
+  MapPin,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { JobPublic } from "@/lib/jobs";
 import { formatSalaryCents } from "@/lib/jobs";
@@ -26,7 +32,10 @@ import { useState, useTransition } from "react";
 type Props = {
   job: JobPublic | null;
   open: boolean;
+  similar?: JobPublic[];
   onOpenChange: (open: boolean) => void;
+  onToggleSave?: (job: JobPublic) => void;
+  onSelectSimilar?: (job: JobPublic) => void;
 };
 
 const BREAKDOWN: Array<{
@@ -40,7 +49,14 @@ const BREAKDOWN: Array<{
   { key: "cultureMatch", label: "Culture" },
 ];
 
-export function JobDetailDialog({ job, open, onOpenChange }: Props) {
+export function JobDetailDialog({
+  job,
+  open,
+  similar = [],
+  onOpenChange,
+  onToggleSave,
+  onSelectSimilar,
+}: Props) {
   const router = useRouter();
   const [reasoningOpen, setReasoningOpen] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
@@ -56,7 +72,7 @@ export function JobDetailDialog({ job, open, onOpenChange }: Props) {
     ? job.location
       ? `${job.location} (Remote)`
       : "Remote"
-    : job.location ?? "Location TBD";
+    : (job.location ?? "Location TBD");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -156,6 +172,34 @@ export function JobDetailDialog({ job, open, onOpenChange }: Props) {
           </>
         )}
 
+        {similar.length > 0 && (
+          <>
+            <Separator />
+            <section aria-labelledby="similar-jobs-heading">
+              <h3 id="similar-jobs-heading" className="mb-2 text-sm font-medium">
+                Similar jobs
+              </h3>
+              <ul className="space-y-1">
+                {similar.map((s) => (
+                  <li key={s.id}>
+                    <button
+                      type="button"
+                      className="w-full cursor-pointer rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted/50"
+                      onClick={() => onSelectSimilar?.(s)}
+                    >
+                      <span className="font-medium">{s.title}</span>
+                      <span className="text-muted-foreground">
+                        {" "}
+                        · {s.company}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          </>
+        )}
+
         {genError && (
           <p className="text-sm text-destructive" role="alert">
             {genError}
@@ -179,14 +223,34 @@ export function JobDetailDialog({ job, open, onOpenChange }: Props) {
                   return;
                 }
                 onOpenChange(false);
-                router.push(
-                  `/applications/${res.data.application.id}/review`,
-                );
+                router.push(`/applications/${res.data.application.id}/review`);
               });
             }}
           >
             {pending ? "Starting…" : "Generate documents"}
           </Button>
+          {onToggleSave && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="cursor-pointer"
+              disabled={pending}
+              onClick={() => onToggleSave(job)}
+            >
+              {job.isSaved ? (
+                <>
+                  <BookmarkCheck className="mr-2 h-3.5 w-3.5" aria-hidden />
+                  Saved
+                </>
+              ) : (
+                <>
+                  <Bookmark className="mr-2 h-3.5 w-3.5" aria-hidden />
+                  Save
+                </>
+              )}
+            </Button>
+          )}
           {job.applicationUrl && (
             <Button asChild variant="outline" size="sm" className="cursor-pointer">
               <a

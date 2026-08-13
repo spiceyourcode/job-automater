@@ -3,7 +3,13 @@
 import { useMemo, useState, useTransition } from "react";
 import { Inbox, Plus, Search } from "lucide-react";
 import type { JobPublic } from "@/lib/jobs";
-import { listJobsAction } from "@/lib/actions/jobs";
+import {
+  importJobAction,
+  listJobsAction,
+  listSimilarJobsAction,
+  saveJobAction,
+  unsaveJobAction,
+} from "@/lib/actions/jobs";
 import { JobCard } from "@/components/job-card";
 import { JobDetailDialog } from "@/components/job-detail-dialog";
 import { EmptyState } from "@/components/empty-state";
@@ -29,9 +35,12 @@ export function JobsBoard({ initialJobs }: Props) {
   const [minScore, setMinScore] = useState<string>("0");
   const [q, setQ] = useState("");
   const [remoteOnly, setRemoteOnly] = useState(false);
+  const [importUrl, setImportUrl] = useState("");
   const [selected, setSelected] = useState<JobPublic | null>(null);
+  const [similar, setSimilar] = useState<JobPublic[]>([]);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [importMsg, setImportMsg] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const refresh = (next?: {
@@ -61,28 +70,123 @@ export function JobsBoard({ initialJobs }: Props) {
     });
   };
 
+  const openJob = (job: JobPublic) => {
+    setSelected(job);
+    setOpen(true);
+    setSimilar([]);
+    startTransition(async () => {
+      const res = await listSimilarJobsAction(job.id, 5);
+      if (res.ok) setSimilar(res.data?.jobs ?? []);
+    });
+  };
+
+  const toggleSave = (job: JobPublic) => {
+    startTransition(async () => {
+      const nextSaved = !job.isSaved;
+      const res = nextSaved
+        ? await saveJobAction(job.id)
+        : await unsaveJobAction(job.id);
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      const patch = (j: JobPublic) =>
+        j.id === job.id ? { ...j, isSaved: nextSaved } : j;
+      setJobs((prev) => prev.map(patch));
+      setSelected((prev) => (prev ? patch(prev) : prev));
+      setSimilar((prev) => prev.map(patch));
+    });
+  };
+
   const heading = useMemo(() => {
     if (jobs.length === 0) return "No matches";
     return `${jobs.length} match${jobs.length === 1 ? "" : "es"}`;
   }, [jobs.length]);
 
-  if (initialJobs.length === 0 && jobs.length === 0 && !q && minScore === "0" && !remoteOnly) {
+  if (
+    initialJobs.length === 0 &&
+    jobs.length === 0 &&
+    !q &&
+    minScore === "0" &&
+    !remoteOnly &&
+    !importMsg
+  ) {
     return (
-      <EmptyState
-        icon={<Inbox className="h-8 w-8" aria-hidden />}
-        title="No job matches yet"
-        description="Connect a source to start collecting openings. We’ll score them against your profile and surface the best fits here."
-        action={{
-          label: "Add sources",
-          href: "/settings/sources",
-          icon: <Plus className="mr-2 h-4 w-4" aria-hidden />,
-        }}
-      />
+      <div className="space-y-6">
+        <ImportBar
+          importUrl={importUrl}
+          setImportUrl={setImportUrl}
+          pending={pending}
+          importMsg={importMsg}
+          onImport={() => {
+            const url = importUrl.trim();
+            if (!url) return;
+            startTransition(async () => {
+              setImportMsg(null);
+              const res = await importJobAction(url);
+              if (!res.ok) {
+                setError(res.error);
+                return;
+              }
+              setError(null);
+              setImportUrl("");
+              setImportMsg(
+                res.data?.deduped
+                  ? "That URL was already imported."
+                  : "Job imported — scoring in progress.",
+              );
+              if (res.data?.job) {
+                setJobs((prev) => [res.data!.job, ...prev]);
+                openJob(res.data.job);
+              }
+            });
+          }}
+        />
+        <EmptyState
+          icon={<Inbox className="h-8 w-8" aria-hidden />}
+          title="No job matches yet"
+          description="Paste a job URL above, or connect a source to start collecting openings."
+          action={{
+            label: "Add sources",
+            href: "/settings/sources",
+            icon: <Plus className="mr-2 h-4 w-4" aria-hidden />,
+          }}
+        />
+      </div>
     );
   }
 
   return (
     <div className="space-y-4">
+      <ImportBar
+        importUrl={importUrl}
+        setImportUrl={setImportUrl}
+        pending={pending}
+        importMsg={importMsg}
+        onImport={() => {
+          const url = importUrl.trim();
+          if (!url) return;
+          startTransition(async () => {
+            setImportMsg(null);
+            const res = await importJobAction(url);
+            if (!res.ok) {
+              setError(res.error);
+              return;
+            }
+            setError(null);
+            setImportUrl("");
+            setImportMsg(
+              res.data?.deduped
+                ? "That URL was already imported."
+                : "Job imported — scoring in progress.",
+            );
+            refresh({ sort: "date" });
+            setSort("date");
+            if (res.data?.job) openJob(res.data.job);
+          });
+        }}
+      />
+
       <form
         className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end"
         onSubmit={(e) => {
@@ -188,10 +292,7 @@ export function JobsBoard({ initialJobs }: Props) {
               <JobCard
                 job={job}
                 selected={selected?.id === job.id}
-                onSelect={(j) => {
-                  setSelected(j);
-                  setOpen(true);
-                }}
+                onSelect={openJob}
               />
             </li>
           ))}
@@ -201,11 +302,63 @@ export function JobsBoard({ initialJobs }: Props) {
       <JobDetailDialog
         job={selected}
         open={open}
+        similar={similar}
+        onToggleSave={toggleSave}
         onOpenChange={(v) => {
           setOpen(v);
-          if (!v) setSelected(null);
+          if (!v) {
+            setSelected(null);
+            setSimilar([]);
+          }
         }}
+        onSelectSimilar={openJob}
       />
+    </div>
+  );
+}
+
+function ImportBar({
+  importUrl,
+  setImportUrl,
+  pending,
+  importMsg,
+  onImport,
+}: {
+  importUrl: string;
+  setImportUrl: (v: string) => void;
+  pending: boolean;
+  importMsg: string | null;
+  onImport: () => void;
+}) {
+  return (
+    <div className="space-y-2 rounded-lg border p-3">
+      <form
+        className="flex flex-col gap-2 sm:flex-row sm:items-end"
+        onSubmit={(e) => {
+          e.preventDefault();
+          onImport();
+        }}
+        aria-label="Import job from URL"
+      >
+        <div className="min-w-0 flex-1 space-y-1.5">
+          <Label htmlFor="jobs-import-url">Import job URL</Label>
+          <Input
+            id="jobs-import-url"
+            type="url"
+            value={importUrl}
+            onChange={(e) => setImportUrl(e.target.value)}
+            placeholder="https://company.com/careers/role"
+          />
+        </div>
+        <Button type="submit" size="sm" className="cursor-pointer" disabled={pending || !importUrl.trim()}>
+          {pending ? "Importing…" : "Import"}
+        </Button>
+      </form>
+      {importMsg && (
+        <p className="text-sm text-muted-foreground" role="status">
+          {importMsg}
+        </p>
+      )}
     </div>
   );
 }

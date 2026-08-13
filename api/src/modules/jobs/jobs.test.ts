@@ -9,6 +9,10 @@ vi.mock("./jobs.service.js", async (importOriginal) => {
     ...actual,
     listJobs: vi.fn(),
     getJob: vi.fn(),
+    importJob: vi.fn(),
+    listSimilarJobs: vi.fn(),
+    saveJob: vi.fn(),
+    unsaveJob: vi.fn(),
     JobError: actual.JobError,
   };
 });
@@ -47,6 +51,7 @@ const sampleJob = {
   isDuplicate: false,
   collectedAt: new Date(),
   postedAt: null,
+  isSaved: false,
   score: {
     overall: 92,
     skillMatch: 95,
@@ -95,24 +100,152 @@ describe("GET /api/v1/jobs/:id", () => {
     mockService.getJob.mockRejectedValue(
       new jobsService.JobError("Job not found", 404),
     );
-    const res = await buildApp().request(
-      `/api/v1/jobs/${sampleJob.id}`,
-      { headers: { Authorization: await authHeader("user-b") } },
-    );
+    const res = await buildApp().request(`/api/v1/jobs/${sampleJob.id}`, {
+      headers: { Authorization: await authHeader("user-b") },
+    });
     expect(res.status).toBe(404);
     expect(mockService.getJob).toHaveBeenCalledWith("user-b", sampleJob.id);
   });
 
   it("200 returns owned job with reasoning", async () => {
     mockService.getJob.mockResolvedValue({ job: sampleJob });
-    const res = await buildApp().request(
-      `/api/v1/jobs/${sampleJob.id}`,
-      { headers: { Authorization: await authHeader("user-a") } },
-    );
+    const res = await buildApp().request(`/api/v1/jobs/${sampleJob.id}`, {
+      headers: { Authorization: await authHeader("user-a") },
+    });
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       job: { score: { reasoning: string } };
     };
     expect(body.job.score.reasoning.length).toBeGreaterThan(10);
+  });
+});
+
+describe("POST /api/v1/jobs/import", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("401 without auth", async () => {
+    const res = await buildApp().request("/api/v1/jobs/import", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ url: "https://example.com/jobs/1" }),
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it("201 imports URL for authenticated user only", async () => {
+    mockService.importJob.mockResolvedValue({
+      job: { ...sampleJob, source: "manual", isSaved: false },
+      taskId: "b1eebc99-9c0b-4ef8-bb6d-6bb9bd380a22",
+      deduped: false,
+    });
+    const res = await buildApp().request("/api/v1/jobs/import", {
+      method: "POST",
+      headers: {
+        Authorization: await authHeader("user-a"),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ url: "https://example.com/jobs/1" }),
+    });
+    expect(res.status).toBe(201);
+    expect(mockService.importJob).toHaveBeenCalledWith(
+      "user-a",
+      expect.objectContaining({ url: "https://example.com/jobs/1" }),
+    );
+  });
+
+  it("400 when SSRF guard rejects private URL", async () => {
+    mockService.importJob.mockRejectedValue(
+      new Error("Private or reserved IP not allowed"),
+    );
+    const res = await buildApp().request("/api/v1/jobs/import", {
+      method: "POST",
+      headers: {
+        Authorization: await authHeader("user-a"),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ url: "http://127.0.0.1/secret" }),
+    });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("GET /api/v1/jobs/:id/similar (IDOR)", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("404 when seed job not owned — never leaks other users' jobs", async () => {
+    mockService.listSimilarJobs.mockRejectedValue(
+      new jobsService.JobError("Job not found", 404),
+    );
+    const res = await buildApp().request(
+      `/api/v1/jobs/${sampleJob.id}/similar`,
+      { headers: { Authorization: await authHeader("user-b") } },
+    );
+    expect(res.status).toBe(404);
+    expect(mockService.listSimilarJobs).toHaveBeenCalledWith(
+      "user-b",
+      sampleJob.id,
+      10,
+    );
+  });
+
+  it("200 returns similar jobs scoped to caller", async () => {
+    mockService.listSimilarJobs.mockResolvedValue({
+      jobs: [{ ...sampleJob, id: "c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33" }],
+    });
+    const res = await buildApp().request(
+      `/api/v1/jobs/${sampleJob.id}/similar?limit=5`,
+      { headers: { Authorization: await authHeader("user-a") } },
+    );
+    expect(res.status).toBe(200);
+    expect(mockService.listSimilarJobs).toHaveBeenCalledWith(
+      "user-a",
+      sampleJob.id,
+      5,
+    );
+  });
+});
+
+describe("POST|DELETE /api/v1/jobs/:id/save (IDOR)", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("404 save when job not owned", async () => {
+    mockService.saveJob.mockRejectedValue(
+      new jobsService.JobError("Job not found", 404),
+    );
+    const res = await buildApp().request(
+      `/api/v1/jobs/${sampleJob.id}/save`,
+      {
+        method: "POST",
+        headers: { Authorization: await authHeader("user-b") },
+      },
+    );
+    expect(res.status).toBe(404);
+    expect(mockService.saveJob).toHaveBeenCalledWith("user-b", sampleJob.id);
+  });
+
+  it("200 save owned job", async () => {
+    mockService.saveJob.mockResolvedValue({ success: true });
+    const res = await buildApp().request(
+      `/api/v1/jobs/${sampleJob.id}/save`,
+      {
+        method: "POST",
+        headers: { Authorization: await authHeader("user-a") },
+      },
+    );
+    expect(res.status).toBe(200);
+  });
+
+  it("404 unsave when job not owned", async () => {
+    mockService.unsaveJob.mockRejectedValue(
+      new jobsService.JobError("Job not found", 404),
+    );
+    const res = await buildApp().request(
+      `/api/v1/jobs/${sampleJob.id}/save`,
+      {
+        method: "DELETE",
+        headers: { Authorization: await authHeader("user-b") },
+      },
+    );
+    expect(res.status).toBe(404);
   });
 });
