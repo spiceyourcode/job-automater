@@ -218,6 +218,22 @@ describe("redactConfig", () => {
     expect(out.password).toBe("***");
     expect(out.username).toBe("u");
   });
+
+  it("hides playwright login secrets", () => {
+    const out = redactFromService("playwright", {
+      startUrl: "https://jobs.example.com",
+      login: {
+        username: "u",
+        password: "p",
+        usernameSelector: "#u",
+        passwordSelector: "#p",
+        submitSelector: "button",
+      },
+    });
+    const login = out.login as Record<string, string>;
+    expect(login.password).toBe("***");
+    expect(login.username).toBe("***");
+  });
 });
 
 describe("mergePreservedSecrets", () => {
@@ -312,5 +328,47 @@ describe("createSourceBodySchema", () => {
         folder: "INBOX",
       });
     }
+  });
+
+  it("accepts career_page config", () => {
+    const r = createSourceBodySchema.safeParse({
+      sourceType: "career_page",
+      name: "Acme careers",
+      config: {
+        baseUrl: "https://acme.example/careers",
+        jobCardSelector: ".job-card",
+        titleSelector: ".job-title a",
+      },
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.config).toMatchObject({
+        jobListPath: "/careers",
+        maxPages: 1,
+      });
+    }
+  });
+
+  it("accepts playwright config", () => {
+    const r = createSourceBodySchema.safeParse({
+      sourceType: "playwright",
+      name: "Custom scrape",
+      config: {
+        startUrl: "https://jobs.example.com/list",
+        jobCardSelector: ".card",
+        titleSelector: "h2",
+        maxPages: 3,
+      },
+    });
+    expect(r.success).toBe(true);
+  });
+
+  it("rejects playwright without selectors", () => {
+    const r = createSourceBodySchema.safeParse({
+      sourceType: "playwright",
+      name: "Bad",
+      config: { startUrl: "https://jobs.example.com" },
+    });
+    expect(r.success).toBe(false);
   });
 });

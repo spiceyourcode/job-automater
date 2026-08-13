@@ -91,18 +91,18 @@ Full matrix + per-task AUTO SKILLS: **`AGENT-PROMPTS.md`**
 
 **Phase 7 — Product shell** ✅ complete (P7.1–P7.6 — one commit each)
 
-**Phase 8 — Collection completeness** (next)
+**Phase 8 — Collection completeness** (in progress)
 
 | Done | Task |
 |------|------|
-| | P8.1 Playwright collector + career_page |
+| ✓ | P8.1 Playwright collector + career_page |
 | | P8.2 Telegram collector |
 | | P8.3 Manual import / similar / save |
 | | P8.4 Daily collect cron + enrichment |
 | | P8.5 Source runs + jobs filters UI |
 
-**Next:** **P8.1** — Playwright collector + career_page source type  
-Prompt: `AGENT-PROMPTS.md` → Phase 8 → P8.1  
+**Next:** **P8.2** — Telegram collector  
+Prompt: `AGENT-PROMPTS.md` → Phase 8 → P8.2  
 Contract: `docs/contracts/phase-8-collection-complete.md`  
 Backlog: Phases 7–13 added 2026-08-12 (docs gap sync)
 

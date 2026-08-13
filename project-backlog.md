@@ -111,7 +111,7 @@ Phases **0–6** are the shipped MVP slice (contracts `phase-1` … `phase-6`). 
 
 | # | Task | Service | Status | Source |
 |---|------|---------|--------|--------|
-| 8.1 | Playwright collector + `career_page` source type | workers, api, web | [ ] | AppFlow §2.7, TRD FR-JC-01 |
+| 8.1 | Playwright collector + `career_page` source type | workers, api, web | [x] | AppFlow §2.7, TRD FR-JC-01 |
 | 8.2 | Telegram channel collector | workers, api, web | [ ] | PRD G1, AppFlow §2.7 |
 | 8.3 | Manual URL import, similar jobs, save/unsave | api, web | [ ] | PRD §10.1, Schema §2.5 |
 | 8.4 | Daily collect cron (BullMQ, user TZ) + company enrichment | api, workers | [ ] | AppFlow §2.2, TRD FR-NE-03 |

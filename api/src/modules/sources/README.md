@@ -5,7 +5,7 @@
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | GET | `/api/v1/sources` | Bearer | List own sources |
-| POST | `/api/v1/sources` | Bearer | Create (rss \| api \| imap) |
+| POST | `/api/v1/sources` | Bearer | Create (rss \| api \| imap \| playwright \| career_page) |
 | GET | `/api/v1/sources/:id` | Bearer | Get own source |
 | PATCH | `/api/v1/sources/:id` | Bearer | Update own source |
 | DELETE | `/api/v1/sources/:id` | Bearer | Delete own source |

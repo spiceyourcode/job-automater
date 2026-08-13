@@ -38,13 +38,20 @@ export function SourcesManager({ initialSources }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [showForm, setShowForm] = useState(false);
-  const [sourceType, setSourceType] = useState<"rss" | "api" | "imap">("rss");
+  const [sourceType, setSourceType] = useState<
+    "rss" | "api" | "imap" | "playwright" | "career_page"
+  >("rss");
   const [name, setName] = useState("");
   const [feedUrl, setFeedUrl] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
   const [imapServer, setImapServer] = useState("");
   const [imapUsername, setImapUsername] = useState("");
   const [imapPassword, setImapPassword] = useState("");
+  const [startUrl, setStartUrl] = useState("");
+  const [jobListPath, setJobListPath] = useState("/careers");
+  const [jobCardSelector, setJobCardSelector] = useState(".job-card");
+  const [titleSelector, setTitleSelector] = useState(".job-title a");
+  const [urlSelector, setUrlSelector] = useState("");
 
   function refresh() {
     router.refresh();
@@ -57,10 +64,27 @@ export function SourcesManager({ initialSources }: Props) {
         sourceType,
         name,
         feedUrl: sourceType === "rss" ? feedUrl : undefined,
-        baseUrl: sourceType === "api" ? baseUrl : undefined,
+        baseUrl:
+          sourceType === "api" || sourceType === "career_page"
+            ? baseUrl
+            : undefined,
         imapServer: sourceType === "imap" ? imapServer : undefined,
         imapUsername: sourceType === "imap" ? imapUsername : undefined,
         imapPassword: sourceType === "imap" ? imapPassword : undefined,
+        startUrl: sourceType === "playwright" ? startUrl : undefined,
+        jobListPath: sourceType === "career_page" ? jobListPath : undefined,
+        jobCardSelector:
+          sourceType === "playwright" || sourceType === "career_page"
+            ? jobCardSelector
+            : undefined,
+        titleSelector:
+          sourceType === "playwright" || sourceType === "career_page"
+            ? titleSelector
+            : undefined,
+        urlSelector:
+          sourceType === "playwright" || sourceType === "career_page"
+            ? urlSelector || undefined
+            : undefined,
       });
       if (!result.ok) {
         toast.error(result.error);
@@ -115,7 +139,7 @@ export function SourcesManager({ initialSources }: Props) {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
-          Phase 2 types: RSS, REST API, IMAP
+          RSS, API, IMAP, Playwright, and career pages
         </p>
         <Button
           type="button"
@@ -144,12 +168,21 @@ export function SourcesManager({ initialSources }: Props) {
                   className="border-input bg-background h-9 w-full rounded-md border px-2 text-sm"
                   value={sourceType}
                   onChange={(e) =>
-                    setSourceType(e.target.value as "rss" | "api" | "imap")
+                    setSourceType(
+                      e.target.value as
+                        | "rss"
+                        | "api"
+                        | "imap"
+                        | "playwright"
+                        | "career_page",
+                    )
                   }
                 >
                   <option value="rss">RSS</option>
                   <option value="api">REST API</option>
                   <option value="imap">IMAP email</option>
+                  <option value="career_page">Career page</option>
+                  <option value="playwright">Playwright scraper</option>
                 </select>
               </div>
               <div className="space-y-2">
@@ -223,6 +256,95 @@ export function SourcesManager({ initialSources }: Props) {
                   </div>
                 </>
               )}
+              {sourceType === "playwright" && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="start-url">Start URL</Label>
+                    <Input
+                      id="start-url"
+                      type="url"
+                      value={startUrl}
+                      onChange={(e) => setStartUrl(e.target.value)}
+                      required
+                      placeholder="https://company.com/careers"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="card-sel">Job card selector</Label>
+                    <Input
+                      id="card-sel"
+                      value={jobCardSelector}
+                      onChange={(e) => setJobCardSelector(e.target.value)}
+                      required
+                      placeholder=".job-card"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="title-sel">Title selector</Label>
+                    <Input
+                      id="title-sel"
+                      value={titleSelector}
+                      onChange={(e) => setTitleSelector(e.target.value)}
+                      required
+                      placeholder=".job-title a"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="url-sel">URL selector (optional)</Label>
+                    <Input
+                      id="url-sel"
+                      value={urlSelector}
+                      onChange={(e) => setUrlSelector(e.target.value)}
+                      placeholder=".job-title a"
+                    />
+                  </div>
+                </>
+              )}
+              {sourceType === "career_page" && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="career-base">Base URL</Label>
+                    <Input
+                      id="career-base"
+                      type="url"
+                      value={baseUrl}
+                      onChange={(e) => setBaseUrl(e.target.value)}
+                      required
+                      placeholder="https://company.com"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="list-path">Job list path</Label>
+                    <Input
+                      id="list-path"
+                      value={jobListPath}
+                      onChange={(e) => setJobListPath(e.target.value)}
+                      required
+                      placeholder="/careers"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="career-card">Job card selector</Label>
+                    <Input
+                      id="career-card"
+                      value={jobCardSelector}
+                      onChange={(e) => setJobCardSelector(e.target.value)}
+                      required
+                      placeholder=".job-card"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="career-title">Title selector</Label>
+                    <Input
+                      id="career-title"
+                      value={titleSelector}
+                      onChange={(e) => setTitleSelector(e.target.value)}
+                      required
+                      placeholder=".job-title a"
+                    />
+                  </div>
+                </>
+              )}
               <Button
                 type="submit"
                 className="cursor-pointer"
@@ -247,8 +369,8 @@ export function SourcesManager({ initialSources }: Props) {
             No sources connected
           </h3>
           <p className="mb-6 max-w-xs text-sm text-muted-foreground">
-            Add an RSS feed, API endpoint, or IMAP mailbox to start collecting
-            jobs.
+            Add an RSS feed, API, IMAP mailbox, or career-page scraper to start
+            collecting jobs.
           </p>
           <Button
             type="button"
@@ -283,6 +405,10 @@ export function SourcesManager({ initialSources }: Props) {
                         String(s.config.baseUrl ?? "")}
                       {s.sourceType === "imap" &&
                         String(s.config.imapServer ?? "")}
+                      {s.sourceType === "playwright" &&
+                        String(s.config.startUrl ?? "")}
+                      {s.sourceType === "career_page" &&
+                        String(s.config.baseUrl ?? "")}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">

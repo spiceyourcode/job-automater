@@ -31,7 +31,7 @@ async function authHeaders(): Promise<HeadersInit | null> {
 }
 
 const createSchema = z.object({
-  sourceType: z.enum(["rss", "api", "imap"]),
+  sourceType: z.enum(["rss", "api", "imap", "playwright", "career_page"]),
   name: z.string().min(1).max(255),
   feedUrl: z.string().url().optional(),
   baseUrl: z.string().url().optional(),
@@ -39,6 +39,12 @@ const createSchema = z.object({
   imapUsername: z.string().optional(),
   imapPassword: z.string().optional(),
   imapPort: z.coerce.number().int().positive().optional(),
+  startUrl: z.string().url().optional(),
+  jobListPath: z.string().optional(),
+  jobCardSelector: z.string().optional(),
+  titleSelector: z.string().optional(),
+  urlSelector: z.string().optional(),
+  maxPages: z.coerce.number().int().positive().max(20).optional(),
 });
 
 export async function listSourcesAction(): Promise<
@@ -77,7 +83,7 @@ export async function createSourceAction(
   } else if (d.sourceType === "api") {
     if (!d.baseUrl) return { ok: false, error: "Base URL is required" };
     config = { baseUrl: d.baseUrl, auth: { type: "none" } };
-  } else {
+  } else if (d.sourceType === "imap") {
     if (!d.imapServer || !d.imapUsername || !d.imapPassword) {
       return { ok: false, error: "IMAP server, username, and password required" };
     }
@@ -87,6 +93,35 @@ export async function createSourceAction(
       username: d.imapUsername,
       password: d.imapPassword,
       folder: "INBOX",
+    };
+  } else if (d.sourceType === "playwright") {
+    if (!d.startUrl || !d.jobCardSelector || !d.titleSelector) {
+      return {
+        ok: false,
+        error: "Start URL, job card selector, and title selector required",
+      };
+    }
+    config = {
+      startUrl: d.startUrl,
+      jobCardSelector: d.jobCardSelector,
+      titleSelector: d.titleSelector,
+      urlSelector: d.urlSelector || undefined,
+      maxPages: d.maxPages ?? 1,
+    };
+  } else {
+    if (!d.baseUrl || !d.jobCardSelector || !d.titleSelector) {
+      return {
+        ok: false,
+        error: "Base URL, job card selector, and title selector required",
+      };
+    }
+    config = {
+      baseUrl: d.baseUrl,
+      jobListPath: d.jobListPath || "/careers",
+      jobCardSelector: d.jobCardSelector,
+      titleSelector: d.titleSelector,
+      urlSelector: d.urlSelector || undefined,
+      maxPages: d.maxPages ?? 1,
     };
   }
 

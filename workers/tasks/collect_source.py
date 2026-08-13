@@ -23,7 +23,7 @@ from db import (
 
 logger = logging.getLogger(__name__)
 
-_ALLOWED_TYPES = frozenset({"rss", "api", "imap"})
+_ALLOWED_TYPES = frozenset({"rss", "api", "imap", "playwright", "career_page"})
 
 
 class CollectSourceJob(BaseModel):
@@ -44,7 +44,15 @@ def _sanitize_error(exc: BaseException) -> str:
     """Strip likely secrets from error strings before DB/logs (HG-8)."""
     text = f"{type(exc).__name__}: {exc}"
     lowered = text.lower()
-    for token in ("password", "token", "bearer", "api_key", "authorization", "secret"):
+    for token in (
+        "password",
+        "token",
+        "bearer",
+        "api_key",
+        "authorization",
+        "secret",
+        "username",
+    ):
         if token in lowered:
             return f"{type(exc).__name__}: [redacted]"
     return text[:500]
@@ -106,7 +114,7 @@ def process_collect_source(payload: dict[str, Any]) -> dict[str, Any]:
         raise
 
     if job.source_type not in _ALLOWED_TYPES:
-        raise ValueError(f"Unsupported source_type for phase 2: {job.source_type}")
+        raise ValueError(f"Unsupported source_type: {job.source_type}")
 
     with connect() as conn:
         source = load_source(conn, job.source_id, job.user_id)

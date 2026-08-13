@@ -49,6 +49,17 @@ export function redactConfig(
     }
     clone.auth = auth;
   }
+  if (
+    sourceType === "playwright" &&
+    clone.login &&
+    typeof clone.login === "object" &&
+    clone.login !== null
+  ) {
+    const login = { ...(clone.login as Record<string, unknown>) };
+    if ("password" in login) login.password = REDACTED;
+    if ("username" in login) login.username = REDACTED;
+    clone.login = login;
+  }
   return clone;
 }
 
@@ -64,6 +75,22 @@ export function mergePreservedSecrets(
 
   if (sourceType === "imap" && merged.password === REDACTED) {
     merged.password = existing.password;
+  }
+
+  if (
+    sourceType === "playwright" &&
+    merged.login &&
+    typeof merged.login === "object" &&
+    merged.login !== null
+  ) {
+    const login = { ...(merged.login as Record<string, unknown>) };
+    const existingLogin =
+      existing.login && typeof existing.login === "object" && existing.login !== null
+        ? (existing.login as Record<string, unknown>)
+        : {};
+    if (login.password === REDACTED) login.password = existingLogin.password;
+    if (login.username === REDACTED) login.username = existingLogin.username;
+    merged.login = login;
   }
 
   if (
@@ -316,6 +343,40 @@ export async function testSource(workspaceId: string, id: string) {
         title: "IMAP config looks valid (live connect in collector)",
         company: String(config.imapServer ?? ""),
       });
+    }
+  } else if (
+    source.sourceType === "playwright" ||
+    source.sourceType === "career_page"
+  ) {
+    const schema =
+      source.sourceType === "playwright"
+        ? sourceConfigByType.playwright
+        : sourceConfigByType.career_page;
+    const parsed = schema.safeParse(config);
+    if (!parsed.success) {
+      errors.push("Scraper config incomplete — check URL and CSS selectors");
+    } else {
+      const startUrl =
+        source.sourceType === "playwright"
+          ? String(config.startUrl ?? "")
+          : String(config.baseUrl ?? "");
+      try {
+        await assertPublicHttpUrl(startUrl);
+        sampleJobs.push({
+          title: "Scraper config valid (Run Now executes Playwright)",
+          company: String(config.jobCardSelector ?? ""),
+          url: startUrl,
+        });
+      } catch (err) {
+        errors.push(
+          err instanceof Error &&
+            (err.message.includes("not allowed") ||
+              err.message.includes("Private") ||
+              err.message.includes("Host"))
+            ? err.message
+            : "Start URL is not a public http(s) URL",
+        );
+      }
     }
   }
 

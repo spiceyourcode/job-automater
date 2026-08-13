@@ -1,8 +1,14 @@
 import { z } from "zod";
 import { salaryCentsSchema } from "../../db/schema/validation.js";
 
-/** Phase 2 source types only. */
-export const sourceTypeSchema = z.enum(["rss", "api", "imap"]);
+/** Source types — Phase 2 + P8.1 playwright/career_page. */
+export const sourceTypeSchema = z.enum([
+  "rss",
+  "api",
+  "imap",
+  "playwright",
+  "career_page",
+]);
 
 const rssConfigSchema = z
   .object({
@@ -37,10 +43,55 @@ const imapConfigSchema = z
   })
   .strict();
 
+const playwrightLoginSchema = z
+  .object({
+    loginUrl: z.string().url().optional(),
+    usernameSelector: z.string().min(1),
+    passwordSelector: z.string().min(1),
+    submitSelector: z.string().min(1),
+    username: z.string().min(1),
+    password: z.string().min(1),
+  })
+  .strict();
+
+const playwrightConfigSchema = z
+  .object({
+    startUrl: z.string().url(),
+    jobCardSelector: z.string().min(1).max(500),
+    titleSelector: z.string().min(1).max(500),
+    urlSelector: z.string().min(1).max(500).optional(),
+    locationSelector: z.string().min(1).max(500).optional(),
+    departmentSelector: z.string().min(1).max(500).optional(),
+    waitForSelector: z.string().min(1).max(500).optional(),
+    paginationNextSelector: z.string().min(1).max(500).optional(),
+    maxPages: z.number().int().positive().max(20).default(1),
+    timeoutMs: z.number().int().positive().max(60000).optional(),
+    login: playwrightLoginSchema.optional(),
+  })
+  .strict();
+
+const careerPageConfigSchema = z
+  .object({
+    baseUrl: z.string().url(),
+    jobListPath: z.string().min(1).max(500).default("/careers"),
+    jobCardSelector: z.string().min(1).max(500),
+    titleSelector: z.string().min(1).max(500),
+    urlSelector: z.string().min(1).max(500).optional(),
+    locationSelector: z.string().min(1).max(500).optional(),
+    departmentSelector: z.string().min(1).max(500).optional(),
+    waitForSelector: z.string().min(1).max(500).optional(),
+    paginationNextSelector: z.string().min(1).max(500).optional(),
+    maxPages: z.number().int().positive().max(20).default(1),
+    timeoutMs: z.number().int().positive().max(60000).optional(),
+  })
+  .strict();
+
 export const sourceConfigByType = {
   rss: rssConfigSchema,
   api: apiConfigSchema,
   imap: imapConfigSchema,
+  playwright: playwrightConfigSchema,
+  career_page: careerPageConfigSchema,
 } as const;
 
 export const createSourceBodySchema = z
