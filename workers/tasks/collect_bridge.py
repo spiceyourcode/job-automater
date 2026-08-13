@@ -18,6 +18,7 @@ COLLECT_QUEUE_KEY = "jobautomater:collect_source"
 GENERATE_DOCS_KEY = "jobautomater:generate_docs"
 SUBMIT_APPLICATION_KEY = "jobautomater:submit_application"
 MONITOR_EMAIL_KEY = "jobautomater:monitor_email"
+REINDEX_CV_KEY = "jobautomater:reindex_cv"
 
 _stop = threading.Event()
 _thread: threading.Thread | None = None
@@ -65,6 +66,15 @@ def _dispatch(key: str, payload: dict[str, Any]) -> None:
             payload.get("user_id"),
             len(payload.get("messages") or []),
         )
+    elif key == REINDEX_CV_KEY:
+        from tasks.reindex_cv import reindex_cv
+
+        reindex_cv.delay(payload)
+        logger.info(
+            "bridge_reindex_cv cv_document_id=%s task_id=%s",
+            payload.get("cv_document_id"),
+            payload.get("task_id"),
+        )
 
 
 def _loop() -> None:
@@ -78,6 +88,7 @@ def _loop() -> None:
                     GENERATE_DOCS_KEY,
                     SUBMIT_APPLICATION_KEY,
                     MONITOR_EMAIL_KEY,
+                    REINDEX_CV_KEY,
                 ],
                 timeout=2,
             )

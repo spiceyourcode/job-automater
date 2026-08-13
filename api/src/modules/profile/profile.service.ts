@@ -13,12 +13,14 @@ import {
   users,
   userSessions,
 } from "../../db/schema/index.js";
-import { getPresignedGetUrl, uploadObject } from "../../lib/s3.js";
+import { getPresignedGetUrl, uploadObject, deleteObject } from "../../lib/s3.js";
+import { enqueueReindexCv } from "../../lib/queue.js";
 import {
   ALLOWED_CV_EXTENSIONS,
   MAX_CV_BYTES,
   resolveCvMimeType,
   type PatchProfileBody,
+  type ReindexCvBody,
 } from "./profile.schema.js";
 
 export class ProfileError extends Error {
@@ -239,6 +241,278 @@ export async function listCvVersions(userId: string) {
   );
 
   return { versions };
+}
+
+async function getCvByVersion(userId: string, version: number) {
+  const [doc] = await db
+    .select({
+      id: cvDocuments.id,
+      userId: cvDocuments.userId,
+      version: cvDocuments.version,
+      originalFilename: cvDocuments.originalFilename,
+      fileUrl: cvDocuments.fileUrl,
+      fileSize: cvDocuments.fileSize,
+      mimeType: cvDocuments.mimeType,
+      isActive: cvDocuments.isActive,
+      chunkCount: cvDocuments.chunkCount,
+      createdAt: cvDocuments.createdAt,
+    })
+    .from(cvDocuments)
+    .where(and(eq(cvDocuments.userId, userId), eq(cvDocuments.version, version)))
+    .limit(1);
+  if (!doc) throw new ProfileError("CV not found", 404);
+  return doc;
+}
+
+export async function activateCvVersion(userId: string, version: number) {
+  const doc = await getCvByVersion(userId, version);
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(cvDocuments)
+      .set({ isActive: false })
+      .where(and(eq(cvDocuments.userId, userId), eq(cvDocuments.isActive, true)));
+
+    await tx
+      .update(cvDocuments)
+      .set({ isActive: true })
+      .where(eq(cvDocuments.id, doc.id));
+
+    await tx
+      .update(profiles)
+      .set({
+        cvFileId: doc.id,
+        cvVersion: doc.version,
+        updatedAt: new Date(),
+      })
+      .where(eq(profiles.userId, userId));
+  });
+
+  console.info(
+    JSON.stringify({
+      event: "cv_activate",
+      userId,
+      cvDocumentId: doc.id,
+      version: doc.version,
+    }),
+  );
+
+  return {
+    cvDocument: {
+      id: doc.id,
+      version: doc.version,
+      originalFilename: doc.originalFilename,
+      fileUrl: await getPresignedGetUrl(doc.fileUrl),
+      fileSize: doc.fileSize,
+      mimeType: doc.mimeType,
+      isActive: true,
+      chunkCount: doc.chunkCount,
+      createdAt: doc.createdAt,
+    },
+  };
+}
+
+export async function deleteCvVersion(userId: string, version: number) {
+  const doc = await getCvByVersion(userId, version);
+
+  await db.transaction(async (tx) => {
+    // Explicit chunk delete — avoid orphan embeddings even if DB cascade fails
+    await tx.delete(cvChunks).where(eq(cvChunks.cvDocumentId, doc.id));
+    await tx.delete(cvDocuments).where(eq(cvDocuments.id, doc.id));
+
+    if (doc.isActive) {
+      const [next] = await tx
+        .select({
+          id: cvDocuments.id,
+          version: cvDocuments.version,
+        })
+        .from(cvDocuments)
+        .where(eq(cvDocuments.userId, userId))
+        .orderBy(desc(cvDocuments.version))
+        .limit(1);
+
+      if (next) {
+        await tx
+          .update(cvDocuments)
+          .set({ isActive: true })
+          .where(eq(cvDocuments.id, next.id));
+        await tx
+          .update(profiles)
+          .set({
+            cvFileId: next.id,
+            cvVersion: next.version,
+            updatedAt: new Date(),
+          })
+          .where(eq(profiles.userId, userId));
+      } else {
+        await tx
+          .update(profiles)
+          .set({
+            cvFileId: null,
+            cvVersion: 1,
+            updatedAt: new Date(),
+          })
+          .where(eq(profiles.userId, userId));
+      }
+    }
+  });
+
+  await deleteObject(doc.fileUrl).catch(() => {
+    // Object may already be gone — DB rows are authoritative
+  });
+
+  console.info(
+    JSON.stringify({
+      event: "cv_delete",
+      userId,
+      cvDocumentId: doc.id,
+      version: doc.version,
+    }),
+  );
+
+  return { success: true as const };
+}
+
+export async function reindexCv(userId: string, body: ReindexCvBody) {
+  let doc;
+  if (body.version != null) {
+    doc = await getCvByVersion(userId, body.version);
+  } else {
+    const [active] = await db
+      .select({
+        id: cvDocuments.id,
+        version: cvDocuments.version,
+        fileUrl: cvDocuments.fileUrl,
+      })
+      .from(cvDocuments)
+      .where(and(eq(cvDocuments.userId, userId), eq(cvDocuments.isActive, true)))
+      .limit(1);
+    if (!active) throw new ProfileError("No active CV to reindex", 404);
+    doc = active;
+  }
+
+  const taskId = randomUUID();
+  await enqueueReindexCv({
+    task_id: taskId,
+    user_id: userId,
+    cv_document_id: doc.id,
+  });
+
+  console.info(
+    JSON.stringify({
+      event: "cv_reindex_enqueued",
+      userId,
+      cvDocumentId: doc.id,
+      taskId,
+    }),
+  );
+
+  return { taskId };
+}
+
+export async function listCvChunks(
+  userId: string,
+  version: number,
+  opts: { limit: number; offset: number },
+) {
+  const doc = await getCvByVersion(userId, version);
+  const rows = await db
+    .select({
+      index: cvChunks.chunkIndex,
+      content: cvChunks.content,
+      sectionType: cvChunks.sectionType,
+      tokenCount: cvChunks.tokenCount,
+    })
+    .from(cvChunks)
+    .where(and(eq(cvChunks.cvDocumentId, doc.id), eq(cvChunks.userId, userId)))
+    .orderBy(cvChunks.chunkIndex)
+    .limit(opts.limit)
+    .offset(opts.offset);
+
+  return {
+    chunks: rows.map((r) => ({
+      index: r.index,
+      content: r.content,
+      sectionType: r.sectionType,
+      tokenCount: r.tokenCount,
+    })),
+  };
+}
+
+/** Side-by-side chunk diff between two owned versions (HG-9 source = chunks). */
+export async function diffCvVersions(
+  userId: string,
+  version: number,
+  against: number,
+) {
+  if (version === against) {
+    throw new ProfileError("Cannot diff a version against itself", 400);
+  }
+  const a = await getCvByVersion(userId, against);
+  const b = await getCvByVersion(userId, version);
+
+  const load = async (cvDocumentId: string) =>
+    db
+      .select({
+        index: cvChunks.chunkIndex,
+        content: cvChunks.content,
+        sectionType: cvChunks.sectionType,
+      })
+      .from(cvChunks)
+      .where(
+        and(eq(cvChunks.cvDocumentId, cvDocumentId), eq(cvChunks.userId, userId)),
+      )
+      .orderBy(cvChunks.chunkIndex);
+
+  const left = await load(a.id);
+  const right = await load(b.id);
+  const leftMap = new Map(left.map((c) => [c.index, c]));
+  const rightMap = new Map(right.map((c) => [c.index, c]));
+  const indexes = new Set([...leftMap.keys(), ...rightMap.keys()]);
+
+  const changes: Array<{
+    index: number;
+    status: "added" | "removed" | "changed" | "unchanged";
+    before: string | null;
+    after: string | null;
+    sectionType: string | null;
+  }> = [];
+
+  for (const index of [...indexes].sort((x, y) => x - y)) {
+    const L = leftMap.get(index);
+    const R = rightMap.get(index);
+    if (!L && R) {
+      changes.push({
+        index,
+        status: "added",
+        before: null,
+        after: R.content,
+        sectionType: R.sectionType,
+      });
+    } else if (L && !R) {
+      changes.push({
+        index,
+        status: "removed",
+        before: L.content,
+        after: null,
+        sectionType: L.sectionType,
+      });
+    } else if (L && R) {
+      changes.push({
+        index,
+        status: L.content === R.content ? "unchanged" : "changed",
+        before: L.content,
+        after: R.content,
+        sectionType: R.sectionType ?? L.sectionType,
+      });
+    }
+  }
+
+  return {
+    fromVersion: against,
+    toVersion: version,
+    changes,
+  };
 }
 
 /**

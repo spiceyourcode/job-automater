@@ -106,3 +106,22 @@ export async function enqueueMonitorEmail(
     await client.quit().catch(() => {});
   }
 }
+
+export type ReindexCvPayload = {
+  task_id: string;
+  user_id: string;
+  cv_document_id: string;
+};
+
+/** Publish CV reindex — never logs parsed text (HG-8). */
+export async function enqueueReindexCv(
+  payload: ReindexCvPayload,
+): Promise<void> {
+  const client = createClient({ url: env.redisUrl });
+  try {
+    await client.connect();
+    await client.lPush("jobautomater:reindex_cv", JSON.stringify(payload));
+  } finally {
+    await client.quit().catch(() => {});
+  }
+}

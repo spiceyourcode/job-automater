@@ -1,5 +1,6 @@
 import {
   CreateBucketCommand,
+  DeleteObjectCommand,
   GetObjectCommand,
   HeadBucketCommand,
   PutObjectCommand,
@@ -50,6 +51,16 @@ export async function uploadObject(params: {
     }),
   );
   return { key: params.key };
+}
+
+/** Delete object by key — never logs body (HG-8). */
+export async function deleteObject(key: string): Promise<void> {
+  await s3.send(
+    new DeleteObjectCommand({
+      Bucket: env.s3Bucket,
+      Key: key,
+    }),
+  );
 }
 
 /** Time-limited download URL for a private object (default 1 hour). */

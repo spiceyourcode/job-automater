@@ -15,6 +15,11 @@ vi.mock("./profile.service.js", () => ({
   uploadCv: vi.fn(),
   listCvVersions: vi.fn(),
   getCvDocumentForUser: vi.fn(),
+  activateCvVersion: vi.fn(),
+  deleteCvVersion: vi.fn(),
+  reindexCv: vi.fn(),
+  listCvChunks: vi.fn(),
+  diffCvVersions: vi.fn(),
   exportUserData: vi.fn(),
   deleteUserAccount: vi.fn(),
   ProfileError: class ProfileError extends Error {
@@ -288,6 +293,114 @@ describe("GET /api/v1/profile/cv/versions", () => {
     });
     expect(res.status).toBe(200);
     expect(mockService.listCvVersions).toHaveBeenCalledWith("user-a");
+  });
+});
+
+describe("POST /api/v1/profile/cv/:version/activate", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("200 activates owned version", async () => {
+    mockService.activateCvVersion.mockResolvedValue({
+      cvDocument: {
+        id: "cv-1",
+        version: 2,
+        originalFilename: "cv.pdf",
+        fileUrl: "http://x",
+        fileSize: 10,
+        mimeType: "application/pdf",
+        isActive: true,
+        chunkCount: 0,
+        createdAt: new Date(),
+      },
+    });
+    const res = await buildApp().request("/api/v1/profile/cv/2/activate", {
+      method: "POST",
+      headers: { Authorization: await authHeader("user-a") },
+    });
+    expect(res.status).toBe(200);
+    expect(mockService.activateCvVersion).toHaveBeenCalledWith("user-a", 2);
+  });
+
+  it("404 when version not owned", async () => {
+    mockService.activateCvVersion.mockRejectedValue(
+      new profileService.ProfileError("CV not found", 404),
+    );
+    const res = await buildApp().request("/api/v1/profile/cv/99/activate", {
+      method: "POST",
+      headers: { Authorization: await authHeader("user-a") },
+    });
+    expect(res.status).toBe(404);
+  });
+});
+
+describe("DELETE /api/v1/profile/cv/:version", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("200 deletes owned version", async () => {
+    mockService.deleteCvVersion.mockResolvedValue({ success: true });
+    const res = await buildApp().request("/api/v1/profile/cv/1", {
+      method: "DELETE",
+      headers: { Authorization: await authHeader("user-a") },
+    });
+    expect(res.status).toBe(200);
+    expect(mockService.deleteCvVersion).toHaveBeenCalledWith("user-a", 1);
+  });
+});
+
+describe("POST /api/v1/profile/cv/reindex", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("202 enqueues async reindex", async () => {
+    mockService.reindexCv.mockResolvedValue({
+      taskId: "11111111-1111-4111-8111-111111111111",
+    });
+    const res = await buildApp().request("/api/v1/profile/cv/reindex", {
+      method: "POST",
+      headers: {
+        Authorization: await authHeader("user-a"),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({}),
+    });
+    expect(res.status).toBe(202);
+    const body = (await res.json()) as { taskId: string };
+    expect(body.taskId).toBe("11111111-1111-4111-8111-111111111111");
+  });
+});
+
+describe("GET /api/v1/profile/cv/:version/chunks", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("200 lists chunks for owned version", async () => {
+    mockService.listCvChunks.mockResolvedValue({
+      chunks: [{ index: 0, content: "x", sectionType: "body", tokenCount: 1 }],
+    });
+    const res = await buildApp().request("/api/v1/profile/cv/1/chunks", {
+      headers: { Authorization: await authHeader("user-a") },
+    });
+    expect(res.status).toBe(200);
+    expect(mockService.listCvChunks).toHaveBeenCalledWith("user-a", 1, {
+      limit: 50,
+      offset: 0,
+    });
+  });
+});
+
+describe("GET /api/v1/profile/cv/:version/diff", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("200 diffs against another version", async () => {
+    mockService.diffCvVersions.mockResolvedValue({
+      fromVersion: 1,
+      toVersion: 2,
+      changes: [],
+    });
+    const res = await buildApp().request(
+      "/api/v1/profile/cv/2/diff?against=1",
+      { headers: { Authorization: await authHeader("user-a") } },
+    );
+    expect(res.status).toBe(200);
+    expect(mockService.diffCvVersions).toHaveBeenCalledWith("user-a", 2, 1);
   });
 });
 

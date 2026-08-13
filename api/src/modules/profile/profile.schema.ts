@@ -48,6 +48,33 @@ export const ALLOWED_CV_MIME_TYPES = new Set([
 
 export const ALLOWED_CV_EXTENSIONS = new Set([".pdf", ".docx", ".doc"]);
 
+export const cvVersionParamSchema = z
+  .object({
+    version: z.coerce.number().int().positive(),
+  })
+  .strict();
+
+export const reindexCvBodySchema = z
+  .object({
+    version: z.number().int().positive().optional(),
+  })
+  .strict();
+
+export const chunksQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(100).default(50),
+    offset: z.coerce.number().int().min(0).default(0),
+  })
+  .strict();
+
+export const diffQuerySchema = z
+  .object({
+    against: z.coerce.number().int().positive(),
+  })
+  .strict();
+
+export type ReindexCvBody = z.infer<typeof reindexCvBodySchema>;
+
 const EXT_TO_MIME: Record<string, string> = {
   ".pdf": "application/pdf",
   ".docx":
