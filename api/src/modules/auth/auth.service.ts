@@ -46,6 +46,8 @@ import type {
   ForgotPasswordBody,
   ResetPasswordBody,
   VerifyEmailBody,
+  PatchMeBody,
+  SessionView,
 } from "./auth.schema.js";
 
 type Tx = PgTransaction<
@@ -83,6 +85,14 @@ export class BadRequestError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "BadRequestError";
+  }
+}
+
+export class NotFoundError extends Error {
+  readonly statusCode = 404;
+  constructor(message = "not found") {
+    super(message);
+    this.name = "NotFoundError";
   }
 }
 
@@ -246,6 +256,9 @@ export const register = async (
           email: user.email,
           name: user.name ?? null,
           emailVerified: false,
+          avatarUrl: null,
+          timezone: "UTC",
+          locale: "en-US",
           role: membership.role,
           workspaceId: membership.workspaceId,
         },
@@ -279,6 +292,9 @@ export const login = async (
       name: users.name,
       passwordHash: users.passwordHash,
       emailVerified: users.emailVerified,
+      avatarUrl: users.avatarUrl,
+      timezone: users.timezone,
+      locale: users.locale,
       deletedAt: users.deletedAt,
     })
     .from(users)
@@ -312,6 +328,9 @@ export const login = async (
         email: user.email,
         name: user.name ?? null,
         emailVerified: user.emailVerified,
+        avatarUrl: user.avatarUrl ?? null,
+        timezone: user.timezone,
+        locale: user.locale,
         role: membership.role,
         workspaceId: membership.workspaceId,
       },
@@ -408,6 +427,9 @@ export const getMe = async (userId: string): Promise<AuthUser> => {
       email: users.email,
       name: users.name,
       emailVerified: users.emailVerified,
+      avatarUrl: users.avatarUrl,
+      timezone: users.timezone,
+      locale: users.locale,
     })
     .from(users)
     .where(and(eq(users.id, userId), isNull(users.deletedAt)))
@@ -422,9 +444,105 @@ export const getMe = async (userId: string): Promise<AuthUser> => {
     email: user.email,
     name: user.name ?? null,
     emailVerified: user.emailVerified,
+    avatarUrl: user.avatarUrl ?? null,
+    timezone: user.timezone,
+    locale: user.locale,
     role: membership.role,
     workspaceId: membership.workspaceId,
   };
+};
+
+export const patchMe = async (
+  userId: string,
+  body: PatchMeBody,
+): Promise<AuthUser> => {
+  const [updated] = await db
+    .update(users)
+    .set({
+      ...(body.name !== undefined ? { name: body.name } : {}),
+      ...(body.avatarUrl !== undefined ? { avatarUrl: body.avatarUrl } : {}),
+      ...(body.timezone !== undefined ? { timezone: body.timezone } : {}),
+      ...(body.locale !== undefined ? { locale: body.locale } : {}),
+    })
+    .where(and(eq(users.id, userId), isNull(users.deletedAt)))
+    .returning({
+      id: users.id,
+      email: users.email,
+      name: users.name,
+      emailVerified: users.emailVerified,
+      avatarUrl: users.avatarUrl,
+      timezone: users.timezone,
+      locale: users.locale,
+    });
+
+  if (!updated) throw new AuthError();
+  const membership = await db.transaction(async (tx) =>
+    resolveMembership(tx, updated.id, updated.email),
+  );
+  return {
+    id: updated.id,
+    email: updated.email,
+    name: updated.name ?? null,
+    emailVerified: updated.emailVerified,
+    avatarUrl: updated.avatarUrl ?? null,
+    timezone: updated.timezone,
+    locale: updated.locale,
+    role: membership.role,
+    workspaceId: membership.workspaceId,
+  };
+};
+
+/** Active (non-revoked, non-expired) sessions for the caller only. */
+export const listSessions = async (userId: string): Promise<SessionView[]> => {
+  const now = new Date();
+  const rows = await db
+    .select({
+      id: userSessions.id,
+      userAgent: userSessions.userAgent,
+      ipAddress: userSessions.ipAddress,
+      createdAt: userSessions.createdAt,
+      expiresAt: userSessions.expiresAt,
+    })
+    .from(userSessions)
+    .where(
+      and(
+        eq(userSessions.userId, userId),
+        isNull(userSessions.revokedAt),
+        sql`${userSessions.expiresAt} > ${now}`,
+      ),
+    );
+
+  return rows.map((r) => ({
+    id: r.id,
+    userAgent: r.userAgent,
+    ipAddress: r.ipAddress ? String(r.ipAddress) : null,
+    createdAt: r.createdAt.toISOString(),
+    expiresAt: r.expiresAt.toISOString(),
+  }));
+};
+
+/**
+ * Revoke a session by id. Ownership required — other users' sessions → 404 (no IDOR).
+ * Sets revoked_at so the refresh token can no longer rotate.
+ */
+export const revokeSession = async (
+  userId: string,
+  sessionId: string,
+): Promise<void> => {
+  const now = new Date();
+  const [row] = await db
+    .update(userSessions)
+    .set({ revokedAt: now })
+    .where(
+      and(
+        eq(userSessions.id, sessionId),
+        eq(userSessions.userId, userId),
+        isNull(userSessions.revokedAt),
+      ),
+    )
+    .returning({ id: userSessions.id });
+
+  if (!row) throw new NotFoundError();
 };
 
 /**

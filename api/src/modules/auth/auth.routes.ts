@@ -12,6 +12,8 @@ import {
   oauthProviderParamSchema,
   oauthCallbackQuerySchema,
   oauthExchangeBodySchema,
+  patchMeBodySchema,
+  sessionIdParamSchema,
 } from "./auth.schema.js";
 import * as authService from "./auth.service.js";
 
@@ -105,6 +107,49 @@ authRoutes.get("/me", requireAuth, async (c) => {
     throw err;
   }
 });
+
+authRoutes.patch(
+  "/me",
+  requireAuth,
+  zValidator("json", patchMeBodySchema),
+  async (c) => {
+    const { userId } = c.get("auth");
+    try {
+      const user = await authService.patchMe(userId, c.req.valid("json"));
+      return c.json(user, 200);
+    } catch (err) {
+      if (isAuthError(err)) {
+        return c.json({ error: "unauthorized" }, 401);
+      }
+      throw err;
+    }
+  },
+);
+
+authRoutes.get("/sessions", requireAuth, async (c) => {
+  const { userId } = c.get("auth");
+  const sessions = await authService.listSessions(userId);
+  return c.json({ sessions }, 200);
+});
+
+authRoutes.delete(
+  "/sessions/:id",
+  requireAuth,
+  zValidator("param", sessionIdParamSchema),
+  async (c) => {
+    const { userId } = c.get("auth");
+    const { id } = c.req.valid("param");
+    try {
+      await authService.revokeSession(userId, id);
+      return c.json({ ok: true }, 200);
+    } catch (err) {
+      if (err instanceof authService.NotFoundError) {
+        return c.json({ error: "not found" }, 404);
+      }
+      throw err;
+    }
+  },
+);
 
 authRoutes.post(
   "/forgot-password",

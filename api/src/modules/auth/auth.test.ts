@@ -16,6 +16,9 @@ vi.mock("./auth.service.js", () => ({
   startOAuth: vi.fn(),
   completeOAuth: vi.fn(),
   exchangeOAuthCode: vi.fn(),
+  patchMe: vi.fn(),
+  listSessions: vi.fn(),
+  revokeSession: vi.fn(),
   parseClientIp: vi.fn(() => null),
   ConflictError: class ConflictError extends Error {
     statusCode = 409;
@@ -36,6 +39,13 @@ vi.mock("./auth.service.js", () => ({
     constructor(msg: string) {
       super(msg);
       this.name = "BadRequestError";
+    }
+  },
+  NotFoundError: class NotFoundError extends Error {
+    statusCode = 404;
+    constructor(msg = "not found") {
+      super(msg);
+      this.name = "NotFoundError";
     }
   },
 }));
@@ -92,19 +102,24 @@ describe("requireAuth middleware", () => {
 
 const AUTH_HEADER = () => testAuthHeader("user-id", "owner");
 
+const mockAuthUser = {
+  id: "uid",
+  email: "a@b.com",
+  name: null as string | null,
+  emailVerified: false,
+  avatarUrl: null as string | null,
+  timezone: "UTC",
+  locale: "en-US",
+  role: "owner" as const,
+  workspaceId: "w0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+};
+
 describe("POST /api/v1/auth/register", () => {
   afterEach(() => vi.clearAllMocks());
 
   it("201 on valid registration", async () => {
     mockService.register.mockResolvedValue({
-      user: {
-        id: "uid",
-        email: "a@b.com",
-        name: null,
-        emailVerified: false,
-        role: "owner",
-        workspaceId: "w0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
-      },
+      user: mockAuthUser,
       tokens: { accessToken: "at", refreshToken: "rt" },
     });
     const res = await buildApp().request("/api/v1/auth/register", {
@@ -152,14 +167,7 @@ describe("POST /api/v1/auth/login", () => {
 
   it("200 on valid credentials", async () => {
     mockService.login.mockResolvedValue({
-      user: {
-        id: "uid",
-        email: "a@b.com",
-        name: null,
-        emailVerified: true,
-        role: "owner",
-        workspaceId: "w0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
-      },
+      user: { ...mockAuthUser, emailVerified: true },
       tokens: { accessToken: "at", refreshToken: "rt" },
     });
     const res = await buildApp().request("/api/v1/auth/login", {
@@ -243,12 +251,9 @@ describe("GET /api/v1/auth/me", () => {
 
   it("200 returns user with valid JWT", async () => {
     mockService.getMe.mockResolvedValue({
-      id: "uid",
+      ...mockAuthUser,
       email: "test@example.com",
-      name: null,
       emailVerified: true,
-      role: "owner",
-      workspaceId: "w0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
     });
     const res = await buildApp().request("/api/v1/auth/me", {
       headers: { Authorization: await AUTH_HEADER() },
@@ -450,5 +455,104 @@ describe("POST /api/v1/auth/oauth/exchange", () => {
       body: JSON.stringify({ code: "short" }),
     });
     expect(res.status).toBe(400);
+  });
+});
+
+describe("PATCH /api/v1/auth/me", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("200 updates timezone and locale", async () => {
+    mockService.patchMe.mockResolvedValue({
+      ...mockAuthUser,
+      emailVerified: true,
+      timezone: "Europe/Berlin",
+      locale: "de-DE",
+    });
+    const res = await buildApp().request("/api/v1/auth/me", {
+      method: "PATCH",
+      headers: {
+        Authorization: await AUTH_HEADER(),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ timezone: "Europe/Berlin", locale: "de-DE" }),
+    });
+    expect(res.status).toBe(200);
+    expect(mockService.patchMe).toHaveBeenCalledWith("user-id", {
+      timezone: "Europe/Berlin",
+      locale: "de-DE",
+    });
+  });
+
+  it("400 when body empty", async () => {
+    const res = await buildApp().request("/api/v1/auth/me", {
+      method: "PATCH",
+      headers: {
+        Authorization: await AUTH_HEADER(),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({}),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("401 without token", async () => {
+    const res = await buildApp().request("/api/v1/auth/me", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "Ada" }),
+    });
+    expect(res.status).toBe(401);
+  });
+});
+
+describe("GET /api/v1/auth/sessions", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("200 lists sessions for caller", async () => {
+    mockService.listSessions.mockResolvedValue([
+      {
+        id: "11111111-1111-4111-8111-111111111111",
+        userAgent: "Vitest",
+        ipAddress: "127.0.0.1",
+        createdAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 86400000).toISOString(),
+      },
+    ]);
+    const res = await buildApp().request("/api/v1/auth/sessions", {
+      headers: { Authorization: await AUTH_HEADER() },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { sessions: unknown[] };
+    expect(body.sessions).toHaveLength(1);
+    expect(mockService.listSessions).toHaveBeenCalledWith("user-id");
+  });
+});
+
+describe("DELETE /api/v1/auth/sessions/:id", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("200 revokes own session", async () => {
+    mockService.revokeSession.mockResolvedValue(undefined);
+    const id = "11111111-1111-4111-8111-111111111111";
+    const res = await buildApp().request(`/api/v1/auth/sessions/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: await AUTH_HEADER() },
+    });
+    expect(res.status).toBe(200);
+    expect(mockService.revokeSession).toHaveBeenCalledWith("user-id", id);
+  });
+
+  it("404 when session missing or not owned (no IDOR leak)", async () => {
+    mockService.revokeSession.mockRejectedValue(
+      new authService.NotFoundError(),
+    );
+    const res = await buildApp().request(
+      "/api/v1/auth/sessions/22222222-2222-4222-8222-222222222222",
+      {
+        method: "DELETE",
+        headers: { Authorization: await AUTH_HEADER() },
+      },
+    );
+    expect(res.status).toBe(404);
   });
 });

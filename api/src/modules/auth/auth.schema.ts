@@ -79,6 +79,42 @@ export interface AuthUser {
   email: string;
   name: string | null;
   emailVerified: boolean;
+  avatarUrl: string | null;
+  timezone: string;
+  locale: string;
   role: "owner" | "member" | "viewer";
   workspaceId: string;
+}
+
+export const patchMeBodySchema = z
+  .object({
+    name: z.string().max(255).nullable().optional(),
+    avatarUrl: z.string().url().max(2048).nullable().optional(),
+    timezone: z.string().min(1).max(50).optional(),
+    locale: z.string().min(2).max(10).optional(),
+  })
+  .strict()
+  .refine(
+    (b) =>
+      b.name !== undefined ||
+      b.avatarUrl !== undefined ||
+      b.timezone !== undefined ||
+      b.locale !== undefined,
+    { message: "At least one field is required" },
+  );
+
+export const sessionIdParamSchema = z
+  .object({
+    id: z.string().uuid(),
+  })
+  .strict();
+
+export type PatchMeBody = z.infer<typeof patchMeBodySchema>;
+
+export interface SessionView {
+  id: string;
+  userAgent: string | null;
+  ipAddress: string | null;
+  createdAt: string;
+  expiresAt: string;
 }
