@@ -31,7 +31,14 @@ async function authHeaders(): Promise<HeadersInit | null> {
 }
 
 const createSchema = z.object({
-  sourceType: z.enum(["rss", "api", "imap", "playwright", "career_page"]),
+  sourceType: z.enum([
+    "rss",
+    "api",
+    "imap",
+    "playwright",
+    "career_page",
+    "telegram",
+  ]),
   name: z.string().min(1).max(255),
   feedUrl: z.string().url().optional(),
   baseUrl: z.string().url().optional(),
@@ -45,6 +52,9 @@ const createSchema = z.object({
   titleSelector: z.string().optional(),
   urlSelector: z.string().optional(),
   maxPages: z.coerce.number().int().positive().max(20).optional(),
+  botToken: z.string().optional(),
+  channelId: z.string().optional(),
+  messageFilter: z.string().optional(),
 });
 
 export async function listSourcesAction(): Promise<
@@ -108,7 +118,7 @@ export async function createSourceAction(
       urlSelector: d.urlSelector || undefined,
       maxPages: d.maxPages ?? 1,
     };
-  } else {
+  } else if (d.sourceType === "career_page") {
     if (!d.baseUrl || !d.jobCardSelector || !d.titleSelector) {
       return {
         ok: false,
@@ -123,6 +133,18 @@ export async function createSourceAction(
       urlSelector: d.urlSelector || undefined,
       maxPages: d.maxPages ?? 1,
     };
+  } else if (d.sourceType === "telegram") {
+    if (!d.botToken || !d.channelId) {
+      return { ok: false, error: "Bot token and channel ID required" };
+    }
+    config = {
+      botToken: d.botToken,
+      channelId: d.channelId,
+      messageFilter: d.messageFilter || undefined,
+      limit: 50,
+    };
+  } else {
+    return { ok: false, error: "Unsupported source type" };
   }
 
   try {

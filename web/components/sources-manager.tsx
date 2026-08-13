@@ -39,7 +39,7 @@ export function SourcesManager({ initialSources }: Props) {
   const [isPending, startTransition] = useTransition();
   const [showForm, setShowForm] = useState(false);
   const [sourceType, setSourceType] = useState<
-    "rss" | "api" | "imap" | "playwright" | "career_page"
+    "rss" | "api" | "imap" | "playwright" | "career_page" | "telegram"
   >("rss");
   const [name, setName] = useState("");
   const [feedUrl, setFeedUrl] = useState("");
@@ -52,6 +52,9 @@ export function SourcesManager({ initialSources }: Props) {
   const [jobCardSelector, setJobCardSelector] = useState(".job-card");
   const [titleSelector, setTitleSelector] = useState(".job-title a");
   const [urlSelector, setUrlSelector] = useState("");
+  const [botToken, setBotToken] = useState("");
+  const [channelId, setChannelId] = useState("");
+  const [messageFilter, setMessageFilter] = useState("");
 
   function refresh() {
     router.refresh();
@@ -85,6 +88,10 @@ export function SourcesManager({ initialSources }: Props) {
           sourceType === "playwright" || sourceType === "career_page"
             ? urlSelector || undefined
             : undefined,
+        botToken: sourceType === "telegram" ? botToken : undefined,
+        channelId: sourceType === "telegram" ? channelId : undefined,
+        messageFilter:
+          sourceType === "telegram" ? messageFilter || undefined : undefined,
       });
       if (!result.ok) {
         toast.error(result.error);
@@ -96,6 +103,7 @@ export function SourcesManager({ initialSources }: Props) {
       setFeedUrl("");
       setBaseUrl("");
       setImapPassword("");
+      setBotToken("");
       refresh();
     });
   }
@@ -139,7 +147,7 @@ export function SourcesManager({ initialSources }: Props) {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
-          RSS, API, IMAP, Playwright, and career pages
+          RSS, API, IMAP, Playwright, career pages, Telegram
         </p>
         <Button
           type="button"
@@ -174,7 +182,8 @@ export function SourcesManager({ initialSources }: Props) {
                         | "api"
                         | "imap"
                         | "playwright"
-                        | "career_page",
+                        | "career_page"
+                        | "telegram",
                     )
                   }
                 >
@@ -183,6 +192,7 @@ export function SourcesManager({ initialSources }: Props) {
                   <option value="imap">IMAP email</option>
                   <option value="career_page">Career page</option>
                   <option value="playwright">Playwright scraper</option>
+                  <option value="telegram">Telegram channel</option>
                 </select>
               </div>
               <div className="space-y-2">
@@ -345,6 +355,41 @@ export function SourcesManager({ initialSources }: Props) {
                   </div>
                 </>
               )}
+              {sourceType === "telegram" && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="bot-token">Bot token</Label>
+                    <Input
+                      id="bot-token"
+                      type="password"
+                      value={botToken}
+                      onChange={(e) => setBotToken(e.target.value)}
+                      required
+                      autoComplete="off"
+                      placeholder="123456:ABC..."
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="channel-id">Channel ID</Label>
+                    <Input
+                      id="channel-id"
+                      value={channelId}
+                      onChange={(e) => setChannelId(e.target.value)}
+                      required
+                      placeholder="@jobs_channel or -100..."
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="msg-filter">Message filter (regex)</Label>
+                    <Input
+                      id="msg-filter"
+                      value={messageFilter}
+                      onChange={(e) => setMessageFilter(e.target.value)}
+                      placeholder="hiring|engineer|remote"
+                    />
+                  </div>
+                </>
+              )}
               <Button
                 type="submit"
                 className="cursor-pointer"
@@ -409,6 +454,8 @@ export function SourcesManager({ initialSources }: Props) {
                         String(s.config.startUrl ?? "")}
                       {s.sourceType === "career_page" &&
                         String(s.config.baseUrl ?? "")}
+                      {s.sourceType === "telegram" &&
+                        String(s.config.channelId ?? "")}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">

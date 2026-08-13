@@ -32,6 +32,9 @@ export function redactConfig(
   if (sourceType === "imap" && "password" in clone) {
     clone.password = REDACTED;
   }
+  if (sourceType === "telegram" && "botToken" in clone) {
+    clone.botToken = REDACTED;
+  }
   if (
     sourceType === "api" &&
     clone.auth &&
@@ -75,6 +78,10 @@ export function mergePreservedSecrets(
 
   if (sourceType === "imap" && merged.password === REDACTED) {
     merged.password = existing.password;
+  }
+
+  if (sourceType === "telegram" && merged.botToken === REDACTED) {
+    merged.botToken = existing.botToken;
   }
 
   if (
@@ -377,6 +384,16 @@ export async function testSource(workspaceId: string, id: string) {
             : "Start URL is not a public http(s) URL",
         );
       }
+    }
+  } else if (source.sourceType === "telegram") {
+    const parsed = sourceConfigByType.telegram.safeParse(config);
+    if (!parsed.success) {
+      errors.push("Telegram config incomplete — bot token and channel id required");
+    } else {
+      sampleJobs.push({
+        title: "Telegram config valid (Run Now fetches channel updates)",
+        company: String(config.channelId ?? ""),
+      });
     }
   }
 

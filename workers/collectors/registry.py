@@ -8,6 +8,7 @@ from collectors.career_page import CareerPageCollector
 from collectors.imap import ImapCollector
 from collectors.playwright import PlaywrightCollector
 from collectors.rss import RssCollector
+from collectors.telegram import TelegramCollector
 
 _REGISTRY: dict[str, BaseCollector] = {
     RssCollector.source_type: RssCollector(),
@@ -15,6 +16,7 @@ _REGISTRY: dict[str, BaseCollector] = {
     ImapCollector.source_type: ImapCollector(),
     PlaywrightCollector.source_type: PlaywrightCollector(),
     CareerPageCollector.source_type: CareerPageCollector(),
+    TelegramCollector.source_type: TelegramCollector(),
 }
 
 

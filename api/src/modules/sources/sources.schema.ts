@@ -8,6 +8,7 @@ export const sourceTypeSchema = z.enum([
   "imap",
   "playwright",
   "career_page",
+  "telegram",
 ]);
 
 const rssConfigSchema = z
@@ -86,12 +87,22 @@ const careerPageConfigSchema = z
   })
   .strict();
 
+const telegramConfigSchema = z
+  .object({
+    botToken: z.string().min(10).max(200),
+    channelId: z.string().min(1).max(100),
+    messageFilter: z.string().max(500).optional(),
+    limit: z.number().int().positive().max(100).default(50),
+  })
+  .strict();
+
 export const sourceConfigByType = {
   rss: rssConfigSchema,
   api: apiConfigSchema,
   imap: imapConfigSchema,
   playwright: playwrightConfigSchema,
   career_page: careerPageConfigSchema,
+  telegram: telegramConfigSchema,
 } as const;
 
 export const createSourceBodySchema = z

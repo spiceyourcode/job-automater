@@ -234,6 +234,15 @@ describe("redactConfig", () => {
     expect(login.password).toBe("***");
     expect(login.username).toBe("***");
   });
+
+  it("hides telegram bot token", () => {
+    const out = redactFromService("telegram", {
+      botToken: "123:SECRET",
+      channelId: "@jobs",
+    });
+    expect(out.botToken).toBe("***");
+    expect(out.channelId).toBe("@jobs");
+  });
 });
 
 describe("mergePreservedSecrets", () => {
@@ -370,5 +379,18 @@ describe("createSourceBodySchema", () => {
       config: { startUrl: "https://jobs.example.com" },
     });
     expect(r.success).toBe(false);
+  });
+
+  it("accepts telegram config", () => {
+    const r = createSourceBodySchema.safeParse({
+      sourceType: "telegram",
+      name: "Jobs channel",
+      config: {
+        botToken: "123456:ABCDEF-secret-token",
+        channelId: "@jobs_chan",
+        messageFilter: "hiring|engineer",
+      },
+    });
+    expect(r.success).toBe(true);
   });
 });

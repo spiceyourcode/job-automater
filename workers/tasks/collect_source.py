@@ -23,7 +23,9 @@ from db import (
 
 logger = logging.getLogger(__name__)
 
-_ALLOWED_TYPES = frozenset({"rss", "api", "imap", "playwright", "career_page"})
+_ALLOWED_TYPES = frozenset(
+    {"rss", "api", "imap", "playwright", "career_page", "telegram"}
+)
 
 
 class CollectSourceJob(BaseModel):
