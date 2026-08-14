@@ -74,6 +74,22 @@ def test_process_rejects_without_approved_at() -> None:
     assert out["error"] == "missing_approved_at"
 
 
+def test_process_rejects_emergency_stop(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.setattr(
+        "tasks.submit_application._is_emergency_stopped",
+        lambda _uid: True,
+    )
+    out = process_submit_application(
+        {
+            "application_id": APP_ID,
+            "user_id": USER_ID,
+            "approved_at": APPROVED_AT,
+        }
+    )
+    assert out["status"] == "error"
+    assert out["error"] == "emergency_stop"
+
+
 def test_process_happy_path_marks_submitted() -> None:
     mock_conn = MagicMock()
     mock_cm = MagicMock()

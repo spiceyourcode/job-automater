@@ -101,11 +101,11 @@ Full matrix + per-task AUTO SKILLS: **`AGENT-PROMPTS.md`**
 |------|------|
 | ✓ | P10.1 Workday + Ashby |
 | ✓ | P10.2 Portal appliers |
-| | P10.3 Rate limits + emergency stop |
+| ✓ | P10.3 Rate limits + emergency stop |
 | | P10.4 Interviews + bulk actions |
 
-**Next:** **P10.3** — Per-site rate limits, daily caps, emergency stop
-Prompt: `AGENT-PROMPTS.md` → Phase 10 → P10.3
+**Next:** **P10.4** — Interview events, follow-ups, bulk archive/withdraw
+Prompt: `AGENT-PROMPTS.md` → Phase 10 → P10.4
 Contract: `docs/contracts/phase-10-apply-complete.md`
 
 ---

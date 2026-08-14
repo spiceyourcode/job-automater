@@ -80,24 +80,38 @@ export async function enqueueGenerateDocs(
 
 /**
  * Publish SubmitApplicationJob — HG-4: rejects missing approved_at.
+ * Enforces emergency stop + per-site/daily caps (P10.3 / FR-AA-07).
  * Never logs CV/CL bodies (HG-8).
  */
 export async function enqueueSubmitApplication(
-  payload: SubmitApplicationPayload,
+  payload: SubmitApplicationPayload & { site?: string },
 ): Promise<void> {
   if (!payload.approved_at) {
     throw new Error("SubmitApplicationJob requires approved_at (HG-4)");
   }
+  const site = payload.site ?? "unknown";
+  const {
+    assertCanEnqueueSubmit,
+    recordSubmitEnqueue,
+  } = await import("./submit-limits.js");
+  await assertCanEnqueueSubmit(payload.user_id, site);
+
+  const body: SubmitApplicationPayload = {
+    application_id: payload.application_id,
+    user_id: payload.user_id,
+    approved_at: payload.approved_at,
+  };
   const client = createClient({ url: env.redisUrl });
   try {
     await client.connect();
     await client.lPush(
       "jobautomater:submit_application",
-      JSON.stringify(payload),
+      JSON.stringify(body),
     );
   } finally {
     await client.quit().catch(() => {});
   }
+  await recordSubmitEnqueue(payload.user_id, site);
 }
 
 /** Publish MonitorEmailJob — never logs email bodies (HG-8). */

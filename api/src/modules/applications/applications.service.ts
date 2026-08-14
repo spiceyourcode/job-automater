@@ -13,6 +13,10 @@ import {
 } from "../../lib/queue.js";
 import { getPresignedGetUrl, uploadObject } from "../../lib/s3.js";
 import { buildApplicationZip, textToAtsPdf } from "../../lib/ats-pdf.js";
+import {
+  siteKeyFromUrl,
+  SubmitLimitError,
+} from "../../lib/submit-limits.js";
 import type {
   BulkGenerateBody,
   CreateApplicationBody,
@@ -40,7 +44,7 @@ export type BulletTracePublic = {
 export class ApplicationError extends Error {
   constructor(
     message: string,
-    readonly statusCode: 400 | 403 | 404 | 409 | 503,
+    readonly statusCode: 400 | 403 | 404 | 409 | 429 | 503,
   ) {
     super(message);
     this.name = "ApplicationError";
@@ -632,13 +636,26 @@ export async function approveApplication(userId: string, id: string) {
     throw new ApplicationError("Failed to approve application", 400);
   }
 
+  const [jobRow] = await db
+    .select({
+      applicationUrl: jobs.applicationUrl,
+      sourceUrl: jobs.sourceUrl,
+    })
+    .from(jobs)
+    .where(and(eq(jobs.id, updated.jobId), eq(jobs.userId, userId)))
+    .limit(1);
+  const site = siteKeyFromUrl(
+    jobRow?.applicationUrl ?? jobRow?.sourceUrl ?? null,
+  );
+
   try {
     await enqueueSubmitApplication({
       application_id: updated.id,
       user_id: userId,
       approved_at: updated.approvedAt.toISOString(),
+      site,
     });
-  } catch {
+  } catch (err) {
     // Roll back to pending_approval so user can retry — never leave approved
     // without a queue payload that carries approved_at.
     await db
@@ -648,6 +665,12 @@ export async function approveApplication(userId: string, id: string) {
         updatedAt: new Date(),
       })
       .where(and(eq(applications.id, id), eq(applications.userId, userId)));
+    if (err instanceof SubmitLimitError) {
+      throw new ApplicationError(
+        err.message,
+        err.code === "emergency_stop" ? 429 : 429,
+      );
+    }
     throw new ApplicationError("Failed to enqueue submission", 503);
   }
 

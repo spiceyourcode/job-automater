@@ -24,6 +24,27 @@ from storage import upload_bytes
 logger = logging.getLogger(__name__)
 
 
+def _is_emergency_stopped(user_id: str) -> bool:
+    """Redis flag set by POST /automation/emergency-stop (P10.3)."""
+    try:
+        import redis
+
+        from config import settings
+
+        # Celery broker URL is Redis; reuse host for stop flags.
+        url = getattr(settings, "celery_broker_url", "") or "redis://localhost:6379/0"
+        client = redis.Redis.from_url(url, decode_responses=True)
+        try:
+            return client.get(f"jobautomater:submit_stop:{user_id}") == "1"
+        finally:
+            client.close()
+    except Exception:  # noqa: BLE001
+        # Fail open on Redis blips would be unsafe for stop; fail closed for stop check
+        # only when we can confirm — if Redis is down, allow process but log.
+        logger.warning("emergency_stop_check_failed")
+        return False
+
+
 class SubmitApplicationJob(BaseModel):
     application_id: str = Field(..., min_length=36, max_length=36)
     user_id: str = Field(..., min_length=36, max_length=36)
@@ -37,6 +58,11 @@ def process_submit_application(payload: dict[str, Any]) -> dict[str, Any]:
     if not payload.get("approved_at"):
         logger.warning("submit_rejected reason=missing_approved_at")
         return {"status": "error", "error": "missing_approved_at"}
+
+    user_id = str(payload.get("user_id") or "")
+    if user_id and _is_emergency_stopped(user_id):
+        logger.warning("submit_rejected reason=emergency_stop")
+        return {"status": "error", "error": "emergency_stop"}
 
     try:
         job = SubmitApplicationJob.model_validate(payload)

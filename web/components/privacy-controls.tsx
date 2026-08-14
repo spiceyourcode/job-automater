@@ -1,11 +1,15 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   deleteOwnAccountAction,
   exportOwnDataAction,
 } from "@/lib/actions/profile";
+import {
+  automationStatusAction,
+  emergencyStopAction,
+} from "@/lib/actions/automation";
 import { Button } from "@/components/ui/button";
 
 export function PrivacyControls() {
@@ -13,6 +17,14 @@ export function PrivacyControls() {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [stopped, setStopped] = useState(false);
+  const [stopMsg, setStopMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    void automationStatusAction().then((res) => {
+      if (res.ok && res.data) setStopped(res.data.emergencyStop);
+    });
+  }, []);
 
   function onExport() {
     setError(null);
@@ -67,6 +79,68 @@ export function PrivacyControls() {
         >
           Download export
         </Button>
+      </section>
+
+      <section className="space-y-3 border-t pt-6">
+        <h2 className="text-sm font-medium">Emergency stop</h2>
+        <p className="text-sm text-muted-foreground">
+          Pause all pending auto-submits for your account and drain the submit
+          queue. Resume when you are ready.
+        </p>
+        {stopped ? (
+          <p className="text-sm text-amber-700 dark:text-amber-500">
+            Automation is stopped.
+          </p>
+        ) : null}
+        {stopMsg ? (
+          <p className="text-sm text-muted-foreground">{stopMsg}</p>
+        ) : null}
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="destructive"
+            className="cursor-pointer"
+            disabled={pending || stopped}
+            onClick={() => {
+              setError(null);
+              setStopMsg(null);
+              startTransition(async () => {
+                const res = await emergencyStopAction(true);
+                if (!res.ok) {
+                  setError(res.error);
+                  return;
+                }
+                setStopped(true);
+                setStopMsg(
+                  `Stopped. Drained ${res.data?.drained ?? 0} queued submit(s).`,
+                );
+              });
+            }}
+          >
+            Stop automation
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="cursor-pointer"
+            disabled={pending || !stopped}
+            onClick={() => {
+              setError(null);
+              setStopMsg(null);
+              startTransition(async () => {
+                const res = await emergencyStopAction(false);
+                if (!res.ok) {
+                  setError(res.error);
+                  return;
+                }
+                setStopped(false);
+                setStopMsg("Automation resumed.");
+              });
+            }}
+          >
+            Resume
+          </Button>
+        </div>
       </section>
 
       <section className="space-y-3 border-t pt-6">
