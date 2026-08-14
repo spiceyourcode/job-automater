@@ -105,11 +105,11 @@ Full matrix + per-task AUTO SKILLS: **`AGENT-PROMPTS.md`**
 | ✓ | P11.2 Notification center |
 | ✓ | P11.3 Email review queue |
 | ✓ | P11.4 Analytics export |
-| | P11.5 WebSocket events |
+| ✓ | P11.5 WebSocket events |
 | | P11.6 Weekly digest |
 
-**Next:** **P11.5** — JWT-auth WebSocket events
-Prompt: `AGENT-PROMPTS.md` → Phase 11 → P11.5
+**Next:** **P11.6** — Weekly digest email
+Prompt: `AGENT-PROMPTS.md` → Phase 11 → P11.6
 Contract: `docs/contracts/phase-11-comms.md`
 
 ---

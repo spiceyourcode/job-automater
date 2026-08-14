@@ -89,6 +89,18 @@ def process_generate_docs(payload: dict[str, Any]) -> dict[str, Any]:
             len(validated["bullet_traces"]),
             duration_ms,
         )
+        try:
+            from tasks.realtime import publish_event
+
+            publish_event(
+                job.user_id,
+                {
+                    "type": "documents_ready",
+                    "application_id": job.application_id,
+                },
+            )
+        except Exception:  # noqa: BLE001
+            pass
         return {
             "status": "ok",
             "application_id": job.application_id,

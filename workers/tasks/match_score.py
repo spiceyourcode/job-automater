@@ -105,6 +105,22 @@ def process_match_score(payload: dict[str, Any]) -> dict[str, Any]:
         failed,
         skipped,
     )
+    try:
+        from tasks.realtime import publish_event
+
+        total = max(scored + duped + failed + skipped, 1)
+        publish_event(
+            job.user_id,
+            {
+                "type": "pipeline_progress",
+                "run_id": job.user_id,
+                "stage": "scoring",
+                "progress": 100,
+                "message": f"Scoring {scored}/{total} jobs",
+            },
+        )
+    except Exception:  # noqa: BLE001
+        pass
     return {
         "status": "ok",
         "scored": scored,

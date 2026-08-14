@@ -9,6 +9,7 @@ import { registerRoutes as registerEmailsRoutes } from "./modules/emails/index.j
 import { registerRoutes as registerAnalyticsRoutes } from "./modules/analytics/index.js";
 import { registerRoutes as registerTeamRoutes } from "./modules/team/index.js";
 import { registerRoutes as registerAutomationRoutes } from "./modules/automation/index.js";
+import { registerRoutes as registerRealtimeRoutes } from "./modules/realtime/index.js";
 
 export const createApp = (): Hono => {
   const app = new Hono();
@@ -23,6 +24,7 @@ export const createApp = (): Hono => {
   registerAnalyticsRoutes(app);
   registerTeamRoutes(app);
   registerAutomationRoutes(app);
+  registerRealtimeRoutes(app);
 
   app.notFound((c) => c.json({ error: "not_found" }, 404));
 

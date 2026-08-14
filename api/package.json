@@ -31,11 +31,13 @@
     "pdf-lib": "^1.17.1",
     "postgres": "^3.4.9",
     "redis": "^6.2.0",
+    "ws": "^8.21.3",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^26.1.2",
+    "@types/ws": "^8.18.1",
     "drizzle-kit": "^0.31.10",
     "tsx": "^4.23.5",
     "typescript": "^7.0.2",

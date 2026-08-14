@@ -6,6 +6,7 @@ import {
   startDailyCollectWorker,
   stopDailyCollectWorker,
 } from "./lib/daily-collect.js";
+import { attachWebSocket, stopWebSocket } from "./lib/ws-server.js";
 
 const app = createApp();
 
@@ -18,6 +19,15 @@ const server = serve(
     console.log(`API listening on http://localhost:${info.port}`);
   },
 );
+
+void attachWebSocket(server as import("node:http").Server).catch((err: unknown) => {
+  console.error(
+    JSON.stringify({
+      event: "ws_attach_failed",
+      error: err instanceof Error ? err.message : "unknown",
+    }),
+  );
+});
 
 void startDailyCollectWorker()
   .then(() => {
@@ -35,6 +45,7 @@ void startDailyCollectWorker()
 const shutdown = async (signal: string) => {
   console.log(`Received ${signal}, shutting down`);
   server.close();
+  await stopWebSocket().catch(() => {});
   await stopDailyCollectWorker().catch(() => {});
   await closeDatabase();
   process.exit(0);

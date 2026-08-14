@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { logoutAction } from "@/lib/actions/auth";
 import { NotificationBell } from "@/components/notification-bell";
+import { RealtimeListener } from "@/components/realtime-listener";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -49,6 +50,7 @@ export function AppShell({
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
+      <RealtimeListener />
       <header className="sticky top-0 z-40 h-14 border-b bg-background/80 backdrop-blur-sm">
         <div className="flex h-full items-center gap-3 px-4">
           <Button

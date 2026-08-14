@@ -159,6 +159,21 @@ def process_collect_source(payload: dict[str, Any]) -> dict[str, Any]:
                 len(inserted_ids),
                 duration_ms,
             )
+            try:
+                from tasks.realtime import publish_event
+
+                publish_event(
+                    job.user_id,
+                    {
+                        "type": "pipeline_progress",
+                        "run_id": job.source_id,
+                        "stage": "collect",
+                        "progress": 100,
+                        "message": f"Collected {len(raw_jobs)} jobs",
+                    },
+                )
+            except Exception:  # noqa: BLE001
+                pass
             result = {
                 "status": "success",
                 "jobs_found": len(raw_jobs),

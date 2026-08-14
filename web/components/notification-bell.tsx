@@ -29,7 +29,12 @@ export function NotificationBell() {
   useEffect(() => {
     load();
     const t = setInterval(load, 60_000);
-    return () => clearInterval(t);
+    const onRealtime = () => load();
+    window.addEventListener("jobautomater:notification", onRealtime);
+    return () => {
+      clearInterval(t);
+      window.removeEventListener("jobautomater:notification", onRealtime);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

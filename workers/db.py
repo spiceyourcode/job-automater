@@ -773,6 +773,18 @@ def insert_notification(
         assert row is not None
         nid = str(row["id"])
     _maybe_dispatch_webhooks(conn, user_id=user_id, type_=type_, title=title)
+    try:
+        from tasks.realtime import publish_event
+
+        publish_event(
+            user_id,
+            {
+                "type": "notification",
+                "notification": {"id": nid, "type": type_, "title": title},
+            },
+        )
+    except Exception:  # noqa: BLE001
+        pass
     return nid
 
 
