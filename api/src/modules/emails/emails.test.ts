@@ -80,6 +80,7 @@ describe("GET /api/v1/emails/notifications", () => {
 
   it("200 lists notifications", async () => {
     mockService.listNotifications.mockResolvedValue({
+      unreadCount: 1,
       notifications: [
         {
           id: "n0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",

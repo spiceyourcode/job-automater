@@ -158,7 +158,7 @@ Phases **0–6** are the shipped MVP slice (contracts `phase-1` … `phase-6`). 
 | # | Task | Service | Status | Source |
 |---|------|---------|--------|--------|
 | 11.1 | Gmail OAuth + watch/history sync (IMAP stays) | api, workers | [x] | TRD FR-EM-01, Impl Plan W19 |
-| 11.2 | Notification center, preferences, Slack/Telegram webhooks | api, web | [ ] | Schema §2.9, UIUX TopBar bell |
+| 11.2 | Notification center, preferences, Slack/Telegram webhooks | api, web | [x] | Schema §2.9, UIUX TopBar bell |
 | 11.3 | Low-confidence email review queue | api, web | [ ] | AppFlow §2.5, Impl Plan W20 |
 | 11.4 | Analytics CSV/PDF export + skill-gap | api, web | [ ] | Schema §2.7, PRD §10.5 |
 | 11.5 | WebSocket: pipeline progress, docs ready, notifications | api, web | [ ] | Schema §2.10, AppFlow §2.3 |

@@ -102,14 +102,14 @@ Full matrix + per-task AUTO SKILLS: **`AGENT-PROMPTS.md`**
 | Done | Task |
 |------|------|
 | ✓ | P11.1 Gmail OAuth |
-| | P11.2 Notification center |
+| ✓ | P11.2 Notification center |
 | | P11.3 Email review queue |
 | | P11.4 Analytics export |
 | | P11.5 WebSocket events |
 | | P11.6 Weekly digest |
 
-**Next:** **P11.2** — Bell UI, preferences, Slack/Telegram webhooks
-Prompt: `AGENT-PROMPTS.md` → Phase 11 → P11.2
+**Next:** **P11.3** — Low-confidence email review queue
+Prompt: `AGENT-PROMPTS.md` → Phase 11 → P11.3
 Contract: `docs/contracts/phase-11-comms.md`
 
 ---

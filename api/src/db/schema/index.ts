@@ -54,6 +54,13 @@ export {
   type NewGmailConnection,
 } from "./gmail-connections.js";
 export {
+  notificationPreferences,
+  DEFAULT_NOTIFICATION_PREFS,
+  type NotificationPreference,
+  type NewNotificationPreference,
+  type ChannelPref,
+} from "./notification-preferences.js";
+export {
   workspaces,
   workspaceMembers,
   WORKSPACE_ROLES,

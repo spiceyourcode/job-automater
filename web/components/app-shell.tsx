@@ -16,6 +16,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { logoutAction } from "@/lib/actions/auth";
+import { NotificationBell } from "@/components/notification-bell";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -30,6 +31,7 @@ const SETTINGS_LINKS = [
   { href: "/settings/cv", label: "CV & Documents" },
   { href: "/settings/sources", label: "Sources" },
   { href: "/settings/team", label: "Team" },
+  { href: "/settings/notifications", label: "Notifications" },
   { href: "/settings/privacy", label: "Privacy" },
 ] as const;
 
@@ -83,6 +85,7 @@ export function AppShell({
                 <Link href={item.href}>{item.label}</Link>
               </Button>
             ))}
+            <NotificationBell />
             <form action={logoutAction}>
               <Button
                 type="submit"

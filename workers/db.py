@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
+import urllib.error
+import urllib.request
 from contextlib import contextmanager
 from typing import Any, Generator
 
@@ -11,6 +14,8 @@ import psycopg
 from psycopg.rows import dict_row
 
 from config import settings
+
+logger = logging.getLogger(__name__)
 
 
 @contextmanager
@@ -766,4 +771,54 @@ def insert_notification(
         )
         row = cur.fetchone()
         assert row is not None
-        return str(row["id"])
+        nid = str(row["id"])
+    _maybe_dispatch_webhooks(conn, user_id=user_id, type_=type_, title=title)
+    return nid
+
+
+def _maybe_dispatch_webhooks(
+    conn: psycopg.Connection,
+    *,
+    user_id: str,
+    type_: str,
+    title: str,
+) -> None:
+    """POST Slack/Telegram if enabled. Never logs URL or payload (HG-8)."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT preferences, slack_webhook_url, telegram_webhook_url
+            FROM notification_preferences
+            WHERE user_id = %s::uuid
+            LIMIT 1
+            """,
+            (user_id,),
+        )
+        row = cur.fetchone()
+    if not row:
+        return
+    prefs = row.get("preferences") or {}
+    if isinstance(prefs, str):
+        try:
+            prefs = json.loads(prefs)
+        except json.JSONDecodeError:
+            prefs = {}
+    channel = prefs.get(type_) or {}
+    if channel.get("slack") and row.get("slack_webhook_url"):
+        _post_webhook(str(row["slack_webhook_url"]), title, "slack")
+    if channel.get("telegram") and row.get("telegram_webhook_url"):
+        _post_webhook(str(row["telegram_webhook_url"]), title, "telegram")
+
+
+def _post_webhook(url: str, title: str, channel: str) -> None:
+    req = urllib.request.Request(
+        url,
+        data=json.dumps({"text": title}).encode("utf-8"),
+        headers={"content-type": "application/json"},
+        method="POST",
+    )
+    try:
+        urllib.request.urlopen(req, timeout=5)  # noqa: S310
+        logger.info("webhook_sent channel=%s", channel)
+    except (urllib.error.URLError, TimeoutError, OSError):
+        logger.warning("webhook_failed channel=%s", channel)

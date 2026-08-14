@@ -29,4 +29,24 @@ export const gmailPushQuerySchema = z
   })
   .strict();
 
+export const channelPrefSchema = z
+  .object({
+    inApp: z.boolean(),
+    email: z.boolean(),
+    slack: z.boolean(),
+    telegram: z.boolean(),
+  })
+  .strict();
+
+export const patchNotificationPrefsBodySchema = z
+  .object({
+    preferences: z.record(z.string(), channelPrefSchema).optional(),
+    slackWebhookUrl: z.string().url().max(2000).nullable().optional(),
+    telegramWebhookUrl: z.string().url().max(2000).nullable().optional(),
+  })
+  .strict();
+
 export type SyncEmailsBody = z.infer<typeof syncEmailsBodySchema>;
+export type PatchNotificationPrefsBody = z.infer<
+  typeof patchNotificationPrefsBodySchema
+>;
