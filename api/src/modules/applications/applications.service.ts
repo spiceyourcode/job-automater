@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, notInArray, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, notInArray, sql } from "drizzle-orm";
 import { db } from "../../db/index.js";
 import {
   applications,
@@ -18,8 +18,12 @@ import {
   SubmitLimitError,
 } from "../../lib/submit-limits.js";
 import type {
+  BulkActionBody,
   BulkGenerateBody,
   CreateApplicationBody,
+  CreateInterviewBody,
+  PatchApplicationMetaBody,
+  PatchInterviewBody,
   PipelineStage,
   RegenerateSectionBody,
   SetTemplateBody,
@@ -94,6 +98,10 @@ function toPublic(app: Application) {
     generationModel: app.generationModel,
     cvTemplate: app.cvTemplate,
     clTemplate: app.clTemplate,
+    userNotes: app.userNotes,
+    interviewStages: app.interviewStages ?? [],
+    nextFollowupAt: app.nextFollowupAt,
+    followupCount: app.followupCount ?? 0,
     createdAt: app.createdAt,
     updatedAt: app.updatedAt,
     /** Approve/Apply blocked until review (P3.2); submit only after approve (HG-4). */
@@ -706,4 +714,170 @@ export async function updateApplicationStage(
 
   if (!updated) throw new ApplicationError("Application not found", 404);
   return { application: toPublic(updated) };
+}
+
+type InterviewEvent = NonNullable<Application["interviewStages"]>[number];
+
+function stagesOf(app: Application): InterviewEvent[] {
+  return Array.isArray(app.interviewStages) ? [...app.interviewStages] : [];
+}
+
+export async function addInterview(
+  userId: string,
+  id: string,
+  body: CreateInterviewBody,
+) {
+  const app = await getOwned(userId, id);
+  const event: InterviewEvent = {
+    id: crypto.randomUUID(),
+    stage: body.stage,
+    type: body.type,
+    scheduledAt: body.scheduledAt,
+    completedAt: null,
+    status: "scheduled",
+    interviewers: body.interviewers,
+    meetingLink: body.meetingLink ?? null,
+    notes: body.notes ?? null,
+    feedback: null,
+  };
+  const next = [...stagesOf(app), event];
+  const [row] = await db
+    .update(applications)
+    .set({
+      interviewStages: next,
+      status: "interviewing",
+      updatedAt: new Date(),
+    })
+    .where(and(eq(applications.id, id), eq(applications.userId, userId)))
+    .returning();
+  if (!row) throw new ApplicationError("Application not found", 404);
+  return { application: toPublic(row), interviewEvent: event };
+}
+
+export async function patchInterview(
+  userId: string,
+  id: string,
+  eventId: string,
+  body: PatchInterviewBody,
+) {
+  const app = await getOwned(userId, id);
+  const next = stagesOf(app);
+  const idx = next.findIndex((e) => e.id === eventId);
+  if (idx < 0) throw new ApplicationError("Interview event not found", 404);
+  const current = next[idx]!;
+  next[idx] = {
+    ...current,
+    status: body.status ?? current.status,
+    completedAt: body.completedAt ?? current.completedAt,
+    feedback: body.feedback ?? current.feedback,
+    notes: body.notes ?? current.notes,
+  };
+  const [row] = await db
+    .update(applications)
+    .set({ interviewStages: next, updatedAt: new Date() })
+    .where(and(eq(applications.id, id), eq(applications.userId, userId)))
+    .returning();
+  if (!row) throw new ApplicationError("Application not found", 404);
+  return { application: toPublic(row), interviewEvent: next[idx] };
+}
+
+export async function patchApplicationMeta(
+  userId: string,
+  id: string,
+  body: PatchApplicationMetaBody,
+) {
+  await getOwned(userId, id);
+  const patch: Record<string, unknown> = { updatedAt: new Date() };
+  if (body.userNotes !== undefined) patch.userNotes = body.userNotes;
+  if (body.nextFollowupAt !== undefined) {
+    patch.nextFollowupAt = body.nextFollowupAt
+      ? new Date(body.nextFollowupAt)
+      : null;
+  }
+  const [row] = await db
+    .update(applications)
+    .set(patch)
+    .where(and(eq(applications.id, id), eq(applications.userId, userId)))
+    .returning();
+  if (!row) throw new ApplicationError("Application not found", 404);
+  return { application: toPublic(row) };
+}
+
+/**
+ * Bulk archive / withdraw / follow-up / regenerate docs.
+ * Only mutates rows owned by userId (IDOR-safe). Never enqueues submit (HG-4).
+ */
+export async function bulkAction(userId: string, body: BulkActionBody) {
+  const owned = await db
+    .select({ id: applications.id, jobId: applications.jobId })
+    .from(applications)
+    .where(
+      and(
+        eq(applications.userId, userId),
+        inArray(applications.id, body.applicationIds),
+      ),
+    );
+  if (owned.length !== body.applicationIds.length) {
+    throw new ApplicationError("Application not found", 404);
+  }
+  const ids = owned.map((r) => r.id);
+
+  if (body.action === "archive" || body.action === "withdraw") {
+    const status = body.action === "archive" ? "archived" : "withdrawn";
+    await db
+      .update(applications)
+      .set({ status, updatedAt: new Date() })
+      .where(
+        and(eq(applications.userId, userId), inArray(applications.id, ids)),
+      );
+    return {
+      updated: ids.length,
+      action: body.action,
+      submitEnqueued: false as const,
+    };
+  }
+
+  if (body.action === "followup") {
+    const when = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    await db
+      .update(applications)
+      .set({
+        nextFollowupAt: when,
+        followupCount: sql`${applications.followupCount} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(eq(applications.userId, userId), inArray(applications.id, ids)),
+      );
+    return {
+      updated: ids.length,
+      action: body.action,
+      submitEnqueued: false as const,
+    };
+  }
+
+  for (const row of owned) {
+    try {
+      await enqueueGenerateDocs({
+        application_id: row.id,
+        user_id: userId,
+        job_id: row.jobId,
+      });
+    } catch {
+      throw new ApplicationError("Failed to enqueue document generation", 503);
+    }
+  }
+  await db
+    .update(applications)
+    .set({
+      documentsReviewedAt: null,
+      approvedAt: null,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(applications.userId, userId), inArray(applications.id, ids)));
+  return {
+    updated: ids.length,
+    action: body.action,
+    submitEnqueued: false as const,
+  };
 }

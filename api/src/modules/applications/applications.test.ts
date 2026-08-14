@@ -20,6 +20,10 @@ vi.mock("./applications.service.js", async (importOriginal) => {
     approveApplication: vi.fn(),
     updateApplicationStage: vi.fn(),
     getDocumentDownloadUrl: vi.fn(),
+    addInterview: vi.fn(),
+    patchInterview: vi.fn(),
+    patchApplicationMeta: vi.fn(),
+    bulkAction: vi.fn(),
     ApplicationError: actual.ApplicationError,
   };
 });
@@ -61,6 +65,10 @@ const sampleApp = {
   generationModel: "heuristic-docs-v1",
   cvTemplate: "modern",
   clTemplate: "modern",
+  userNotes: null,
+  interviewStages: [],
+  nextFollowupAt: null,
+  followupCount: 0,
   createdAt: new Date(),
   updatedAt: new Date(),
   canApply: false,
@@ -514,6 +522,123 @@ describe("GET /api/v1/applications/:id/download/:kind", () => {
       `/api/v1/applications/${sampleApp.id}/download/zip`,
       { headers: { Authorization: await authHeader("user-b") } },
     );
+    expect(res.status).toBe(404);
+  });
+});
+
+describe("POST /api/v1/applications/:id/interviews", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("401 without auth", async () => {
+    const res = await buildApp().request(
+      `/api/v1/applications/${sampleApp.id}/interviews`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          stage: "phone_screen",
+          scheduledAt: "2026-08-20T14:00:00.000Z",
+        }),
+      },
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("201 creates interview event", async () => {
+    mockService.addInterview.mockResolvedValue({
+      application: { ...sampleApp, status: "interviewing" },
+      interviewEvent: {
+        id: "e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+        stage: "phone_screen",
+        scheduledAt: "2026-08-20T14:00:00.000Z",
+        status: "scheduled",
+        interviewers: [],
+      },
+    });
+    const res = await buildApp().request(
+      `/api/v1/applications/${sampleApp.id}/interviews`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: await authHeader("user-a"),
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          stage: "phone_screen",
+          scheduledAt: "2026-08-20T14:00:00.000Z",
+        }),
+      },
+    );
+    expect(res.status).toBe(201);
+    expect(mockService.addInterview).toHaveBeenCalledWith(
+      "user-a",
+      sampleApp.id,
+      expect.objectContaining({ stage: "phone_screen" }),
+    );
+  });
+
+  it("404 IDOR — other user cannot add interview", async () => {
+    mockService.addInterview.mockRejectedValue(
+      new applicationsService.ApplicationError("Application not found", 404),
+    );
+    const res = await buildApp().request(
+      `/api/v1/applications/${sampleApp.id}/interviews`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: await authHeader("user-b"),
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          stage: "phone_screen",
+          scheduledAt: "2026-08-20T14:00:00.000Z",
+        }),
+      },
+    );
+    expect(res.status).toBe(404);
+  });
+});
+
+describe("POST /api/v1/applications/bulk-action", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("200 archives owned applications without enqueueing submit", async () => {
+    mockService.bulkAction.mockResolvedValue({
+      updated: 2,
+      action: "archive",
+      submitEnqueued: false,
+    });
+    const res = await buildApp().request("/api/v1/applications/bulk-action", {
+      method: "POST",
+      headers: {
+        Authorization: await authHeader("user-a"),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        applicationIds: [sampleApp.id, "c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33"],
+        action: "archive",
+      }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { submitEnqueued: boolean };
+    expect(body.submitEnqueued).toBe(false);
+  });
+
+  it("404 IDOR — cannot withdraw another user's application", async () => {
+    mockService.bulkAction.mockRejectedValue(
+      new applicationsService.ApplicationError("Application not found", 404),
+    );
+    const res = await buildApp().request("/api/v1/applications/bulk-action", {
+      method: "POST",
+      headers: {
+        Authorization: await authHeader("user-b"),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        applicationIds: [sampleApp.id],
+        action: "withdraw",
+      }),
+    });
     expect(res.status).toBe(404);
   });
 });

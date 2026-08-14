@@ -145,7 +145,7 @@ Phases **0–6** are the shipped MVP slice (contracts `phase-1` … `phase-6`). 
 | 10.1 | Workday + Ashby ATS submitters (still HG-4) | workers | [x] | TRD FR-AA-01, PRD §11 P4.2 |
 | 10.2 | LinkedIn Easy Apply, Indeed, generic career portals | workers | [x] | TRD FR-AA-02, AppFlow §2.3 |
 | 10.3 | Per-site rate limits, daily caps, emergency stop | api, workers | [x] | TRD FR-AA-07, Impl Plan W16/W18 |
-| 10.4 | Interviews, follow-ups, notes, bulk archive/withdraw | api, web | [ ] | AppFlow §2.4, Schema §2.6 |
+| 10.4 | Interviews, follow-ups, notes, bulk archive/withdraw | api, web | [x] | AppFlow §2.4, Schema §2.6 |
 
 **Contract:** [`docs/contracts/phase-10-apply-complete.md`](./docs/contracts/phase-10-apply-complete.md)
 

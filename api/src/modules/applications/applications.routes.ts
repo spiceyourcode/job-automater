@@ -4,8 +4,13 @@ import { requireAuth, requireRole } from "../../middleware/require-auth.js";
 import {
   applicationDownloadParamSchema,
   applicationIdParamSchema,
+  bulkActionBodySchema,
   bulkGenerateBodySchema,
   createApplicationBodySchema,
+  createInterviewBodySchema,
+  interviewEventParamSchema,
+  patchApplicationMetaBodySchema,
+  patchInterviewBodySchema,
   regenerateSectionBodySchema,
   setTemplateBodySchema,
   updateBulletsBodySchema,
@@ -60,6 +65,26 @@ applicationsRoutes.post(
         c.req.valid("json"),
       );
       return c.json(result, 202);
+    } catch (err) {
+      if (isAppError(err)) {
+        return c.json({ error: err.message }, err.statusCode);
+      }
+      throw err;
+    }
+  },
+);
+
+applicationsRoutes.post(
+  "/bulk-action",
+  requireRole("owner", "member"),
+  zValidator("json", bulkActionBodySchema),
+  async (c) => {
+    const { userId } = c.get("auth");
+    try {
+      return c.json(
+        await applicationsService.bulkAction(userId, c.req.valid("json")),
+        200,
+      );
     } catch (err) {
       if (isAppError(err)) {
         return c.json({ error: err.message }, err.statusCode);
@@ -245,6 +270,83 @@ applicationsRoutes.patch(
         await applicationsService.updateApplicationStage(
           userId,
           c.req.valid("param").id,
+          c.req.valid("json"),
+        ),
+        200,
+      );
+    } catch (err) {
+      if (isAppError(err)) {
+        return c.json({ error: err.message }, err.statusCode);
+      }
+      throw err;
+    }
+  },
+);
+
+applicationsRoutes.patch(
+  "/:id",
+  requireRole("owner", "member"),
+  zValidator("param", applicationIdParamSchema),
+  zValidator("json", patchApplicationMetaBodySchema),
+  async (c) => {
+    const { userId } = c.get("auth");
+    try {
+      return c.json(
+        await applicationsService.patchApplicationMeta(
+          userId,
+          c.req.valid("param").id,
+          c.req.valid("json"),
+        ),
+        200,
+      );
+    } catch (err) {
+      if (isAppError(err)) {
+        return c.json({ error: err.message }, err.statusCode);
+      }
+      throw err;
+    }
+  },
+);
+
+applicationsRoutes.post(
+  "/:id/interviews",
+  requireRole("owner", "member"),
+  zValidator("param", applicationIdParamSchema),
+  zValidator("json", createInterviewBodySchema),
+  async (c) => {
+    const { userId } = c.get("auth");
+    try {
+      return c.json(
+        await applicationsService.addInterview(
+          userId,
+          c.req.valid("param").id,
+          c.req.valid("json"),
+        ),
+        201,
+      );
+    } catch (err) {
+      if (isAppError(err)) {
+        return c.json({ error: err.message }, err.statusCode);
+      }
+      throw err;
+    }
+  },
+);
+
+applicationsRoutes.patch(
+  "/:id/interviews/:eventId",
+  requireRole("owner", "member"),
+  zValidator("param", interviewEventParamSchema),
+  zValidator("json", patchInterviewBodySchema),
+  async (c) => {
+    const { userId } = c.get("auth");
+    const { id, eventId } = c.req.valid("param");
+    try {
+      return c.json(
+        await applicationsService.patchInterview(
+          userId,
+          id,
+          eventId,
           c.req.valid("json"),
         ),
         200,

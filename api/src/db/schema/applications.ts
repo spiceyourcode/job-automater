@@ -61,6 +61,25 @@ export const applications = pgTable(
     submittedAt: timestamp("submitted_at", { withTimezone: true }),
     approvedAt: timestamp("approved_at", { withTimezone: true }),
     userNotes: text("user_notes"),
+    interviewStages: jsonb("interview_stages")
+      .$type<
+        Array<{
+          id: string;
+          stage: string;
+          type?: string;
+          scheduledAt: string;
+          completedAt?: string | null;
+          status: "scheduled" | "passed" | "failed" | "cancelled";
+          interviewers: Array<{ name: string; role: string; email?: string }>;
+          meetingLink?: string | null;
+          notes?: string | null;
+          feedback?: string | null;
+        }>
+      >()
+      .default(sql`'[]'::jsonb`)
+      .notNull(),
+    nextFollowupAt: timestamp("next_followup_at", { withTimezone: true }),
+    followupCount: integer("followup_count").default(0).notNull(),
     submitError: varchar("submit_error", { length: 100 }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()

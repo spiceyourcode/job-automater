@@ -38,6 +38,16 @@ export type ApplicationPublic = {
   }>;
   cvTemplate?: "modern" | "classic" | "minimal";
   clTemplate?: string;
+  userNotes?: string | null;
+  interviewStages?: Array<{
+    id: string;
+    stage: string;
+    scheduledAt: string;
+    status: string;
+    notes?: string | null;
+  }>;
+  nextFollowupAt?: string | null;
+  followupCount?: number;
   jobTitle?: string;
   jobCompany?: string;
 };
@@ -348,6 +358,82 @@ export async function updateApplicationStageAction(
     }
     const data = (await res.json()) as { application: ApplicationPublic };
     revalidatePath("/dashboard");
+    revalidatePath("/dashboard/pipeline");
+    return { ok: true, data };
+  } catch {
+    return { ok: false, error: "Network error" };
+  }
+}
+
+export async function bulkActionAction(
+  applicationIds: string[],
+  action: "archive" | "withdraw" | "followup" | "regenerate_docs",
+): Promise<ActionResult<{ updated: number; submitEnqueued: boolean }>> {
+  const headers = await authHeaders();
+  if (!headers) return { ok: false, error: "Unauthorized" };
+  try {
+    const res = await fetch(`${API_URL}/api/v1/applications/bulk-action`, {
+      method: "POST",
+      headers: { ...headers, "content-type": "application/json" },
+      body: JSON.stringify({ applicationIds, action }),
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      return { ok: false, error: body.error ?? "Bulk action failed" };
+    }
+    const data = (await res.json()) as {
+      updated: number;
+      submitEnqueued: boolean;
+    };
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/pipeline");
+    return { ok: true, data };
+  } catch {
+    return { ok: false, error: "Network error" };
+  }
+}
+
+export async function addInterviewAction(
+  id: string,
+  body: { stage: string; scheduledAt: string; notes?: string },
+): Promise<ActionResult<{ application: ApplicationPublic }>> {
+  const headers = await authHeaders();
+  if (!headers) return { ok: false, error: "Unauthorized" };
+  try {
+    const res = await fetch(`${API_URL}/api/v1/applications/${id}/interviews`, {
+      method: "POST",
+      headers: { ...headers, "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = (await res.json().catch(() => ({}))) as { error?: string };
+      return { ok: false, error: err.error ?? "Could not add interview" };
+    }
+    const data = (await res.json()) as { application: ApplicationPublic };
+    revalidatePath("/dashboard/pipeline");
+    return { ok: true, data };
+  } catch {
+    return { ok: false, error: "Network error" };
+  }
+}
+
+export async function patchApplicationMetaAction(
+  id: string,
+  body: { userNotes?: string; nextFollowupAt?: string | null },
+): Promise<ActionResult<{ application: ApplicationPublic }>> {
+  const headers = await authHeaders();
+  if (!headers) return { ok: false, error: "Unauthorized" };
+  try {
+    const res = await fetch(`${API_URL}/api/v1/applications/${id}`, {
+      method: "PATCH",
+      headers: { ...headers, "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = (await res.json().catch(() => ({}))) as { error?: string };
+      return { ok: false, error: err.error ?? "Could not update" };
+    }
+    const data = (await res.json()) as { application: ApplicationPublic };
     revalidatePath("/dashboard/pipeline");
     return { ok: true, data };
   } catch {

@@ -70,12 +70,77 @@ export const bulkGenerateBodySchema = z
   })
   .strict();
 
+export const interviewerSchema = z
+  .object({
+    name: z.string().min(1).max(200),
+    role: z.string().min(1).max(200),
+    email: z.string().email().optional(),
+  })
+  .strict();
+
+export const createInterviewBodySchema = z
+  .object({
+    stage: z.string().min(1).max(80),
+    type: z.string().min(1).max(80).optional(),
+    scheduledAt: z.string().datetime({ offset: true }),
+    interviewers: z.array(interviewerSchema).max(20).default([]),
+    meetingLink: z.string().url().max(2000).optional(),
+    notes: z.string().max(5000).optional(),
+  })
+  .strict();
+
+export const interviewEventParamSchema = z.object({
+  id: z.string().uuid(),
+  eventId: z.string().uuid(),
+});
+
+export const patchInterviewBodySchema = z
+  .object({
+    status: z.enum(["scheduled", "passed", "failed", "cancelled"]).optional(),
+    completedAt: z.string().datetime({ offset: true }).optional(),
+    feedback: z.string().max(5000).optional(),
+    notes: z.string().max(5000).optional(),
+  })
+  .strict()
+  .refine(
+    (b) =>
+      b.status !== undefined ||
+      b.completedAt !== undefined ||
+      b.feedback !== undefined ||
+      b.notes !== undefined,
+    { message: "At least one field required" },
+  );
+
+export const bulkActionBodySchema = z
+  .object({
+    applicationIds: z.array(z.string().uuid()).min(1).max(50),
+    action: z.enum(["archive", "withdraw", "followup", "regenerate_docs"]),
+  })
+  .strict();
+
+export const patchApplicationMetaBodySchema = z
+  .object({
+    userNotes: z.string().max(10_000).optional(),
+    nextFollowupAt: z.string().datetime({ offset: true }).nullable().optional(),
+  })
+  .strict()
+  .refine(
+    (b) => b.userNotes !== undefined || b.nextFollowupAt !== undefined,
+    { message: "At least one field required" },
+  );
+
 export type CreateApplicationBody = z.infer<typeof createApplicationBodySchema>;
 export type UpdateStageBody = z.infer<typeof updateStageBodySchema>;
 export type SetTemplateBody = z.infer<typeof setTemplateBodySchema>;
 export type UpdateBulletsBody = z.infer<typeof updateBulletsBodySchema>;
 export type RegenerateSectionBody = z.infer<typeof regenerateSectionBodySchema>;
 export type BulkGenerateBody = z.infer<typeof bulkGenerateBodySchema>;
+export type CreateInterviewBody = z.infer<typeof createInterviewBodySchema>;
+export type PatchInterviewBody = z.infer<typeof patchInterviewBodySchema>;
+export type BulkActionBody = z.infer<typeof bulkActionBodySchema>;
+export type PatchApplicationMetaBody = z.infer<
+  typeof patchApplicationMetaBodySchema
+>;
 export type PipelineStage = z.infer<typeof pipelineStageSchema>;
 
 /** Map Kanban stage → applications.status */

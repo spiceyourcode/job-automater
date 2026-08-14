@@ -95,18 +95,22 @@ Full matrix + per-task AUTO SKILLS: **`AGENT-PROMPTS.md`**
 
 **Phase 9 — Document completeness** ✅ complete (P9.1–P9.4 — one commit each)
 
-**Phase 10 — Apply completeness** (next)
+**Phase 10 — Apply completeness** ✅ complete (P10.1–P10.4 — one commit each)
+
+**Phase 11 — Comms & realtime** (next)
 
 | Done | Task |
 |------|------|
-| ✓ | P10.1 Workday + Ashby |
-| ✓ | P10.2 Portal appliers |
-| ✓ | P10.3 Rate limits + emergency stop |
-| | P10.4 Interviews + bulk actions |
+| | P11.1 Gmail OAuth |
+| | P11.2 Notification center |
+| | P11.3 Email review queue |
+| | P11.4 Analytics export |
+| | P11.5 WebSocket events |
+| | P11.6 Weekly digest |
 
-**Next:** **P10.4** — Interview events, follow-ups, bulk archive/withdraw
-Prompt: `AGENT-PROMPTS.md` → Phase 10 → P10.4
-Contract: `docs/contracts/phase-10-apply-complete.md`
+**Next:** **P11.1** — Gmail OAuth watch + history sync  
+Prompt: `AGENT-PROMPTS.md` → Phase 11 → P11.1  
+Contract: `docs/contracts/phase-11-comms.md`
 
 ---
 
