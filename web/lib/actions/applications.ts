@@ -79,6 +79,43 @@ export async function createApplicationAction(
   }
 }
 
+export async function bulkGenerateAction(
+  limit = 10,
+  minScore?: number,
+): Promise<
+  ActionResult<{ count: number; queued: Array<{ applicationId: string; jobId: string }> }>
+> {
+  const headers = await authHeaders();
+  if (!headers) return { ok: false, error: "Unauthorized" };
+  try {
+    const res = await fetch(`${API_URL}/api/v1/applications/bulk-generate`, {
+      method: "POST",
+      headers: { ...headers, "content-type": "application/json" },
+      body: JSON.stringify({
+        limit,
+        ...(minScore != null ? { minScore } : {}),
+      }),
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      return { ok: false, error: body.error ?? "Bulk generate failed" };
+    }
+    const data = (await res.json()) as {
+      count: number;
+      queued: Array<{ applicationId: string; jobId: string }>;
+      submitEnqueued?: boolean;
+    };
+    if (data.submitEnqueued) {
+      return { ok: false, error: "Refusing submit on bulk generate (HG-4)" };
+    }
+    revalidatePath("/dashboard");
+    revalidatePath("/applications");
+    return { ok: true, data };
+  } catch {
+    return { ok: false, error: "Network error — is the API running?" };
+  }
+}
+
 export async function getApplicationAction(
   id: string,
 ): Promise<

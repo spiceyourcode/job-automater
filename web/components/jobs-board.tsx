@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { Inbox, Plus, Search } from "lucide-react";
+import { Inbox, Plus, Search, Sparkles } from "lucide-react";
 import type { JobPublic } from "@/lib/jobs";
 import {
   getJobStatsAction,
@@ -11,6 +11,7 @@ import {
   saveJobAction,
   unsaveJobAction,
 } from "@/lib/actions/jobs";
+import { bulkGenerateAction } from "@/lib/actions/applications";
 import { JobCard } from "@/components/job-card";
 import { JobDetailDialog } from "@/components/job-detail-dialog";
 import { EmptyState } from "@/components/empty-state";
@@ -50,6 +51,7 @@ export function JobsBoard({ initialJobs }: Props) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [importMsg, setImportMsg] = useState<string | null>(null);
+  const [bulkMsg, setBulkMsg] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const refresh = (next?: {
@@ -402,6 +404,42 @@ export function JobsBoard({ initialJobs }: Props) {
       <p className="text-sm text-muted-foreground" aria-live="polite">
         {statsLine ?? heading}
       </p>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="cursor-pointer"
+          disabled={pending}
+          onClick={() => {
+            startTransition(async () => {
+              setBulkMsg(null);
+              const min = Number(minScore);
+              const res = await bulkGenerateAction(
+                10,
+                Number.isFinite(min) && min > 0 ? min : undefined,
+              );
+              if (!res.ok) {
+                setError(res.error);
+                return;
+              }
+              setError(null);
+              setBulkMsg(
+                `Queued ${res.data?.count ?? 0} draft document packs (no submit).`,
+              );
+            });
+          }}
+        >
+          <Sparkles className="mr-1 h-3.5 w-3.5" aria-hidden />
+          Generate top 10 drafts
+        </Button>
+        {bulkMsg && (
+          <p className="text-sm text-muted-foreground" role="status">
+            {bulkMsg}
+          </p>
+        )}
+      </div>
 
       {jobs.length === 0 ? (
         <EmptyState

@@ -11,6 +11,7 @@ vi.mock("./applications.service.js", async (importOriginal) => {
     listApplications: vi.fn(),
     getApplication: vi.fn(),
     createApplication: vi.fn(),
+    bulkGenerateDocuments: vi.fn(),
     regenerateDocuments: vi.fn(),
     setApplicationTemplate: vi.fn(),
     updateBulletTraces: vi.fn(),
@@ -97,6 +98,38 @@ describe("POST /api/v1/applications", () => {
     };
     expect(body.application.status).toBe("draft");
     expect(body.application.canApply).toBe(false);
+  });
+});
+
+describe("POST /api/v1/applications/bulk-generate (HG-4)", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("202 queues drafts only — never reports submit", async () => {
+    mockService.bulkGenerateDocuments.mockResolvedValue({
+      queued: [{ applicationId: sampleApp.id, jobId: sampleApp.jobId }],
+      count: 1,
+      status: "generating",
+      submitEnqueued: false,
+    });
+    const res = await buildApp().request("/api/v1/applications/bulk-generate", {
+      method: "POST",
+      headers: {
+        Authorization: await authHeader("user-a"),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ limit: 5, minScore: 70 }),
+    });
+    expect(res.status).toBe(202);
+    const body = (await res.json()) as {
+      submitEnqueued: boolean;
+      count: number;
+    };
+    expect(body.submitEnqueued).toBe(false);
+    expect(body.count).toBe(1);
+    expect(mockService.bulkGenerateDocuments).toHaveBeenCalledWith(
+      "user-a",
+      expect.objectContaining({ limit: 5, minScore: 70 }),
+    );
   });
 });
 

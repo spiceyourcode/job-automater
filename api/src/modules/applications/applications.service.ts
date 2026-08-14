@@ -1,7 +1,8 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, gte, notInArray, sql } from "drizzle-orm";
 import { db } from "../../db/index.js";
 import {
   applications,
+  jobScores,
   jobs,
   profiles,
   type Application,
@@ -12,6 +13,7 @@ import {
 } from "../../lib/queue.js";
 import { getPresignedGetUrl, uploadObject } from "../../lib/s3.js";
 import type {
+  BulkGenerateBody,
   CreateApplicationBody,
   PipelineStage,
   RegenerateSectionBody,
@@ -217,6 +219,87 @@ export async function createApplication(
   }
 
   return { application: toPublic(app), status: "generating" as const };
+}
+
+/**
+ * P9.3 / FR-DG-06: queue GenerateDocs for top N scored matches.
+ * Creates draft applications only — never enqueues submit (HG-4).
+ */
+export async function bulkGenerateDocuments(
+  userId: string,
+  body: BulkGenerateBody,
+) {
+  const existing = await db
+    .select({ jobId: applications.jobId })
+    .from(applications)
+    .where(eq(applications.userId, userId));
+  const existingIds = existing.map((r) => r.jobId);
+
+  const scoreFilter =
+    body.minScore != null
+      ? gte(jobScores.overallScore, String(body.minScore))
+      : undefined;
+
+  const candidates = await db
+    .select({
+      jobId: jobs.id,
+      overall: jobScores.overallScore,
+    })
+    .from(jobs)
+    .innerJoin(
+      jobScores,
+      and(eq(jobScores.jobId, jobs.id), eq(jobScores.userId, userId)),
+    )
+    .where(
+      and(
+        eq(jobs.userId, userId),
+        eq(jobs.isDuplicate, false),
+        existingIds.length > 0 ? notInArray(jobs.id, existingIds) : undefined,
+        scoreFilter,
+      ),
+    )
+    .orderBy(sql`${jobScores.overallScore} DESC NULLS LAST`)
+    .limit(body.limit);
+
+  const [profile] = await db
+    .select({ cvVersion: profiles.cvVersion })
+    .from(profiles)
+    .where(eq(profiles.userId, userId))
+    .limit(1);
+
+  const queued: Array<{ applicationId: string; jobId: string }> = [];
+  for (const row of candidates) {
+    const [created] = await db
+      .insert(applications)
+      .values({
+        userId,
+        jobId: row.jobId,
+        cvVersion: profile?.cvVersion ?? 1,
+        status: "draft",
+      })
+      .returning({ id: applications.id, jobId: applications.jobId });
+    if (!created) continue;
+    try {
+      await enqueueGenerateDocs({
+        application_id: created.id,
+        user_id: userId,
+        job_id: created.jobId,
+      });
+      queued.push({ applicationId: created.id, jobId: created.jobId });
+    } catch {
+      await db
+        .delete(applications)
+        .where(eq(applications.id, created.id));
+    }
+  }
+
+  return {
+    queued,
+    count: queued.length,
+    status: "generating" as const,
+    /** Explicit HG-4 signal for tests/clients */
+    submitEnqueued: false as const,
+  };
 }
 
 export async function regenerateDocuments(userId: string, id: string) {

@@ -63,11 +63,19 @@ export const regenerateSectionBodySchema = z
   })
   .strict();
 
+export const bulkGenerateBodySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(25).default(10),
+    minScore: z.coerce.number().min(0).max(100).optional(),
+  })
+  .strict();
+
 export type CreateApplicationBody = z.infer<typeof createApplicationBodySchema>;
 export type UpdateStageBody = z.infer<typeof updateStageBodySchema>;
 export type SetTemplateBody = z.infer<typeof setTemplateBodySchema>;
 export type UpdateBulletsBody = z.infer<typeof updateBulletsBodySchema>;
 export type RegenerateSectionBody = z.infer<typeof regenerateSectionBodySchema>;
+export type BulkGenerateBody = z.infer<typeof bulkGenerateBodySchema>;
 export type PipelineStage = z.infer<typeof pipelineStageSchema>;
 
 /** Map Kanban stage → applications.status */

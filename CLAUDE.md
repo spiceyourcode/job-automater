@@ -99,11 +99,11 @@ Full matrix + per-task AUTO SKILLS: **`AGENT-PROMPTS.md`**
 |------|------|
 | ✓ | P9.1 CV/CL templates |
 | ✓ | P9.2 Bullet accept/reject |
-| | P9.3 Bulk generate |
+| ✓ | P9.3 Bulk generate |
 | | P9.4 PDF/ZIP download |
 
-**Next:** **P9.3** — Bulk generate top N drafts  
-Prompt: `AGENT-PROMPTS.md` → Phase 9 → P9.3  
+**Next:** **P9.4** — ATS-friendly PDF + ZIP download  
+Prompt: `AGENT-PROMPTS.md` → Phase 9 → P9.4  
 Contract: `docs/contracts/phase-9-documents-complete.md`  
 Backlog: Phases 7–13 added 2026-08-12 (docs gap sync)
 

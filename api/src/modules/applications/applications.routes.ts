@@ -4,6 +4,7 @@ import { requireAuth, requireRole } from "../../middleware/require-auth.js";
 import {
   applicationDownloadParamSchema,
   applicationIdParamSchema,
+  bulkGenerateBodySchema,
   createApplicationBodySchema,
   regenerateSectionBodySchema,
   setTemplateBodySchema,
@@ -38,6 +39,27 @@ applicationsRoutes.post(
         c.req.valid("json"),
       );
       return c.json(result, 201);
+    } catch (err) {
+      if (isAppError(err)) {
+        return c.json({ error: err.message }, err.statusCode);
+      }
+      throw err;
+    }
+  },
+);
+
+applicationsRoutes.post(
+  "/bulk-generate",
+  requireRole("owner", "member"),
+  zValidator("json", bulkGenerateBodySchema),
+  async (c) => {
+    const { userId } = c.get("auth");
+    try {
+      const result = await applicationsService.bulkGenerateDocuments(
+        userId,
+        c.req.valid("json"),
+      );
+      return c.json(result, 202);
     } catch (err) {
       if (isAppError(err)) {
         return c.json({ error: err.message }, err.statusCode);
