@@ -37,6 +37,7 @@ class EmailMessageIn(BaseModel):
 class MonitorEmailJob(BaseModel):
     user_id: str = Field(..., min_length=36, max_length=36)
     messages: list[EmailMessageIn] = Field(default_factory=list)
+    provider: str = "imap"
 
     model_config = {"extra": "forbid"}
 
@@ -78,6 +79,7 @@ def process_monitor_email(payload: dict[str, Any]) -> dict[str, Any]:
                 snippet=msg.snippet,
                 body_text=msg.body_text,
                 received_at=received,
+                provider=job.provider,
             )
 
             # Classifier gets subject/snippet only — never log body (HG-8)

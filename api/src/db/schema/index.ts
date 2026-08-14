@@ -49,6 +49,11 @@ export {
   type NewNotification,
 } from "./emails.js";
 export {
+  gmailConnections,
+  type GmailConnection,
+  type NewGmailConnection,
+} from "./gmail-connections.js";
+export {
   workspaces,
   workspaceMembers,
   WORKSPACE_ROLES,

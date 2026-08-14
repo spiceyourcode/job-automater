@@ -38,6 +38,8 @@ const envSchema = z
     OAUTH_LINKEDIN_CLIENT_ID: z.string().optional(),
     OAUTH_LINKEDIN_CLIENT_SECRET: z.string().optional(),
     API_PUBLIC_URL: z.string().url().default("http://localhost:3001"),
+    GMAIL_PUBSUB_TOPIC: z.string().optional(),
+    GMAIL_PUSH_TOKEN: z.string().optional(),
   })
   .strict();
 
@@ -76,6 +78,8 @@ const parsed = envSchema.safeParse({
   API_PUBLIC_URL:
     process.env.API_PUBLIC_URL ??
     `http://localhost:${process.env.API_PORT ?? "3001"}`,
+  GMAIL_PUBSUB_TOPIC: process.env.GMAIL_PUBSUB_TOPIC || undefined,
+  GMAIL_PUSH_TOKEN: process.env.GMAIL_PUSH_TOKEN || undefined,
 });
 
 if (!parsed.success) {
@@ -110,4 +114,6 @@ export const env = {
   oauthLinkedinClientId: parsed.data.OAUTH_LINKEDIN_CLIENT_ID,
   oauthLinkedinClientSecret: parsed.data.OAUTH_LINKEDIN_CLIENT_SECRET,
   apiPublicUrl: parsed.data.API_PUBLIC_URL,
+  gmailPubsubTopic: parsed.data.GMAIL_PUBSUB_TOPIC,
+  gmailPushToken: parsed.data.GMAIL_PUSH_TOKEN,
 } as const;

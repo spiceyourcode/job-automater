@@ -31,6 +31,7 @@ export type SubmitApplicationPayload = {
 
 export type MonitorEmailPayload = {
   user_id: string;
+  provider?: "gmail" | "imap";
   messages: Array<{
     external_id: string;
     from_email: string;

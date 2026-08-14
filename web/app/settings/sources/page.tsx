@@ -1,5 +1,7 @@
 import { SourcesManager } from "@/components/sources-manager";
+import { GmailConnect } from "@/components/gmail-connect";
 import { listSourcesAction } from "@/lib/actions/sources";
+import { Suspense } from "react";
 
 export default async function SourcesSettingsPage() {
   const listed = await listSourcesAction();
@@ -13,6 +15,10 @@ export default async function SourcesSettingsPage() {
           Add feeds and mailboxes, then use Run now to enqueue collection.
         </p>
       </div>
+
+      <Suspense fallback={null}>
+        <GmailConnect />
+      </Suspense>
 
       {!listed.ok && (
         <p className="mb-4 text-sm text-destructive" role="alert">

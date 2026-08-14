@@ -13,6 +13,8 @@ async function getRedis(): Promise<RedisClientType> {
 export type OAuthStatePayload = {
   provider: string;
   codeVerifier?: string;
+  userId?: string;
+  purpose?: "login" | "gmail";
 };
 
 /** Store OAuth CSRF/PKCE state for 10 minutes. */

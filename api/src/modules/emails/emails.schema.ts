@@ -23,4 +23,10 @@ export const notificationIdParamSchema = z.object({
   id: z.string().uuid(),
 });
 
+export const gmailPushQuerySchema = z
+  .object({
+    token: z.string().max(200).optional(),
+  })
+  .strict();
+
 export type SyncEmailsBody = z.infer<typeof syncEmailsBodySchema>;
