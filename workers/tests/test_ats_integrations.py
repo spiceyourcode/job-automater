@@ -43,6 +43,19 @@ def test_detect_lever() -> None:
     assert detect_ats("https://jobs.lever.co/acme/abcd-efgh") == "lever"
 
 
+def test_detect_workday() -> None:
+    assert (
+        detect_ats(
+            "https://acme.wd5.myworkdayjobs.com/en-US/Careers/job/Software-Engineer_R123"
+        )
+        == "workday"
+    )
+
+
+def test_detect_ashby() -> None:
+    assert detect_ats("https://jobs.ashbyhq.com/acme/job/posting-uuid") == "ashby"
+
+
 def test_parse_greenhouse() -> None:
     assert parse_greenhouse_board_and_job(
         "https://boards.greenhouse.io/acme/jobs/12345"
@@ -53,6 +66,25 @@ def test_parse_lever() -> None:
     assert parse_lever_site_and_posting(
         "https://jobs.lever.co/acme/abcd-efgh"
     ) == ("acme", "abcd-efgh")
+
+
+def test_parse_workday() -> None:
+    from agents.submit_verify.ats.detect import parse_workday_tenant_site_job
+
+    assert parse_workday_tenant_site_job(
+        "https://acme.wd5.myworkdayjobs.com/en-US/Careers/job/Software-Engineer_R123"
+    ) == ("acme", "Careers", "Software-Engineer_R123")
+
+
+def test_parse_ashby() -> None:
+    from agents.submit_verify.ats.detect import parse_ashby_org_and_posting
+
+    assert parse_ashby_org_and_posting(
+        "https://jobs.ashbyhq.com/acme/job/posting-uuid"
+    ) == ("acme", "posting-uuid")
+    assert parse_ashby_org_and_posting(
+        "https://jobs.ashbyhq.com/acme/posting-uuid"
+    ) == ("acme", "posting-uuid")
 
 
 def test_greenhouse_submit_success(monkeypatch) -> None:  # type: ignore[no-untyped-def]
@@ -94,6 +126,67 @@ def test_lever_submit_success(monkeypatch) -> None:  # type: ignore[no-untyped-d
     assert result is not None
     assert result.submitted_via == "auto_ats"
     assert result.external_application_id == "lev-1"
+
+
+def test_ashby_submit_success(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    from agents.submit_verify.ats.ashby import try_ashby_submit
+
+    monkeypatch.setattr(settings, "ashby_api_key", "ashby-key")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert "api.ashbyhq.com" in str(request.url)
+        assert "applicationForm.submit" in str(request.url)
+        return httpx.Response(200, json={"id": "ash-99"})
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    result = try_ashby_submit(
+        job={"application_url": "https://jobs.ashbyhq.com/acme/job/posting-uuid"},
+        profile=PROFILE,
+        application=APP,
+        client=client,
+    )
+    assert result is not None
+    assert result.submitted_via == "auto_ats"
+    assert result.external_application_id == "ash-99"
+    assert result.screenshot_bytes
+
+
+def test_workday_submit_success() -> None:
+    from agents.submit_verify.ats.workday import try_workday_submit
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert "myworkdayjobs.com" in str(request.url)
+        assert "/wday/cxs/" in str(request.url)
+        return httpx.Response(200, json={"applicationId": "wd-42"})
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    result = try_workday_submit(
+        job={
+            "application_url": (
+                "https://acme.wd5.myworkdayjobs.com/en-US/Careers/job/"
+                "Software-Engineer_R123"
+            )
+        },
+        profile=PROFILE,
+        application=APP,
+        client=client,
+    )
+    assert result is not None
+    assert result.submitted_via == "auto_ats"
+    assert result.external_application_id == "wd-42"
+    assert result.screenshot_bytes
+
+
+def test_ashby_without_key_falls_back(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    from agents.submit_verify.ats.ashby import try_ashby_submit
+
+    monkeypatch.setattr(settings, "ashby_api_key", "")
+    result = try_ashby_submit(
+        job={"application_url": "https://jobs.ashbyhq.com/acme/job/x"},
+        profile=PROFILE,
+        application=APP,
+    )
+    assert result is None
 
 
 def test_ats_then_skips_portal(monkeypatch) -> None:  # type: ignore[no-untyped-def]

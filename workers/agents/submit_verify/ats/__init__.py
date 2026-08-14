@@ -1,4 +1,4 @@
-"""ATS-first router: Greenhouse/Lever before Playwright (P4.3)."""
+"""ATS-first router: Greenhouse/Lever/Workday/Ashby before Playwright."""
 
 from __future__ import annotations
 
@@ -7,9 +7,11 @@ from typing import Any
 
 import httpx
 
+from agents.submit_verify.ats.ashby import try_ashby_submit
 from agents.submit_verify.ats.detect import detect_ats
 from agents.submit_verify.ats.greenhouse import try_greenhouse_submit
 from agents.submit_verify.ats.lever import try_lever_submit
+from agents.submit_verify.ats.workday import try_workday_submit
 from agents.submit_verify.schema import SubmitResult
 
 logger = logging.getLogger(__name__)
@@ -32,6 +34,14 @@ def try_ats_submit(
         )
     if vendor == "lever":
         return try_lever_submit(
+            job=job, profile=profile, application=application, client=client
+        )
+    if vendor == "workday":
+        return try_workday_submit(
+            job=job, profile=profile, application=application, client=client
+        )
+    if vendor == "ashby":
+        return try_ashby_submit(
             job=job, profile=profile, application=application, client=client
         )
     return None

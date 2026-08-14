@@ -38,7 +38,15 @@ def domain_from_url(url: str | None) -> str | None:
     if not host:
         return None
     host = host.lower().removeprefix("www.")
-    if host in {"linkedin.com", "indeed.com", "greenhouse.io", "lever.co"}:
+    if host in {
+        "linkedin.com",
+        "indeed.com",
+        "greenhouse.io",
+        "lever.co",
+        "myworkdayjobs.com",
+        "ashbyhq.com",
+    }:
+
         return None
     return host[:255]
 
