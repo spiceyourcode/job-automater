@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     s3_secret_key: str = "minioadmin"
     s3_bucket: str = "jobautomater"
     s3_region: str = "us-east-1"
+    smtp_webhook_url: str = ""
+    email_from: str = "noreply@jobautomater.local"
 
 
 settings = Settings()

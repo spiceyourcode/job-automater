@@ -97,20 +97,20 @@ Full matrix + per-task AUTO SKILLS: **`AGENT-PROMPTS.md`**
 
 **Phase 10 — Apply completeness** ✅ complete (P10.1–P10.4 — one commit each)
 
-**Phase 11 — Comms & realtime** (next)
+**Phase 11 — Comms & realtime** ✅ complete (P11.1–P11.6 — one commit each)
+
+**Phase 12 — Production launch** (next)
 
 | Done | Task |
 |------|------|
-| ✓ | P11.1 Gmail OAuth |
-| ✓ | P11.2 Notification center |
-| ✓ | P11.3 Email review queue |
-| ✓ | P11.4 Analytics export |
-| ✓ | P11.5 WebSocket events |
-| | P11.6 Weekly digest |
+| | P12.1 CI + API rate limits |
+| | P12.2 Observability + OpenAPI |
+| | P12.3 Landing + runbooks |
+| | P12.4 A11y polish |
 
-**Next:** **P11.6** — Weekly digest email
-Prompt: `AGENT-PROMPTS.md` → Phase 11 → P11.6
-Contract: `docs/contracts/phase-11-comms.md`
+**Next:** **P12.1** — GitHub Actions CI + Redis API rate limits
+Prompt: `AGENT-PROMPTS.md` → Phase 12 → P12.1
+Contract: `docs/contracts/phase-12-launch.md`
 
 ---
 

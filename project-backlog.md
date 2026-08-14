@@ -162,7 +162,7 @@ Phases **0–6** are the shipped MVP slice (contracts `phase-1` … `phase-6`). 
 | 11.3 | Low-confidence email review queue | api, web | [x] | AppFlow §2.5, Impl Plan W20 |
 | 11.4 | Analytics CSV/PDF export + skill-gap | api, web | [x] | Schema §2.7, PRD §10.5 |
 | 11.5 | WebSocket: pipeline progress, docs ready, notifications | api, web | [x] | Schema §2.10, AppFlow §2.3 |
-| 11.6 | Weekly digest email | workers | [ ] | PRD §11 P5.7, AppFlow §1 |
+| 11.6 | Weekly digest email | workers | [x] | PRD §11 P5.7, AppFlow §1 |
 
 **Contract:** [`docs/contracts/phase-11-comms.md`](./docs/contracts/phase-11-comms.md)
 
