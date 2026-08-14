@@ -16,7 +16,11 @@ class Settings(BaseSettings):
 
     celery_broker_url: str = "redis://localhost:6379/0"
     celery_result_backend: str = "redis://localhost:6379/1"
+    # LLM providers — no Anthropic (user stack: OpenAI, Qrok, Google, Cerebras)
     openai_api_key: str = ""
+    qrok_api_key: str = ""
+    google_api_key: str = ""
+    cerebras_api_key: str = ""
     database_url: str = (
         "postgresql://jobautomater:jobautomater@127.0.0.1:5432/jobautomater"
     )

@@ -6,7 +6,7 @@ import {
   type RateLimitResult,
 } from "../lib/rate-limit.js";
 
-const SKIP_PREFIXES = ["/health", "/api/v1/ws"] as const;
+const SKIP_PREFIXES = ["/health", "/api/v1/ws", "/api/v1/openapi.json"] as const;
 
 function clientIp(c: {
   req: { header: (name: string) => string | undefined };
