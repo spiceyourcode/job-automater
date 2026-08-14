@@ -12,6 +12,7 @@ import {
   enqueueSubmitApplication,
 } from "../../lib/queue.js";
 import { getPresignedGetUrl, uploadObject } from "../../lib/s3.js";
+import { buildApplicationZip, textToAtsPdf } from "../../lib/ats-pdf.js";
 import type {
   BulkGenerateBody,
   CreateApplicationBody,
@@ -484,9 +485,28 @@ export async function markDocumentsReviewed(userId: string, id: string) {
     throw new ApplicationError("Untraced bullets cannot be saved (HG-9)", 400);
   }
 
-  // Persist text artifacts to MinIO for download URLs
+  // Persist markdown + ATS PDFs + ZIP to MinIO for download URLs
   const cvKey = `applications/${userId}/${id}/tailored-cv.md`;
   const clKey = `applications/${userId}/${id}/cover-letter.md`;
+  const cvPdfKey = `applications/${userId}/${id}/tailored-cv.pdf`;
+  const clPdfKey = `applications/${userId}/${id}/cover-letter.pdf`;
+  const zipKey = `applications/${userId}/${id}/application-pack.zip`;
+
+  const cvPdf = await textToAtsPdf("Tailored CV", app.tailoredCvContent);
+  const clPdf = await textToAtsPdf("Cover Letter", app.coverLetterContent);
+  const zipBuf = await buildApplicationZip({
+    cvText: app.tailoredCvContent,
+    clText: app.coverLetterContent,
+    metadata: {
+      applicationId: id,
+      jobId: app.jobId,
+      cvTemplate: app.cvTemplate,
+      clTemplate: app.clTemplate,
+      bulletTraces: traces,
+      generatedAt: new Date().toISOString(),
+    },
+  });
+
   await uploadObject({
     key: cvKey,
     body: Buffer.from(app.tailoredCvContent, "utf8"),
@@ -497,13 +517,28 @@ export async function markDocumentsReviewed(userId: string, id: string) {
     body: Buffer.from(app.coverLetterContent, "utf8"),
     contentType: "text/markdown; charset=utf-8",
   });
+  await uploadObject({
+    key: cvPdfKey,
+    body: Buffer.from(cvPdf),
+    contentType: "application/pdf",
+  });
+  await uploadObject({
+    key: clPdfKey,
+    body: Buffer.from(clPdf),
+    contentType: "application/pdf",
+  });
+  await uploadObject({
+    key: zipKey,
+    body: zipBuf,
+    contentType: "application/zip",
+  });
 
   const [updated] = await db
     .update(applications)
     .set({
       documentsReviewedAt: new Date(),
-      tailoredCvUrl: cvKey,
-      coverLetterUrl: clKey,
+      tailoredCvUrl: cvPdfKey,
+      coverLetterUrl: clPdfKey,
       updatedAt: new Date(),
     })
     .where(and(eq(applications.id, id), eq(applications.userId, userId)))
@@ -516,13 +551,44 @@ export async function markDocumentsReviewed(userId: string, id: string) {
 export async function getDocumentDownloadUrl(
   userId: string,
   id: string,
-  kind: "cv" | "cl",
+  kind: "cv" | "cl" | "zip",
 ) {
   const app = await getOwned(userId, id);
+  if (kind === "zip") {
+    if (!app.documentsReviewedAt || !app.tailoredCvContent || !app.coverLetterContent) {
+      throw new ApplicationError("Confirm review before downloading ZIP", 400);
+    }
+    const zipKey = `applications/${userId}/${id}/application-pack.zip`;
+    const traces = normalizeBulletTraces(app.bulletTraces);
+    const zipBuf = await buildApplicationZip({
+      cvText: app.tailoredCvContent,
+      clText: app.coverLetterContent,
+      metadata: {
+        applicationId: id,
+        jobId: app.jobId,
+        cvTemplate: app.cvTemplate,
+        clTemplate: app.clTemplate,
+        bulletTraces: traces,
+        generatedAt: new Date().toISOString(),
+      },
+    });
+    await uploadObject({
+      key: zipKey,
+      body: zipBuf,
+      contentType: "application/zip",
+    });
+    const url = await getPresignedGetUrl(zipKey, 600);
+    return { url, contentType: "application/zip" as const };
+  }
   const key = kind === "cv" ? app.tailoredCvUrl : app.coverLetterUrl;
   if (!key) throw new ApplicationError("Document not available", 404);
   const url = await getPresignedGetUrl(key, 600);
-  return { url };
+  return {
+    url,
+    contentType: key.endsWith(".pdf")
+      ? ("application/pdf" as const)
+      : ("text/markdown" as const),
+  };
 }
 
 /**

@@ -459,3 +459,61 @@ describe("normalizeBulletTraces (HG-9)", () => {
     expect(traces[0]?.status).toBe("pending");
   });
 });
+
+describe("GET /api/v1/applications/:id/download/:kind", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("401 without auth", async () => {
+    const res = await buildApp().request(
+      `/api/v1/applications/${sampleApp.id}/download/cv`,
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("200 returns signed PDF URL for owner", async () => {
+    mockService.getDocumentDownloadUrl.mockResolvedValue({
+      url: "https://minio.example/cv.pdf?X-Amz-Signature=abc",
+      contentType: "application/pdf",
+    });
+    const res = await buildApp().request(
+      `/api/v1/applications/${sampleApp.id}/download/cv`,
+      { headers: { Authorization: await authHeader("user-a") } },
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { url: string; contentType: string };
+    expect(body.contentType).toBe("application/pdf");
+    expect(mockService.getDocumentDownloadUrl).toHaveBeenCalledWith(
+      "user-a",
+      sampleApp.id,
+      "cv",
+    );
+  });
+
+  it("200 returns ZIP pack URL", async () => {
+    mockService.getDocumentDownloadUrl.mockResolvedValue({
+      url: "https://minio.example/pack.zip?X-Amz-Signature=abc",
+      contentType: "application/zip",
+    });
+    const res = await buildApp().request(
+      `/api/v1/applications/${sampleApp.id}/download/zip`,
+      { headers: { Authorization: await authHeader("user-a") } },
+    );
+    expect(res.status).toBe(200);
+    expect(mockService.getDocumentDownloadUrl).toHaveBeenCalledWith(
+      "user-a",
+      sampleApp.id,
+      "zip",
+    );
+  });
+
+  it("404 IDOR — other user cannot download", async () => {
+    mockService.getDocumentDownloadUrl.mockRejectedValue(
+      new applicationsService.ApplicationError("Application not found", 404),
+    );
+    const res = await buildApp().request(
+      `/api/v1/applications/${sampleApp.id}/download/zip`,
+      { headers: { Authorization: await authHeader("user-b") } },
+    );
+    expect(res.status).toBe(404);
+  });
+});

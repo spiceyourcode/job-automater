@@ -291,8 +291,8 @@ export async function approveApplicationAction(
 
 export async function downloadDocAction(
   id: string,
-  kind: "cv" | "cl",
-): Promise<ActionResult<{ url: string }>> {
+  kind: "cv" | "cl" | "zip",
+): Promise<ActionResult<{ url: string; contentType?: string }>> {
   const headers = await authHeaders();
   if (!headers) return { ok: false, error: "Unauthorized" };
   try {
@@ -301,7 +301,10 @@ export async function downloadDocAction(
       { headers },
     );
     if (!res.ok) return { ok: false, error: "Download unavailable" };
-    return { ok: true, data: (await res.json()) as { url: string } };
+    return {
+      ok: true,
+      data: (await res.json()) as { url: string; contentType?: string },
+    };
   } catch {
     return { ok: false, error: "Network error" };
   }

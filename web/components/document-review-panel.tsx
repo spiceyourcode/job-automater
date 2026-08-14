@@ -345,6 +345,24 @@ export function DocumentReviewPanel({ applicationId, initial }: Props) {
         </Button>
         <Button
           type="button"
+          variant="outline"
+          className="cursor-pointer"
+          disabled={!reviewed || pending}
+          onClick={() => {
+            startTransition(async () => {
+              const res = await downloadDocAction(applicationId, "zip");
+              if (!res.ok || !res.data?.url) {
+                setError(!res.ok ? res.error : "Download failed");
+              } else {
+                window.open(res.data.url, "_blank", "noopener,noreferrer");
+              }
+            });
+          }}
+        >
+          Download ZIP pack
+        </Button>
+        <Button
+          type="button"
           className="cursor-pointer"
           disabled={!ready || reviewed || pending || pendingCount > 0}
           title={

@@ -12,7 +12,7 @@ export const applicationIdParamSchema = z.object({
 
 export const applicationDownloadParamSchema = z.object({
   id: z.string().uuid(),
-  kind: z.enum(["cv", "cl"]),
+  kind: z.enum(["cv", "cl", "zip"]),
 });
 
 /** AppFlow §2.4 pipeline stages */

@@ -93,19 +93,20 @@ Full matrix + per-task AUTO SKILLS: **`AGENT-PROMPTS.md`**
 
 **Phase 8 — Collection completeness** ✅ complete (P8.1–P8.5 — one commit each)
 
-**Phase 9 — Document completeness** (in progress)
+**Phase 9 — Document completeness** ✅ complete (P9.1–P9.4 — one commit each)
+
+**Phase 10 — Apply completeness** (next)
 
 | Done | Task |
 |------|------|
-| ✓ | P9.1 CV/CL templates |
-| ✓ | P9.2 Bullet accept/reject |
-| ✓ | P9.3 Bulk generate |
-| | P9.4 PDF/ZIP download |
+| | P10.1 Workday + Ashby |
+| | P10.2 Portal appliers |
+| | P10.3 Rate limits + emergency stop |
+| | P10.4 Interviews + bulk actions |
 
-**Next:** **P9.4** — ATS-friendly PDF + ZIP download  
-Prompt: `AGENT-PROMPTS.md` → Phase 9 → P9.4  
-Contract: `docs/contracts/phase-9-documents-complete.md`  
-Backlog: Phases 7–13 added 2026-08-12 (docs gap sync)
+**Next:** **P10.1** — Workday and Ashby ATS submitters  
+Prompt: `AGENT-PROMPTS.md` → Phase 10 → P10.1  
+Contract: `docs/contracts/phase-10-apply-complete.md`
 
 ---
 
