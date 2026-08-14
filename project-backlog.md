@@ -176,7 +176,7 @@ Phases **0–6** are the shipped MVP slice (contracts `phase-1` … `phase-6`). 
 |---|------|---------|--------|--------|
 | 12.1 | GitHub Actions CI (api/web/workers) + API rate limits | ci, api | [x] | Impl Plan W1/W24, Schema §2.1 |
 | 12.2 | Observability (Sentry, structured logs) + OpenAPI | api, workers | [x] | PRD §11 P6.4/P6.6 |
-| 12.3 | Landing page + execute staging/beta/backup runbooks | web, docs | [ ] | PRD §11 P6.7, runbooks/ |
+| 12.3 | Landing page + execute staging/beta/backup runbooks | web, docs | [x] | PRD §11 P6.7, runbooks/ |
 | 12.4 | WCAG AA audit, keyboard shortcuts, dark-mode polish | web | [ ] | UIUX §7, §11 Phase 4 |
 
 **Contract:** [`docs/contracts/phase-12-launch.md`](./docs/contracts/phase-12-launch.md)

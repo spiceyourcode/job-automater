@@ -105,11 +105,11 @@ Full matrix + per-task AUTO SKILLS: **`AGENT-PROMPTS.md`**
 |------|------|
 | ✓ | P12.1 CI + API rate limits |
 | ✓ | P12.2 Observability + OpenAPI |
-| | P12.3 Landing + runbooks |
+| ✓ | P12.3 Landing + runbooks |
 | | P12.4 A11y polish |
 
-**Next:** **P12.3** — Landing + runbooks
-Prompt: `AGENT-PROMPTS.md` → Phase 12 → P12.3
+**Next:** **P12.4** — A11y polish
+Prompt: `AGENT-PROMPTS.md` → Phase 12 → P12.4
 Contract: `docs/contracts/phase-12-launch.md`
 
 ---

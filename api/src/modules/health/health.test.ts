@@ -52,3 +52,14 @@ describe("GET /health", () => {
     expect(body.db).toBe("down");
   });
 });
+
+describe("GET /health/flags", () => {
+  it("returns boolean flags without secrets", async () => {
+    const app = createApp();
+    const res = await app.request("/health/flags");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.autoApplyWithoutApproval).toBe(false);
+    expect(JSON.stringify(body)).not.toMatch(/sk-|password/i);
+  });
+});
