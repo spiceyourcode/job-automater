@@ -411,6 +411,26 @@ describe("GET /api/v1/auth/oauth/:provider/callback", () => {
     expect(loc).toContain("code=");
   });
 
+  it("ignores extra Google query keys (iss, scope, authuser, prompt)", async () => {
+    mockService.completeOAuth.mockResolvedValue({
+      exchangeCode: "e".repeat(40),
+    });
+    const qs = new URLSearchParams({
+      code: "abc",
+      state: "xyz",
+      iss: "https://accounts.google.com",
+      scope: "email profile openid",
+      authuser: "0",
+      prompt: "consent",
+    });
+    const res = await buildApp().request(
+      `/api/v1/auth/oauth/google/callback?${qs.toString()}`,
+      { method: "GET", redirect: "manual" },
+    );
+    expect(res.status).toBe(302);
+    expect(mockService.completeOAuth).toHaveBeenCalled();
+  });
+
   it("302 to login on email collision (no takeover)", async () => {
     mockService.completeOAuth.mockRejectedValue(
       new authService.ConflictError(

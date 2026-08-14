@@ -46,6 +46,7 @@ export const oauthProviderParamSchema = z
   })
   .strict();
 
+/** Google appends iss/scope/authuser/prompt — do not .strict() this query. */
 export const oauthCallbackQuerySchema = z
   .object({
     code: z.string().min(1).optional(),
@@ -53,7 +54,7 @@ export const oauthCallbackQuerySchema = z
     error: z.string().optional(),
     error_description: z.string().optional(),
   })
-  .strict();
+  .passthrough();
 
 export const oauthExchangeBodySchema = z
   .object({

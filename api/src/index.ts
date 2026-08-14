@@ -6,7 +6,17 @@ import {
   startDailyCollectWorker,
   stopDailyCollectWorker,
 } from "./lib/daily-collect.js";
+import { captureUnhandled, flushSentry, initSentry } from "./lib/sentry.js";
 import { attachWebSocket, stopWebSocket } from "./lib/ws-server.js";
+
+initSentry();
+
+process.on("uncaughtException", (err) => {
+  captureUnhandled(err);
+});
+process.on("unhandledRejection", (reason) => {
+  captureUnhandled(reason);
+});
 
 const app = createApp();
 
@@ -47,6 +57,7 @@ const shutdown = async (signal: string) => {
   server.close();
   await stopWebSocket().catch(() => {});
   await stopDailyCollectWorker().catch(() => {});
+  await flushSentry().catch(() => {});
   await closeDatabase();
   process.exit(0);
 };

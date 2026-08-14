@@ -40,6 +40,7 @@ const envSchema = z
     API_PUBLIC_URL: z.string().url().default("http://localhost:3001"),
     GMAIL_PUBSUB_TOPIC: z.string().optional(),
     GMAIL_PUSH_TOKEN: z.string().optional(),
+    SENTRY_DSN: z.string().url().optional(),
   })
   .strict();
 
@@ -80,6 +81,7 @@ const parsed = envSchema.safeParse({
     `http://localhost:${process.env.API_PORT ?? "3001"}`,
   GMAIL_PUBSUB_TOPIC: process.env.GMAIL_PUBSUB_TOPIC || undefined,
   GMAIL_PUSH_TOKEN: process.env.GMAIL_PUSH_TOKEN || undefined,
+  SENTRY_DSN: process.env.SENTRY_DSN || undefined,
 });
 
 if (!parsed.success) {
@@ -116,4 +118,5 @@ export const env = {
   apiPublicUrl: parsed.data.API_PUBLIC_URL,
   gmailPubsubTopic: parsed.data.GMAIL_PUBSUB_TOPIC,
   gmailPushToken: parsed.data.GMAIL_PUSH_TOKEN,
+  sentryDsn: parsed.data.SENTRY_DSN,
 } as const;
