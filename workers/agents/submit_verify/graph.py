@@ -61,7 +61,11 @@ def _submit_node(state: SubmitState, submit_fn: SubmitFn) -> dict[str, Any]:
     # Skip portal when ATS already succeeded
     if state.get("result") and state["result"].get("status") == "submitted":
         return {}
-    result = submit_fn(state["application"], state["job"])
+    app = dict(state["application"])
+    # Portal appliers read profile for form fill (not persisted)
+    if state.get("profile") is not None:
+        app["_profile"] = state["profile"]
+    result = submit_fn(app, state["job"])
     logger.info(
         "submit_verify_result status=%s via=%s",
         result.status,
