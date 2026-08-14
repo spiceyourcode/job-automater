@@ -10,3 +10,5 @@ Cross-table SELECT is an explicit analytics exception to HG-6 — no writes to f
 | GET | `/api/v1/analytics/pipeline` | Funnel stage counts |
 | GET | `/api/v1/analytics/matches` | Match quality time series |
 | GET | `/api/v1/analytics/sources` | Source ROI (jobs collected) |
+| GET | `/api/v1/analytics/skills` | Skill-gap vs in-demand keywords (owner only) |
+| GET | `/api/v1/analytics/export` | CSV/PDF download (`format`, `reportType`) — owner rows only |

@@ -1,7 +1,10 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { requireAuth } from "../../middleware/require-auth.js";
-import { analyticsRangeQuerySchema } from "./analytics.schema.js";
+import {
+  analyticsExportQuerySchema,
+  analyticsRangeQuerySchema,
+} from "./analytics.schema.js";
 import * as analyticsService from "./analytics.service.js";
 
 export const analyticsRoutes = new Hono();
@@ -44,3 +47,33 @@ analyticsRoutes.get("/sources", async (c) => {
   const { userId } = c.get("auth");
   return c.json(await analyticsService.getSourcePerformance(userId), 200);
 });
+
+analyticsRoutes.get(
+  "/skills",
+  zValidator("query", analyticsRangeQuerySchema),
+  async (c) => {
+    const { userId } = c.get("auth");
+    return c.json(
+      await analyticsService.getSkillGaps(userId, c.req.valid("query")),
+      200,
+    );
+  },
+);
+
+analyticsRoutes.get(
+  "/export",
+  zValidator("query", analyticsExportQuerySchema),
+  async (c) => {
+    const { userId } = c.get("auth");
+    const file = await analyticsService.buildAnalyticsExport(
+      userId,
+      c.req.valid("query"),
+    );
+    c.header("Content-Type", file.contentType);
+    c.header(
+      "Content-Disposition",
+      `attachment; filename="${file.filename}"`,
+    );
+    return c.body(file.body);
+  },
+);

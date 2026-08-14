@@ -12,6 +12,8 @@ vi.mock("./analytics.service.js", async (importOriginal) => {
     getPipelineFunnel: vi.fn(),
     getMatchQuality: vi.fn(),
     getSourcePerformance: vi.fn(),
+    getSkillGaps: vi.fn(),
+    buildAnalyticsExport: vi.fn(),
   };
 });
 
@@ -68,5 +70,91 @@ describe("GET /api/v1/analytics/pipeline", () => {
       headers: { Authorization: await authHeader() },
     });
     expect(res.status).toBe(200);
+  });
+});
+
+describe("GET /api/v1/analytics/skills", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("401 without auth", async () => {
+    const res = await buildApp().request("/api/v1/analytics/skills");
+    expect(res.status).toBe(401);
+  });
+
+  it("passes authenticated userId only (no other-user leak)", async () => {
+    mockService.getSkillGaps.mockImplementation(async (uid: string) => {
+      expect(uid).toBe("user-a");
+      return {
+        range: {
+          from: "2026-05-16T00:00:00.000Z",
+          to: "2026-08-14T00:00:00.000Z",
+        },
+        inDemand: [{ skill: "Python", count: 3, avgSalaryCents: 15000000 }],
+        mySkills: ["Python"],
+        mySkillsCoverage: {
+          totalProfileSkills: 1,
+          inDemandCovered: 1,
+          coveragePct: 100,
+        },
+        gaps: [],
+      };
+    });
+    const res = await buildApp().request("/api/v1/analytics/skills", {
+      headers: { Authorization: await authHeader("user-a") },
+    });
+    expect(res.status).toBe(200);
+    expect(mockService.getSkillGaps).toHaveBeenCalledWith(
+      "user-a",
+      expect.anything(),
+    );
+  });
+});
+
+describe("GET /api/v1/analytics/export", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("401 without auth", async () => {
+    const res = await buildApp().request("/api/v1/analytics/export");
+    expect(res.status).toBe(401);
+    expect(mockService.buildAnalyticsExport).not.toHaveBeenCalled();
+  });
+
+  it("exports CSV for the authenticated user only", async () => {
+    mockService.buildAnalyticsExport.mockImplementation(async (uid: string) => {
+      expect(uid).toBe("user-a");
+      expect(uid).not.toBe("user-b");
+      return {
+        filename: "analytics-dashboard.csv",
+        contentType: "text/csv; charset=utf-8",
+        body: Buffer.from("metric,value\njobsCollected,10\n"),
+      };
+    });
+    const res = await buildApp().request(
+      "/api/v1/analytics/export?format=csv",
+      { headers: { Authorization: await authHeader("user-a") } },
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toMatch(/text\/csv/);
+    const text = await res.text();
+    expect(text).toContain("jobsCollected");
+    expect(text).not.toContain("user-b");
+    expect(mockService.buildAnalyticsExport).toHaveBeenCalledWith(
+      "user-a",
+      expect.objectContaining({ format: "csv" }),
+    );
+  });
+
+  it("does not call export with another user's id", async () => {
+    mockService.buildAnalyticsExport.mockResolvedValue({
+      filename: "analytics-dashboard.csv",
+      contentType: "text/csv; charset=utf-8",
+      body: Buffer.from("metric,value\n"),
+    });
+    await buildApp().request("/api/v1/analytics/export?format=csv", {
+      headers: { Authorization: await authHeader("user-a") },
+    });
+    const uid = mockService.buildAnalyticsExport.mock.calls[0]?.[0];
+    expect(uid).toBe("user-a");
+    expect(uid).not.toBe("user-b");
   });
 });

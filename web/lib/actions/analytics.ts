@@ -87,3 +87,34 @@ export async function getMatchQualityAction(range?: {
 export async function getSourcePerformanceAction() {
   return getJson<{ sources: SourceRow[] }>("/api/v1/analytics/sources");
 }
+
+export type SkillDemand = {
+  skill: string;
+  count: number;
+  avgSalaryCents: number | null;
+};
+
+export type SkillGapReport = {
+  range: { from: string; to: string };
+  inDemand: SkillDemand[];
+  mySkills: string[];
+  mySkillsCoverage: {
+    totalProfileSkills: number;
+    inDemandCovered: number;
+    coveragePct: number;
+  };
+  gaps: SkillDemand[];
+};
+
+export async function getSkillGapsAction(range?: {
+  from?: string;
+  to?: string;
+}) {
+  const qs = new URLSearchParams();
+  if (range?.from) qs.set("from", range.from);
+  if (range?.to) qs.set("to", range.to);
+  const q = qs.toString();
+  return getJson<SkillGapReport>(
+    `/api/v1/analytics/skills${q ? `?${q}` : ""}`,
+  );
+}

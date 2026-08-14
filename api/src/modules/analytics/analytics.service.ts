@@ -9,19 +9,41 @@ import {
   applications,
   jobScores,
   jobs,
+  profiles,
   sourceConfigs,
 } from "../../db/schema/index.js";
-import type { AnalyticsRangeQuery } from "./analytics.schema.js";
+import { textToAtsPdf } from "../../lib/ats-pdf.js";
+import { assertOwnerOnly, toCsv } from "../../lib/csv.js";
+import type {
+  AnalyticsExportQuery,
+  AnalyticsRangeQuery,
+} from "./analytics.schema.js";
 
-function rangeBounds(query: AnalyticsRangeQuery): {
+function rangeBounds(
+  query: AnalyticsRangeQuery,
+  defaultDays = 30,
+): {
   from: Date;
   to: Date;
 } {
   const to = query.to ? new Date(query.to) : new Date();
   const from = query.from
     ? new Date(query.from)
-    : new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
+    : new Date(to.getTime() - defaultDays * 24 * 60 * 60 * 1000);
   return { from, to };
+}
+
+function skillLabel(item: unknown): string | null {
+  if (typeof item === "string") {
+    const s = item.trim();
+    return s.length > 0 ? s : null;
+  }
+  if (item && typeof item === "object") {
+    const rec = item as Record<string, unknown>;
+    const raw = rec.skill ?? rec.name ?? rec.label;
+    if (typeof raw === "string" && raw.trim()) return raw.trim();
+  }
+  return null;
 }
 
 export async function getDashboardSummary(
@@ -212,5 +234,254 @@ export async function getSourcePerformance(userId: string) {
       lastRunStatus: s.lastRunStatus,
       jobsCollected: jobMap.get(s.id) ?? 0,
     })),
+  };
+}
+
+export type SkillDemand = {
+  skill: string;
+  count: number;
+  avgSalaryCents: number | null;
+};
+
+export type SkillGapReport = {
+  range: { from: string; to: string };
+  inDemand: SkillDemand[];
+  mySkills: string[];
+  mySkillsCoverage: {
+    totalProfileSkills: number;
+    inDemandCovered: number;
+    coveragePct: number;
+  };
+  gaps: SkillDemand[];
+};
+
+/** Skill-gap for this user only — never mix another user's jobs/scores (HG-6 analytics exception). */
+export async function getSkillGaps(
+  userId: string,
+  query: AnalyticsRangeQuery,
+): Promise<SkillGapReport> {
+  const { from, to } = rangeBounds(query, 90);
+
+  const [profile] = await db
+    .select({ technicalSkills: profiles.technicalSkills })
+    .from(profiles)
+    .where(eq(profiles.userId, userId))
+    .limit(1);
+
+  const mySkills = [
+    ...new Set(
+      (profile?.technicalSkills ?? [])
+        .map(skillLabel)
+        .filter((s): s is string => s != null),
+    ),
+  ];
+  const mySet = new Set(mySkills.map((s) => s.toLowerCase()));
+
+  const jobRows = await db
+    .select({
+      userId: jobs.userId,
+      keywords: jobs.keywords,
+      techStack: jobs.techStack,
+      salaryMin: jobs.salaryMin,
+    })
+    .from(jobs)
+    .where(
+      and(
+        eq(jobs.userId, userId),
+        eq(jobs.isDuplicate, false),
+        gte(jobs.collectedAt, from),
+        lte(jobs.collectedAt, to),
+      ),
+    );
+
+  assertOwnerOnly(userId, jobRows);
+
+  const demand = new Map<
+    string,
+    { label: string; count: number; salarySum: number; salaryN: number }
+  >();
+  const bump = (raw: unknown, salaryMin: number | null) => {
+    const label = skillLabel(raw);
+    if (!label) return;
+    const key = label.toLowerCase();
+    const cur = demand.get(key) ?? {
+      label,
+      count: 0,
+      salarySum: 0,
+      salaryN: 0,
+    };
+    cur.count += 1;
+    if (salaryMin != null && salaryMin > 0) {
+      cur.salarySum += salaryMin;
+      cur.salaryN += 1;
+    }
+    demand.set(key, cur);
+  };
+
+  for (const row of jobRows) {
+    for (const k of row.keywords ?? []) bump(k, row.salaryMin);
+    for (const t of row.techStack ?? []) bump(t, row.salaryMin);
+  }
+
+  const scoreRows = await db
+    .select({
+      userId: jobScores.userId,
+      missingSkills: jobScores.missingSkills,
+    })
+    .from(jobScores)
+    .where(
+      and(
+        eq(jobScores.userId, userId),
+        gte(jobScores.scoredAt, from),
+        lte(jobScores.scoredAt, to),
+      ),
+    );
+
+  assertOwnerOnly(userId, scoreRows);
+  for (const row of scoreRows) {
+    for (const s of row.missingSkills ?? []) bump(s, null);
+  }
+
+  const inDemand: SkillDemand[] = [...demand.values()]
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 50)
+    .map((d) => ({
+      skill: d.label,
+      count: d.count,
+      avgSalaryCents:
+        d.salaryN > 0 ? Math.round(d.salarySum / d.salaryN) : null,
+    }));
+
+  const inDemandCovered = inDemand.filter((d) =>
+    mySet.has(d.skill.toLowerCase()),
+  ).length;
+  const gaps = inDemand.filter((d) => !mySet.has(d.skill.toLowerCase()));
+
+  return {
+    range: { from: from.toISOString(), to: to.toISOString() },
+    inDemand,
+    mySkills,
+    mySkillsCoverage: {
+      totalProfileSkills: mySkills.length,
+      inDemandCovered,
+      coveragePct:
+        inDemand.length === 0
+          ? 100
+          : Math.round((inDemandCovered / inDemand.length) * 1000) / 10,
+    },
+    gaps,
+  };
+}
+
+export type AnalyticsExportFile = {
+  filename: string;
+  contentType: string;
+  body: Buffer;
+};
+
+async function getApplicationExportRows(userId: string, query: AnalyticsRangeQuery) {
+  const { from, to } = rangeBounds(query);
+  const rows = await db
+    .select({
+      userId: applications.userId,
+      applicationId: applications.id,
+      status: applications.status,
+      createdAt: applications.createdAt,
+      submittedAt: applications.submittedAt,
+      company: jobs.company,
+      title: jobs.title,
+    })
+    .from(applications)
+    .innerJoin(jobs, eq(jobs.id, applications.jobId))
+    .where(
+      and(
+        eq(applications.userId, userId),
+        gte(applications.createdAt, from),
+        lte(applications.createdAt, to),
+      ),
+    );
+  return assertOwnerOnly(userId, rows);
+}
+
+function tableToText(headers: string[], rows: Array<Array<unknown>>): string {
+  const widths = headers.map((h, i) =>
+    Math.max(h.length, ...rows.map((r) => String(r[i] ?? "").length), 1),
+  );
+  const fmt = (row: unknown[]) =>
+    row
+      .map((c, i) => String(c ?? "").padEnd(widths[i] ?? 1))
+      .join("  ");
+  return [fmt(headers), fmt(headers.map(() => "-")), ...rows.map(fmt)].join(
+    "\n",
+  );
+}
+
+/** Owner-scoped CSV/PDF. Never includes CV/CL or other users' rows. */
+export async function buildAnalyticsExport(
+  userId: string,
+  query: AnalyticsExportQuery,
+): Promise<AnalyticsExportFile> {
+  const reportType = query.reportType ?? "dashboard";
+  const format = query.format ?? "csv";
+  let headers: string[] = [];
+  let rows: Array<Array<unknown>> = [];
+
+  if (reportType === "pipeline") {
+    const { funnel } = await getPipelineFunnel(userId);
+    headers = ["stage", "label", "count"];
+    rows = funnel.map((f) => [f.stage, f.label, f.count]);
+  } else if (reportType === "matches") {
+    const { series } = await getMatchQuality(userId, query);
+    headers = ["day", "avgScore", "count"];
+    rows = series.map((s) => [s.day, s.avgScore, s.count]);
+  } else if (reportType === "sources") {
+    const { sources } = await getSourcePerformance(userId);
+    headers = ["id", "name", "type", "jobsCollected"];
+    rows = sources.map((s) => [s.id, s.name, s.type, s.jobsCollected]);
+  } else if (reportType === "applications") {
+    const apps = await getApplicationExportRows(userId, query);
+    headers = ["applicationId", "company", "title", "status", "createdAt", "submittedAt"];
+    rows = apps.map((a) => [
+      a.applicationId,
+      a.company,
+      a.title,
+      a.status,
+      a.createdAt.toISOString(),
+      a.submittedAt?.toISOString() ?? "",
+    ]);
+  } else {
+    const summary = await getDashboardSummary(userId, query);
+    headers = ["metric", "value"];
+    rows = [
+      ["from", summary.range.from],
+      ["to", summary.range.to],
+      ["jobsCollected", summary.jobsCollected],
+      ["applicationsCreated", summary.applicationsCreated],
+      ["applicationsSubmitted", summary.applicationsSubmitted],
+      ["interviewing", summary.interviewing],
+      ["offered", summary.offered],
+      ["avgMatchScore", summary.avgMatchScore ?? ""],
+      ["highMatches", summary.highMatches],
+    ];
+  }
+
+  const stamp = new Date().toISOString().slice(0, 10);
+  if (format === "pdf") {
+    const body = tableToText(headers, rows);
+    const bytes = await textToAtsPdf(
+      `JobAutomater analytics (${reportType})`,
+      body,
+    );
+    return {
+      filename: `analytics-${reportType}-${stamp}.pdf`,
+      contentType: "application/pdf",
+      body: Buffer.from(bytes),
+    };
+  }
+
+  return {
+    filename: `analytics-${reportType}-${stamp}.csv`,
+    contentType: "text/csv; charset=utf-8",
+    body: Buffer.from(toCsv(headers, rows), "utf8"),
   };
 }

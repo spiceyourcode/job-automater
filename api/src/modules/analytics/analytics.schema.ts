@@ -7,4 +7,12 @@ export const analyticsRangeQuerySchema = z
   })
   .strict();
 
+export const analyticsExportQuerySchema = analyticsRangeQuerySchema.extend({
+  format: z.enum(["csv", "pdf"]).default("csv"),
+  reportType: z
+    .enum(["pipeline", "matches", "sources", "applications", "dashboard"])
+    .default("dashboard"),
+});
+
 export type AnalyticsRangeQuery = z.infer<typeof analyticsRangeQuerySchema>;
+export type AnalyticsExportQuery = z.infer<typeof analyticsExportQuerySchema>;

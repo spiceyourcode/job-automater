@@ -5,10 +5,12 @@ import {
   getAnalyticsDashboardAction,
   getMatchQualityAction,
   getPipelineFunnelAction,
+  getSkillGapsAction,
   getSourcePerformanceAction,
   type DashboardSummary,
   type FunnelStage,
   type MatchPoint,
+  type SkillGapReport,
   type SourceRow,
 } from "@/lib/actions/analytics";
 import { Button } from "@/components/ui/button";
@@ -19,6 +21,7 @@ type Props = {
   initialFunnel: FunnelStage[];
   initialMatches: MatchPoint[];
   initialSources: SourceRow[];
+  initialSkills: SkillGapReport | null;
 };
 
 function BarRow({ label, value, max }: { label: string; value: number; max: number }) {
@@ -45,11 +48,13 @@ export function AnalyticsDashboard({
   initialFunnel,
   initialMatches,
   initialSources,
+  initialSkills,
 }: Props) {
   const [summary, setSummary] = useState(initialSummary);
   const [funnel, setFunnel] = useState(initialFunnel);
   const [matches, setMatches] = useState(initialMatches);
   const [sources, setSources] = useState(initialSources);
+  const [skills, setSkills] = useState(initialSkills);
   const [days, setDays] = useState(30);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -74,11 +79,12 @@ export function AnalyticsDashboard({
     const from = new Date(to.getTime() - nextDays * 24 * 60 * 60 * 1000);
     const range = { from: from.toISOString(), to: to.toISOString() };
     startTransition(async () => {
-      const [s, p, m, src] = await Promise.all([
+      const [s, p, m, src, sk] = await Promise.all([
         getAnalyticsDashboardAction(range),
         getPipelineFunnelAction(),
         getMatchQualityAction(range),
         getSourcePerformanceAction(),
+        getSkillGapsAction(range),
       ]);
       if (!s.ok) {
         setError(s.error);
@@ -88,6 +94,7 @@ export function AnalyticsDashboard({
       if (p.ok && p.data) setFunnel(p.data.funnel);
       if (m.ok && m.data) setMatches(m.data.series);
       if (src.ok && src.data) setSources(src.data.sources);
+      if (sk.ok) setSkills(sk.data ?? null);
     });
   };
 
@@ -108,6 +115,22 @@ export function AnalyticsDashboard({
             {d}d
           </Button>
         ))}
+        <div className="ml-auto flex flex-wrap gap-2">
+          <Button asChild size="sm" variant="outline" className="cursor-pointer">
+            <a
+              href={`/analytics/export?format=csv&reportType=dashboard&from=${encodeURIComponent(summary.range.from)}&to=${encodeURIComponent(summary.range.to)}`}
+            >
+              Download CSV
+            </a>
+          </Button>
+          <Button asChild size="sm" variant="outline" className="cursor-pointer">
+            <a
+              href={`/analytics/export?format=pdf&reportType=dashboard&from=${encodeURIComponent(summary.range.from)}&to=${encodeURIComponent(summary.range.to)}`}
+            >
+              Download PDF
+            </a>
+          </Button>
+        </div>
       </div>
 
       {error && (
@@ -194,6 +217,37 @@ export function AnalyticsDashboard({
                 max={sourceMax}
               />
             ))}
+          </div>
+        )}
+      </section>
+
+      <section aria-labelledby="skills-heading">
+        <h2 id="skills-heading" className="mb-3 text-lg font-medium">
+          Skill gap
+        </h2>
+        {!skills ? (
+          <p className="text-sm text-muted-foreground">
+            No skill data yet. Collect and score jobs to see coverage.
+          </p>
+        ) : (
+          <div className="space-y-3 rounded-lg border p-4">
+            <p className="text-sm text-muted-foreground">
+              Coverage {skills.mySkillsCoverage.coveragePct}% ·{" "}
+              {skills.mySkillsCoverage.inDemandCovered}/
+              {skills.inDemand.length} in-demand skills on your profile
+            </p>
+            {skills.gaps.length === 0 ? (
+              <p className="text-sm">No gaps in the current range.</p>
+            ) : (
+              skills.gaps.slice(0, 12).map((g) => (
+                <BarRow
+                  key={g.skill}
+                  label={g.skill}
+                  value={g.count}
+                  max={Math.max(1, ...skills.gaps.map((x) => x.count))}
+                />
+              ))
+            )}
           </div>
         )}
       </section>
