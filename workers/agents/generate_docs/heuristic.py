@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from agents.generate_docs.templates import render_cover_letter, render_cv
+
 
 def _chunk_lines(content: str) -> list[str]:
     lines = []
@@ -19,10 +21,12 @@ def generate_from_chunks(
     chunks: list[dict[str, Any]],
     job: dict[str, Any],
     profile: dict[str, Any] | None = None,
+    cv_template: str = "modern",
+    cl_template: str = "modern",
 ) -> dict[str, Any]:
     """
-    Build tailored CV + cover letter by selecting/rephrasing chunk lines.
-    Never invents employers or skills not present in chunks.
+    Build tailored CV + cover letter by selecting chunk lines.
+    Templates only change layout — never invent employers or skills (HG-9).
     """
     if not chunks:
         raise ValueError("no_cv_chunks")
@@ -42,7 +46,6 @@ def generate_from_chunks(
         section = str(ch.get("section_type") or "experience")
         content = str(ch.get("content") or "")
         for line in _chunk_lines(content)[:3]:
-            # Light rephrase: prefix for targeting — content still from chunk
             if section == "skills":
                 skills_bits.append(line)
                 traces.append(
@@ -50,7 +53,6 @@ def generate_from_chunks(
                 )
             else:
                 bullet = f"Relevant to {job_title}: {line}"
-                # Keep grounding via original line tokens
                 experience_bullets.append(bullet)
                 traces.append(
                     {"text": line, "chunk_id": cid, "section": section}
@@ -59,7 +61,6 @@ def generate_from_chunks(
             break
 
     if not experience_bullets:
-        # Fallback: use raw chunk content snippets
         for ch in chunks[:4]:
             cid = str(ch["id"])
             snippet = str(ch.get("content") or "").strip()[:240]
@@ -78,32 +79,33 @@ def generate_from_chunks(
         raise ValueError("insufficient_cv_content")
 
     name_line = headline or "Candidate"
-    cv_parts = [
-        f"# {name_line}",
-        f"## Target: {job_title} at {company}",
-        "",
-        "## Experience highlights",
-        *[f"- {b}" for b in experience_bullets],
-    ]
-    if skills_bits:
-        cv_parts += ["", "## Skills", *[f"- {s}" for s in skills_bits[:8]]]
+    tailored_cv = render_cv(
+        template=cv_template,
+        name=name_line,
+        job_title=job_title,
+        company=company,
+        experience_bullets=experience_bullets,
+        skills=skills_bits[:8],
+    )
 
-    # Cover letter uses first 2 grounded lines
     lead = experience_bullets[0]
-    support = experience_bullets[1] if len(experience_bullets) > 1 else experience_bullets[0]
-    # Extract original phrases for CL (already traced)
-    cl = (
-        f"Dear Hiring Team at {company},\n\n"
-        f"I am writing to apply for the {job_title} role. "
-        f"My background includes: {lead}\n\n"
-        f"Additionally: {support}\n\n"
-        f"I would welcome the chance to discuss how this experience aligns with your needs.\n\n"
-        f"Sincerely,\n{name_line}"
+    support = (
+        experience_bullets[1]
+        if len(experience_bullets) > 1
+        else experience_bullets[0]
+    )
+    cover_letter = render_cover_letter(
+        template=cl_template,
+        name=name_line,
+        job_title=job_title,
+        company=company,
+        lead=lead,
+        support=support,
     )
 
     return {
-        "tailored_cv": "\n".join(cv_parts),
-        "cover_letter": cl,
+        "tailored_cv": tailored_cv,
+        "cover_letter": cover_letter,
         "bullet_traces": traces,
-        "model_used": "heuristic-docs-v1",
+        "model_used": f"heuristic-docs-v1:{cv_template}",
     }

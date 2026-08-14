@@ -93,17 +93,17 @@ Full matrix + per-task AUTO SKILLS: **`AGENT-PROMPTS.md`**
 
 **Phase 8 — Collection completeness** ✅ complete (P8.1–P8.5 — one commit each)
 
-**Phase 9 — Document completeness** (next)
+**Phase 9 — Document completeness** (in progress)
 
 | Done | Task |
 |------|------|
-| | P9.1 CV/CL templates |
+| ✓ | P9.1 CV/CL templates |
 | | P9.2 Bullet accept/reject |
 | | P9.3 Bulk generate |
 | | P9.4 PDF/ZIP download |
 
-**Next:** **P9.1** — modern/classic/minimal CV+CL templates  
-Prompt: `AGENT-PROMPTS.md` → Phase 9 → P9.1  
+**Next:** **P9.2** — Per-bullet accept/reject  
+Prompt: `AGENT-PROMPTS.md` → Phase 9 → P9.2  
 Contract: `docs/contracts/phase-9-documents-complete.md`  
 Backlog: Phases 7–13 added 2026-08-12 (docs gap sync)
 

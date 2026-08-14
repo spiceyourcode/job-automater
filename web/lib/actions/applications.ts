@@ -31,6 +31,8 @@ export type ApplicationPublic = {
   canApply: boolean;
   canApprove?: boolean;
   bulletTraces: Array<{ text: string; chunkId: string; section: string }>;
+  cvTemplate?: "modern" | "classic" | "minimal";
+  clTemplate?: string;
   jobTitle?: string;
   jobCompany?: string;
 };
@@ -108,6 +110,34 @@ export async function regenerateApplicationAction(
     if (!res.ok) return { ok: false, error: "Regenerate failed" };
     revalidatePath(`/applications/${id}/review`);
     return { ok: true };
+  } catch {
+    return { ok: false, error: "Network error" };
+  }
+}
+
+export async function setTemplateAction(
+  id: string,
+  cvTemplate: "modern" | "classic" | "minimal",
+  clTemplate?: "modern" | "classic" | "minimal",
+): Promise<ActionResult<{ application: ApplicationPublic }>> {
+  const headers = await authHeaders();
+  if (!headers) return { ok: false, error: "Unauthorized" };
+  try {
+    const res = await fetch(`${API_URL}/api/v1/applications/${id}/template`, {
+      method: "PATCH",
+      headers: { ...headers, "content-type": "application/json" },
+      body: JSON.stringify({
+        cvTemplate,
+        ...(clTemplate ? { clTemplate } : {}),
+      }),
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      return { ok: false, error: body.error ?? "Template update failed" };
+    }
+    const data = (await res.json()) as { application: ApplicationPublic };
+    revalidatePath(`/applications/${id}/review`);
+    return { ok: true, data };
   } catch {
     return { ok: false, error: "Network error" };
   }

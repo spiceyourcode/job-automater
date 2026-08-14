@@ -14,6 +14,7 @@ import { getPresignedGetUrl, uploadObject } from "../../lib/s3.js";
 import type {
   CreateApplicationBody,
   PipelineStage,
+  SetTemplateBody,
   UpdateStageBody,
 } from "./applications.schema.js";
 import {
@@ -57,6 +58,8 @@ function toPublic(app: Application) {
     submitError: app.submitError,
     pipelineStage: statusToStage(app.status),
     generationModel: app.generationModel,
+    cvTemplate: app.cvTemplate,
+    clTemplate: app.clTemplate,
     createdAt: app.createdAt,
     updatedAt: app.updatedAt,
     /** Approve/Apply blocked until review (P3.2); submit only after approve (HG-4). */
@@ -214,6 +217,52 @@ export async function regenerateDocuments(userId: string, id: string) {
     throw new ApplicationError("Failed to enqueue document generation", 503);
   }
   return { status: "generating" as const };
+}
+
+/**
+ * Switch CV/CL template and regenerate docs (layout only — HG-9 re-validated).
+ * Clears review/approve so Apply stays gated until re-review.
+ */
+export async function setApplicationTemplate(
+  userId: string,
+  id: string,
+  body: SetTemplateBody,
+) {
+  const app = await getOwned(userId, id);
+  const clTemplate = body.clTemplate ?? body.cvTemplate;
+
+  const [updated] = await db
+    .update(applications)
+    .set({
+      cvTemplate: body.cvTemplate,
+      clTemplate,
+      documentsReviewedAt: null,
+      approvedAt: null,
+      tailoredCvContent: null,
+      coverLetterContent: null,
+      bulletTraces: [],
+      status: "draft",
+      updatedAt: new Date(),
+    })
+    .where(and(eq(applications.id, id), eq(applications.userId, userId)))
+    .returning();
+
+  if (!updated) throw new ApplicationError("Application not found", 404);
+
+  try {
+    await enqueueGenerateDocs({
+      application_id: app.id,
+      user_id: userId,
+      job_id: app.jobId,
+    });
+  } catch {
+    throw new ApplicationError("Failed to enqueue document generation", 503);
+  }
+
+  return {
+    application: toPublic(updated),
+    status: "generating" as const,
+  };
 }
 
 /** Mark documents reviewed — unlocks Apply (still no submit without P4 approve). */

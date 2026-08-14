@@ -54,8 +54,14 @@ def process_generate_docs(payload: dict[str, Any]) -> dict[str, Any]:
             return {"status": "error", "error": "no_cv_chunks"}
 
         profile = load_profile_for_user(conn, job.user_id)
+        cv_template = str(app_row.get("cv_template") or "modern")
+        cl_template = str(app_row.get("cl_template") or "modern")
         validated = run_generate_docs(
-            chunks=chunks, job=job_row, profile=profile
+            chunks=chunks,
+            job=job_row,
+            profile=profile,
+            cv_template=cv_template,
+            cl_template=cl_template,
         )
         if validated is None:
             # HG-9: never persist ungrounded docs

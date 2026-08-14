@@ -30,8 +30,16 @@ export const updateStageBodySchema = z
   })
   .strict();
 
+export const setTemplateBodySchema = z
+  .object({
+    cvTemplate: z.enum(["modern", "classic", "minimal"]),
+    clTemplate: z.enum(["modern", "classic", "minimal"]).optional(),
+  })
+  .strict();
+
 export type CreateApplicationBody = z.infer<typeof createApplicationBodySchema>;
 export type UpdateStageBody = z.infer<typeof updateStageBodySchema>;
+export type SetTemplateBody = z.infer<typeof setTemplateBodySchema>;
 export type PipelineStage = z.infer<typeof pipelineStageSchema>;
 
 /** Map Kanban stage → applications.status */

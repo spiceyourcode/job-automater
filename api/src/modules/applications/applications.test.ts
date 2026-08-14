@@ -12,6 +12,7 @@ vi.mock("./applications.service.js", async (importOriginal) => {
     getApplication: vi.fn(),
     createApplication: vi.fn(),
     regenerateDocuments: vi.fn(),
+    setApplicationTemplate: vi.fn(),
     markDocumentsReviewed: vi.fn(),
     approveApplication: vi.fn(),
     updateApplicationStage: vi.fn(),
@@ -54,6 +55,8 @@ const sampleApp = {
   submitError: null,
   pipelineStage: null,
   generationModel: "heuristic-docs-v1",
+  cvTemplate: "modern",
+  clTemplate: "modern",
   createdAt: new Date(),
   updatedAt: new Date(),
   canApply: false,
@@ -268,6 +271,73 @@ describe("PATCH /api/v1/applications/:id/stage", () => {
           "content-type": "application/json",
         },
         body: JSON.stringify({ stage: "nope" }),
+      },
+    );
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("PATCH /api/v1/applications/:id/template", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("404 when application not owned", async () => {
+    mockService.setApplicationTemplate.mockRejectedValue(
+      new applicationsService.ApplicationError("Application not found", 404),
+    );
+    const res = await buildApp().request(
+      `/api/v1/applications/${sampleApp.id}/template`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: await authHeader("user-b"),
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ cvTemplate: "classic" }),
+      },
+    );
+    expect(res.status).toBe(404);
+    expect(mockService.setApplicationTemplate).toHaveBeenCalledWith(
+      "user-b",
+      sampleApp.id,
+      { cvTemplate: "classic" },
+    );
+  });
+
+  it("202 switches template and regenerates", async () => {
+    mockService.setApplicationTemplate.mockResolvedValue({
+      application: {
+        ...sampleApp,
+        cvTemplate: "minimal",
+        clTemplate: "minimal",
+        tailoredCvContent: null,
+        coverLetterContent: null,
+      },
+      status: "generating",
+    });
+    const res = await buildApp().request(
+      `/api/v1/applications/${sampleApp.id}/template`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: await authHeader("user-a"),
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ cvTemplate: "minimal", clTemplate: "minimal" }),
+      },
+    );
+    expect(res.status).toBe(202);
+  });
+
+  it("400 rejects unknown template", async () => {
+    const res = await buildApp().request(
+      `/api/v1/applications/${sampleApp.id}/template`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: await authHeader(),
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ cvTemplate: "fancy" }),
       },
     );
     expect(res.status).toBe(400);

@@ -20,6 +20,8 @@ class DocsState(TypedDict, total=False):
     chunks: list[dict[str, Any]]
     job: dict[str, Any]
     profile: dict[str, Any] | None
+    cv_template: str
+    cl_template: str
     draft: dict[str, Any]
     validated: dict[str, Any] | None
     error: str | None
@@ -30,6 +32,8 @@ def _generate_node(state: DocsState) -> dict[str, Any]:
         chunks=state["chunks"],
         job=state["job"],
         profile=state.get("profile"),
+        cv_template=state.get("cv_template") or "modern",
+        cl_template=state.get("cl_template") or "modern",
     )
     # Never log document bodies (HG-8)
     logger.info(
@@ -78,9 +82,17 @@ def run_generate_docs(
     chunks: list[dict[str, Any]],
     job: dict[str, Any],
     profile: dict[str, Any] | None = None,
+    cv_template: str = "modern",
+    cl_template: str = "modern",
 ) -> dict[str, Any] | None:
     """Returns validated docs dict or None if HG-9 validation fails."""
     result = get_graph().invoke(
-        {"chunks": chunks, "job": job, "profile": profile}
+        {
+            "chunks": chunks,
+            "job": job,
+            "profile": profile,
+            "cv_template": cv_template,
+            "cl_template": cl_template,
+        }
     )
     return result.get("validated")

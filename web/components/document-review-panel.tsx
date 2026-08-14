@@ -8,10 +8,19 @@ import {
   getApplicationAction,
   markReviewedAction,
   regenerateApplicationAction,
+  setTemplateAction,
   type ApplicationPublic,
 } from "@/lib/actions/applications";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type Props = {
   applicationId: string;
@@ -25,6 +34,10 @@ export function DocumentReviewPanel({ applicationId, initial }: Props) {
   const router = useRouter();
   const [app, setApp] = useState(initial.application);
   const [job] = useState(initial.job);
+  const [template, setTemplate] = useState<"modern" | "classic" | "minimal">(
+    (initial.application.cvTemplate as "modern" | "classic" | "minimal") ||
+      "modern",
+  );
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -36,6 +49,14 @@ export function DocumentReviewPanel({ applicationId, initial }: Props) {
         const res = await getApplicationAction(applicationId);
         if (res.ok && res.data?.application) {
           setApp(res.data.application);
+          if (res.data.application.cvTemplate) {
+            setTemplate(
+              res.data.application.cvTemplate as
+                | "modern"
+                | "classic"
+                | "minimal",
+            );
+          }
         }
       });
     }, 2000);
@@ -49,17 +70,58 @@ export function DocumentReviewPanel({ applicationId, initial }: Props) {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Review documents
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {job
-            ? `${job.title} at ${job.company}`
-            : "Application draft"}{" "}
-          · Status: {app.status}
-          {!ready && " · Generating…"}
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Review documents
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {job
+              ? `${job.title} at ${job.company}`
+              : "Application draft"}{" "}
+            · Status: {app.status}
+            {!ready && " · Generating…"}
+          </p>
+        </div>
+        <div className="w-full space-y-1.5 sm:w-48">
+          <Label htmlFor="cv-template">Template</Label>
+          <Select
+            value={template}
+            disabled={pending}
+            onValueChange={(v) => {
+              const next = v as "modern" | "classic" | "minimal";
+              setTemplate(next);
+              setError(null);
+              startTransition(async () => {
+                const res = await setTemplateAction(applicationId, next, next);
+                if (!res.ok) {
+                  setError(res.error);
+                  return;
+                }
+                setApp((a) => ({
+                  ...a,
+                  ...(res.data?.application ?? {}),
+                  tailoredCvContent: null,
+                  coverLetterContent: null,
+                  documentsReviewedAt: null,
+                  canApply: false,
+                  canApprove: false,
+                  cvTemplate: next,
+                  clTemplate: next,
+                }));
+              });
+            }}
+          >
+            <SelectTrigger id="cv-template" className="w-full cursor-pointer">
+              <SelectValue placeholder="Template" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="modern">Modern</SelectItem>
+              <SelectItem value="classic">Classic</SelectItem>
+              <SelectItem value="minimal">Minimal</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {error && (
@@ -70,8 +132,8 @@ export function DocumentReviewPanel({ applicationId, initial }: Props) {
 
       {!ready ? (
         <p className="rounded-md border bg-muted/40 p-4 text-sm text-muted-foreground">
-          Tailoring your CV and cover letter from your CV chunks. This page
-          refreshes automatically.
+          Tailoring your CV and cover letter from your CV chunks ({template}{" "}
+          template). This page refreshes automatically.
         </p>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
@@ -103,7 +165,7 @@ export function DocumentReviewPanel({ applicationId, initial }: Props) {
           >
             <div className="rounded-lg border p-4">
               <h2 id="tailored-heading" className="mb-2 text-sm font-medium">
-                Tailored CV
+                Tailored CV ({template})
               </h2>
               <pre className="max-h-48 overflow-y-auto whitespace-pre-wrap font-sans text-sm leading-relaxed text-muted-foreground">
                 {app.tailoredCvContent}

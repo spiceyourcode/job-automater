@@ -127,7 +127,7 @@ Phases **0–6** are the shipped MVP slice (contracts `phase-1` … `phase-6`). 
 
 | # | Task | Service | Status | Source |
 |---|------|---------|--------|--------|
-| 9.1 | CV/CL templates (modern, classic, minimal) + selector | workers, web | [ ] | PRD §11 P3.4, TRD FR-DG-03 |
+| 9.1 | CV/CL templates (modern, classic, minimal) + selector | workers, web | [x] | PRD §11 P3.4, TRD FR-DG-03 |
 | 9.2 | Per-bullet accept/reject + regenerate section | api, web | [ ] | AppFlow §2.3, Impl Plan W11 |
 | 9.3 | Bulk generate top N + progress (drafts only) | api, workers, web | [ ] | PRD G5, TRD FR-DG-06 |
 | 9.4 | ATS-friendly PDF + ZIP download | api, web | [ ] | PRD §11 P3.5, Schema §2.6 |
