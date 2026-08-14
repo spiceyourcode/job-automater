@@ -103,13 +103,13 @@ Full matrix + per-task AUTO SKILLS: **`AGENT-PROMPTS.md`**
 
 | Done | Task |
 |------|------|
-| | P12.1 CI + API rate limits |
+| ✓ | P12.1 CI + API rate limits |
 | | P12.2 Observability + OpenAPI |
 | | P12.3 Landing + runbooks |
 | | P12.4 A11y polish |
 
-**Next:** **P12.1** — GitHub Actions CI + Redis API rate limits
-Prompt: `AGENT-PROMPTS.md` → Phase 12 → P12.1
+**Next:** **P12.2** — Observability + OpenAPI
+Prompt: `AGENT-PROMPTS.md` → Phase 12 → P12.2
 Contract: `docs/contracts/phase-12-launch.md`
 
 ---

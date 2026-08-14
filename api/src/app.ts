@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { apiRateLimit } from "./middleware/api-rate-limit.js";
 import { registerRoutes as registerHealthRoutes } from "./modules/health/index.js";
 import { registerRoutes as registerAuthRoutes } from "./modules/auth/index.js";
 import { registerRoutes as registerProfileRoutes } from "./modules/profile/index.js";
@@ -13,6 +14,9 @@ import { registerRoutes as registerRealtimeRoutes } from "./modules/realtime/ind
 
 export const createApp = (): Hono => {
   const app = new Hono();
+
+  // Schema §2.1 — before routes so anonymous floods cannot skip limits
+  app.use("*", apiRateLimit);
 
   registerHealthRoutes(app);
   registerAuthRoutes(app);

@@ -1,0 +1,92 @@
+# CI — P12.1
+# Never echo secrets. Use env: blocks only; mask if GitHub Secrets are added later.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: API typecheck + test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci
+      JWT_SECRET: ci-test-jwt-secret-min-32-characters-ok
+      REDIS_URL: redis://127.0.0.1:6379
+      S3_ENDPOINT: http://127.0.0.1:9000
+      S3_ACCESS_KEY: ci-minio
+      S3_SECRET_KEY: ci-minio-secret
+      S3_BUCKET: jobautomater
+      S3_REGION: us-east-1
+      APP_URL: http://localhost:3000
+      API_PUBLIC_URL: http://localhost:3001
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Test
+        run: npm test
+
+  web:
+    name: Web typecheck
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    env:
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+      API_URL: http://localhost:3001
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+
+  workers:
+    name: Workers pytest
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: workers
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: Test
+        run: python -m pytest -q
+        env:
+          DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci
+          CELERY_BROKER_URL: redis://127.0.0.1:6379/0
+          CELERY_RESULT_BACKEND: redis://127.0.0.1:6379/1
+          SUBMIT_DRY_RUN: "true"
