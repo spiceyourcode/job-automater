@@ -99,3 +99,47 @@ export async function disconnectGmailAction(): Promise<ActionResult> {
     return { ok: false, error: "Network error" };
   }
 }
+
+export async function listEmailReviewAction(): Promise<
+  ActionResult<{ emails: Array<Record<string, unknown>> }>
+> {
+  const headers = await authHeaders();
+  if (!headers) return { ok: false, error: "Unauthorized" };
+  try {
+    const res = await fetch(`${API_URL}/api/v1/emails/review`, {
+      headers,
+      cache: "no-store",
+    });
+    if (!res.ok) return { ok: false, error: "Failed to load review queue" };
+    return {
+      ok: true,
+      data: (await res.json()) as { emails: Array<Record<string, unknown>> },
+    };
+  } catch {
+    return { ok: false, error: "Network error" };
+  }
+}
+
+export async function classifyEmailAction(
+  id: string,
+  category: string,
+): Promise<ActionResult<{ applicationStatusUpdated: boolean }>> {
+  const headers = await authHeaders();
+  if (!headers) return { ok: false, error: "Unauthorized" };
+  try {
+    const res = await fetch(`${API_URL}/api/v1/emails/${id}/classify`, {
+      method: "POST",
+      headers: { ...headers, "content-type": "application/json" },
+      body: JSON.stringify({ category }),
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      return { ok: false, error: body.error ?? "Classify failed" };
+    }
+    const data = (await res.json()) as { applicationStatusUpdated: boolean };
+    revalidatePath("/settings/email-review");
+    return { ok: true, data };
+  } catch {
+    return { ok: false, error: "Network error" };
+  }
+}

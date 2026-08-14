@@ -103,13 +103,13 @@ Full matrix + per-task AUTO SKILLS: **`AGENT-PROMPTS.md`**
 |------|------|
 | ✓ | P11.1 Gmail OAuth |
 | ✓ | P11.2 Notification center |
-| | P11.3 Email review queue |
+| ✓ | P11.3 Email review queue |
 | | P11.4 Analytics export |
 | | P11.5 WebSocket events |
 | | P11.6 Weekly digest |
 
-**Next:** **P11.3** — Low-confidence email review queue
-Prompt: `AGENT-PROMPTS.md` → Phase 11 → P11.3
+**Next:** **P11.4** — Analytics CSV/PDF export + skill-gap
+Prompt: `AGENT-PROMPTS.md` → Phase 11 → P11.4
 Contract: `docs/contracts/phase-11-comms.md`
 
 ---

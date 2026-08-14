@@ -27,6 +27,7 @@ import {
   startGmailWatch,
 } from "../../lib/gmail.js";
 import type {
+  ClassifyEmailBody,
   PatchNotificationPrefsBody,
   SyncEmailsBody,
 } from "./emails.schema.js";
@@ -84,6 +85,58 @@ export async function listEmails(userId: string) {
     .orderBy(desc(emails.receivedAt))
     .limit(100);
   return { emails: rows };
+}
+
+export async function listReviewQueue(userId: string) {
+  const rows = await db
+    .select({
+      id: emails.id,
+      applicationId: emails.applicationId,
+      fromEmail: emails.fromEmail,
+      fromName: emails.fromName,
+      subject: emails.subject,
+      snippet: emails.snippet,
+      category: emails.category,
+      confidence: emails.confidence,
+      needsManualReview: emails.needsManualReview,
+      receivedAt: emails.receivedAt,
+    })
+    .from(emails)
+    .where(and(eq(emails.userId, userId), eq(emails.needsManualReview, true)))
+    .orderBy(desc(emails.receivedAt))
+    .limit(100);
+  return { emails: rows };
+}
+
+/**
+ * User-corrected category. Never auto-updates application status (P11.3).
+ */
+export async function classifyEmail(
+  userId: string,
+  id: string,
+  body: ClassifyEmailBody,
+) {
+  const [updated] = await db
+    .update(emails)
+    .set({
+      category: body.category,
+      needsManualReview: false,
+      processed: true,
+      processedAt: new Date(),
+      classifiedAt: new Date(),
+    })
+    .where(and(eq(emails.id, id), eq(emails.userId, userId)))
+    .returning({
+      id: emails.id,
+      category: emails.category,
+      needsManualReview: emails.needsManualReview,
+      applicationId: emails.applicationId,
+    });
+  if (!updated) throw new EmailsError("Email not found", 404);
+  return {
+    email: updated,
+    applicationStatusUpdated: false as const,
+  };
 }
 
 export async function listNotifications(userId: string) {

@@ -50,3 +50,23 @@ export type SyncEmailsBody = z.infer<typeof syncEmailsBodySchema>;
 export type PatchNotificationPrefsBody = z.infer<
   typeof patchNotificationPrefsBodySchema
 >;
+
+export const emailIdParamSchema = z.object({
+  id: z.string().uuid(),
+});
+
+export const classifyEmailBodySchema = z
+  .object({
+    category: z.enum([
+      "application_confirmation",
+      "interview_invitation",
+      "rejection",
+      "offer",
+      "follow_up_request",
+      "spam",
+      "other",
+    ]),
+  })
+  .strict();
+
+export type ClassifyEmailBody = z.infer<typeof classifyEmailBodySchema>;

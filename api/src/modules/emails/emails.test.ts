@@ -17,6 +17,8 @@ vi.mock("./emails.service.js", async (importOriginal) => {
     syncGmailHistory: vi.fn(),
     handleGmailPush: vi.fn(),
     disconnectGmail: vi.fn(),
+    listReviewQueue: vi.fn(),
+    classifyEmail: vi.fn(),
     EmailsError: actual.EmailsError,
   };
 });
@@ -166,5 +168,65 @@ describe("POST /api/v1/emails/gmail/push", () => {
     });
     expect(res.status).toBe(200);
     expect(mockService.handleGmailPush).toHaveBeenCalled();
+  });
+});
+
+describe("GET /api/v1/emails/review", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("200 lists low-confidence queue without bodies", async () => {
+    mockService.listReviewQueue.mockResolvedValue({
+      emails: [
+        {
+          id: "e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+          applicationId: null,
+          fromEmail: "hr@acme.com",
+          fromName: "HR",
+          subject: "Update",
+          snippet: "Please see",
+          category: "other",
+          confidence: "0.40",
+          needsManualReview: true,
+          receivedAt: new Date(),
+        },
+      ],
+    });
+    const res = await buildApp().request("/api/v1/emails/review", {
+      headers: { Authorization: await authHeader() },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { emails: Array<Record<string, unknown>> };
+    expect(body.emails).toHaveLength(1);
+    expect(body.emails[0]?.bodyText).toBeUndefined();
+  });
+});
+
+describe("POST /api/v1/emails/:id/classify", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("200 corrects category without updating application status", async () => {
+    mockService.classifyEmail.mockResolvedValue({
+      email: {
+        id: "e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+        category: "rejection",
+        needsManualReview: false,
+        applicationId: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+      },
+      applicationStatusUpdated: false,
+    });
+    const res = await buildApp().request(
+      "/api/v1/emails/e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11/classify",
+      {
+        method: "POST",
+        headers: {
+          Authorization: await authHeader(),
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ category: "rejection" }),
+      },
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { applicationStatusUpdated: boolean };
+    expect(body.applicationStatusUpdated).toBe(false);
   });
 });

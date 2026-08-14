@@ -32,6 +32,7 @@ const SETTINGS_LINKS = [
   { href: "/settings/sources", label: "Sources" },
   { href: "/settings/team", label: "Team" },
   { href: "/settings/notifications", label: "Notifications" },
+  { href: "/settings/email-review", label: "Email review" },
   { href: "/settings/privacy", label: "Privacy" },
 ] as const;
 

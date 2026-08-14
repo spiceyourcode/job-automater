@@ -3,6 +3,8 @@ import { zValidator } from "@hono/zod-validator";
 import { requireAuth } from "../../middleware/require-auth.js";
 import { env } from "../../env.js";
 import {
+  classifyEmailBodySchema,
+  emailIdParamSchema,
   gmailPushQuerySchema,
   notificationIdParamSchema,
   syncEmailsBodySchema,
@@ -38,6 +40,33 @@ emailsRoutes.get("/", async (c) => {
   const { userId } = c.get("auth");
   return c.json(await emailsService.listEmails(userId), 200);
 });
+
+emailsRoutes.get("/review", async (c) => {
+  const { userId } = c.get("auth");
+  return c.json(await emailsService.listReviewQueue(userId), 200);
+});
+
+emailsRoutes.post(
+  "/:id/classify",
+  zValidator("param", emailIdParamSchema),
+  zValidator("json", classifyEmailBodySchema),
+  async (c) => {
+    const { userId } = c.get("auth");
+    try {
+      return c.json(
+        await emailsService.classifyEmail(
+          userId,
+          c.req.valid("param").id,
+          c.req.valid("json"),
+        ),
+        200,
+      );
+    } catch (err) {
+      if (isErr(err)) return c.json({ error: err.message }, err.statusCode);
+      throw err;
+    }
+  },
+);
 
 emailsRoutes.get("/gmail", async (c) => {
   const { userId } = c.get("auth");
