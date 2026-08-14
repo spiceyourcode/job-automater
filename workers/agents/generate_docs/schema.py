@@ -13,6 +13,7 @@ class BulletTrace(BaseModel):
     text: str = Field(min_length=8, max_length=2000)
     chunk_id: str = Field(min_length=1)
     section: str = Field(min_length=1, max_length=50)
+    status: str | None = Field(default=None, max_length=20)
 
 
 class GeneratedDocuments(BaseModel):

@@ -26,6 +26,8 @@ class GenerateDocsJob(BaseModel):
     application_id: str = Field(..., min_length=36, max_length=36)
     user_id: str = Field(..., min_length=36, max_length=36)
     job_id: str = Field(..., min_length=36, max_length=36)
+    accepted_traces: list[dict[str, Any]] = Field(default_factory=list)
+    regenerate_sections: list[str] = Field(default_factory=list)
 
     model_config = {"extra": "forbid"}
 
@@ -62,6 +64,8 @@ def process_generate_docs(payload: dict[str, Any]) -> dict[str, Any]:
             profile=profile,
             cv_template=cv_template,
             cl_template=cl_template,
+            accepted_traces=job.accepted_traces,
+            regenerate_sections=job.regenerate_sections,
         )
         if validated is None:
             # HG-9: never persist ungrounded docs

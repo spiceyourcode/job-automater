@@ -13,6 +13,8 @@ vi.mock("./applications.service.js", async (importOriginal) => {
     createApplication: vi.fn(),
     regenerateDocuments: vi.fn(),
     setApplicationTemplate: vi.fn(),
+    updateBulletTraces: vi.fn(),
+    regenerateSection: vi.fn(),
     markDocumentsReviewed: vi.fn(),
     approveApplication: vi.fn(),
     updateApplicationStage: vi.fn(),
@@ -46,6 +48,7 @@ const sampleApp = {
       text: "Built APIs with FastAPI",
       chunkId: "c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33",
       section: "experience",
+      status: "pending" as const,
     },
   ],
   documentsReviewedAt: null,
@@ -341,5 +344,85 @@ describe("PATCH /api/v1/applications/:id/template", () => {
       },
     );
     expect(res.status).toBe(400);
+  });
+});
+
+describe("PATCH /api/v1/applications/:id/bullets", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("404 when not owned", async () => {
+    mockService.updateBulletTraces.mockRejectedValue(
+      new applicationsService.ApplicationError("Application not found", 404),
+    );
+    const res = await buildApp().request(
+      `/api/v1/applications/${sampleApp.id}/bullets`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: await authHeader("user-b"),
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          traces: [
+            {
+              text: "Built APIs with FastAPI",
+              chunkId: "c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33",
+              section: "experience",
+              status: "accepted",
+            },
+          ],
+        }),
+      },
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("200 updates bullet statuses", async () => {
+    mockService.updateBulletTraces.mockResolvedValue({
+      application: {
+        ...sampleApp,
+        bulletTraces: [
+          {
+            text: "Built APIs with FastAPI",
+            chunkId: "c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33",
+            section: "experience",
+            status: "accepted",
+          },
+        ],
+      },
+    });
+    const res = await buildApp().request(
+      `/api/v1/applications/${sampleApp.id}/bullets`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: await authHeader("user-a"),
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          traces: [
+            {
+              text: "Built APIs with FastAPI",
+              chunkId: "c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33",
+              section: "experience",
+              status: "accepted",
+            },
+          ],
+        }),
+      },
+    );
+    expect(res.status).toBe(200);
+  });
+});
+
+describe("normalizeBulletTraces (HG-9)", () => {
+  it("drops untraced bullets and normalizes chunk_id", () => {
+    const traces = applicationsService.normalizeBulletTraces([
+      { text: "Built APIs with FastAPI", chunk_id: "c1", section: "experience" },
+      { text: "hallucinated without chunk", section: "experience" },
+    ]);
+    expect(traces).toHaveLength(1);
+    expect(traces[0]?.chunkId).toBe("c1");
+    expect(traces[0]?.status).toBe("pending");
   });
 });

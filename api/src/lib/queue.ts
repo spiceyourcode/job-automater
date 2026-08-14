@@ -11,6 +11,15 @@ export type GenerateDocsPayload = {
   application_id: string;
   user_id: string;
   job_id: string;
+  /** P9.2 — bullets to keep verbatim when regenerating a section. */
+  accepted_traces?: Array<{
+    text: string;
+    chunk_id: string;
+    section: string;
+    status?: string;
+  }>;
+  /** Empty / omitted = full regenerate. */
+  regenerate_sections?: string[];
 };
 
 /** HG-4: approved_at is required — never enqueue without it. */

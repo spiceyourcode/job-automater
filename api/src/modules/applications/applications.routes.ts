@@ -5,7 +5,9 @@ import {
   applicationDownloadParamSchema,
   applicationIdParamSchema,
   createApplicationBodySchema,
+  regenerateSectionBodySchema,
   setTemplateBodySchema,
+  updateBulletsBodySchema,
   updateStageBodySchema,
 } from "./applications.schema.js";
 import * as applicationsService from "./applications.service.js";
@@ -98,6 +100,56 @@ applicationsRoutes.patch(
     try {
       return c.json(
         await applicationsService.setApplicationTemplate(
+          userId,
+          c.req.valid("param").id,
+          c.req.valid("json"),
+        ),
+        202,
+      );
+    } catch (err) {
+      if (isAppError(err)) {
+        return c.json({ error: err.message }, err.statusCode);
+      }
+      throw err;
+    }
+  },
+);
+
+applicationsRoutes.patch(
+  "/:id/bullets",
+  requireRole("owner", "member"),
+  zValidator("param", applicationIdParamSchema),
+  zValidator("json", updateBulletsBodySchema),
+  async (c) => {
+    const { userId } = c.get("auth");
+    try {
+      return c.json(
+        await applicationsService.updateBulletTraces(
+          userId,
+          c.req.valid("param").id,
+          c.req.valid("json"),
+        ),
+        200,
+      );
+    } catch (err) {
+      if (isAppError(err)) {
+        return c.json({ error: err.message }, err.statusCode);
+      }
+      throw err;
+    }
+  },
+);
+
+applicationsRoutes.post(
+  "/:id/regenerate-section",
+  requireRole("owner", "member"),
+  zValidator("param", applicationIdParamSchema),
+  zValidator("json", regenerateSectionBodySchema),
+  async (c) => {
+    const { userId } = c.get("auth");
+    try {
+      return c.json(
+        await applicationsService.regenerateSection(
           userId,
           c.req.valid("param").id,
           c.req.valid("json"),

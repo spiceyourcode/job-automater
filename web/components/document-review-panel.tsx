@@ -9,6 +9,8 @@ import {
   markReviewedAction,
   regenerateApplicationAction,
   setTemplateAction,
+  updateBulletsAction,
+  regenerateSectionAction,
   type ApplicationPublic,
 } from "@/lib/actions/applications";
 import { Button } from "@/components/ui/button";
@@ -21,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Check, RotateCcw, X } from "lucide-react";
 
 type Props = {
   applicationId: string;
@@ -67,6 +70,26 @@ export function DocumentReviewPanel({ applicationId, initial }: Props) {
   const reviewed = Boolean(app.documentsReviewedAt);
   const canApprove = Boolean(app.canApprove ?? app.canApply);
   const approved = Boolean(app.approvedAt) || app.status === "approved";
+  const traces = app.bulletTraces ?? [];
+  const pendingCount = traces.filter(
+    (t) => !t.status || t.status === "pending",
+  ).length;
+  const sections = Array.from(new Set(traces.map((t) => t.section)));
+
+  const setBulletStatus = (
+    index: number,
+    status: "accepted" | "rejected" | "pending",
+  ) => {
+    const next = traces.map((t, i) =>
+      i === index ? { ...t, status } : { ...t, status: t.status ?? "pending" },
+    );
+    setApp((a) => ({ ...a, bulletTraces: next, documentsReviewedAt: null }));
+    startTransition(async () => {
+      const res = await updateBulletsAction(applicationId, next);
+      if (!res.ok) setError(res.error);
+      else if (res.data?.application) setApp(res.data.application);
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -145,18 +168,95 @@ export function DocumentReviewPanel({ applicationId, initial }: Props) {
               Source grounding
             </h2>
             <p className="mb-2 text-xs text-muted-foreground">
-              Every bullet is traced to a CV chunk (HG-9).
+              Accept or reject each bullet (HG-9). Confirm review stays disabled
+              until none are pending.
             </p>
             <ul className="max-h-80 space-y-2 overflow-y-auto text-sm text-muted-foreground">
-              {(app.bulletTraces ?? []).map((t, i) => (
-                <li key={`${t.chunkId}-${i}`} className="rounded border p-2">
-                  <span className="font-mono text-xs text-foreground/70">
-                    {t.section}
-                  </span>
-                  <p className="mt-1">{t.text}</p>
-                </li>
-              ))}
+              {traces.map((t, i) => {
+                const status = t.status ?? "pending";
+                return (
+                  <li
+                    key={`${t.chunkId}-${i}`}
+                    className="rounded border p-2"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <span className="font-mono text-xs text-foreground/70">
+                          {t.section} · {status}
+                        </span>
+                        <p className="mt-1 text-foreground/90">{t.text}</p>
+                      </div>
+                      <div className="flex shrink-0 gap-1">
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant={status === "accepted" ? "default" : "outline"}
+                          className="h-8 w-8 cursor-pointer"
+                          disabled={pending}
+                          aria-label="Accept bullet"
+                          onClick={() => setBulletStatus(i, "accepted")}
+                        >
+                          <Check className="h-3.5 w-3.5" aria-hidden />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant={status === "rejected" ? "destructive" : "outline"}
+                          className="h-8 w-8 cursor-pointer"
+                          disabled={pending}
+                          aria-label="Reject bullet"
+                          onClick={() => setBulletStatus(i, "rejected")}
+                        >
+                          <X className="h-3.5 w-3.5" aria-hidden />
+                        </Button>
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
+            {sections.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {sections.map((section) => (
+                  <Button
+                    key={section}
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="cursor-pointer"
+                    disabled={pending}
+                    onClick={() => {
+                      startTransition(async () => {
+                        const res = await regenerateSectionAction(
+                          applicationId,
+                          section,
+                        );
+                        if (!res.ok) setError(res.error);
+                        else {
+                          setApp((a) => ({
+                            ...a,
+                            ...(res.data?.application ?? {}),
+                            tailoredCvContent: null,
+                            coverLetterContent: null,
+                            documentsReviewedAt: null,
+                            canApply: false,
+                          }));
+                        }
+                      });
+                    }}
+                  >
+                    <RotateCcw className="mr-1 h-3.5 w-3.5" aria-hidden />
+                    Regen {section}
+                  </Button>
+                ))}
+              </div>
+            )}
+            {pendingCount > 0 && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                {pendingCount} bullet{pendingCount === 1 ? "" : "s"} still
+                pending.
+              </p>
+            )}
           </section>
 
           <section
@@ -246,7 +346,12 @@ export function DocumentReviewPanel({ applicationId, initial }: Props) {
         <Button
           type="button"
           className="cursor-pointer"
-          disabled={!ready || reviewed || pending}
+          disabled={!ready || reviewed || pending || pendingCount > 0}
+          title={
+            pendingCount > 0
+              ? "Accept or reject every bullet first"
+              : undefined
+          }
           onClick={() => {
             startTransition(async () => {
               const res = await markReviewedAction(applicationId);

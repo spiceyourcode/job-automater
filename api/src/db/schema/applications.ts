@@ -36,7 +36,15 @@ export const applications = pgTable(
     coverLetterContent: text("cover_letter_text"),
     /** Every generated bullet must list a cv_chunks id (HG-9). */
     bulletTraces: jsonb("bullet_traces")
-      .$type<Array<{ text: string; chunkId: string; section: string }>>()
+      .$type<
+        Array<{
+          text: string;
+          chunkId?: string;
+          chunk_id?: string;
+          section: string;
+          status?: "accepted" | "rejected" | "pending";
+        }>
+      >()
       .default(sql`'[]'::jsonb`)
       .notNull(),
     generationModel: varchar("generation_model", { length: 50 }),

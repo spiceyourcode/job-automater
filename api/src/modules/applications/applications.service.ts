@@ -14,7 +14,9 @@ import { getPresignedGetUrl, uploadObject } from "../../lib/s3.js";
 import type {
   CreateApplicationBody,
   PipelineStage,
+  RegenerateSectionBody,
   SetTemplateBody,
+  UpdateBulletsBody,
   UpdateStageBody,
 } from "./applications.schema.js";
 import {
@@ -25,6 +27,13 @@ import {
 /** Contract state machine: draft → pending_approval → approved → submitted */
 const APPROVABLE_STATUSES = new Set(["draft"]);
 
+export type BulletTracePublic = {
+  text: string;
+  chunkId: string;
+  section: string;
+  status: "accepted" | "rejected" | "pending";
+};
+
 export class ApplicationError extends Error {
   constructor(
     message: string,
@@ -33,6 +42,24 @@ export class ApplicationError extends Error {
     super(message);
     this.name = "ApplicationError";
   }
+}
+
+/** Normalize worker snake_case / API camelCase; drop untraced (HG-9). */
+export function normalizeBulletTraces(raw: unknown): BulletTracePublic[] {
+  if (!Array.isArray(raw)) return [];
+  const out: BulletTracePublic[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const t = item as Record<string, unknown>;
+    const text = String(t.text ?? "").trim();
+    const chunkId = String(t.chunkId ?? t.chunk_id ?? "").trim();
+    const section = String(t.section ?? "").trim() || "experience";
+    if (text.length < 8 || !chunkId) continue;
+    const status =
+      t.status === "accepted" || t.status === "rejected" ? t.status : "pending";
+    out.push({ text, chunkId, section, status });
+  }
+  return out;
 }
 
 function toPublic(app: Application) {
@@ -50,7 +77,7 @@ function toPublic(app: Application) {
     coverLetterContent: app.coverLetterContent,
     tailoredCvUrl: app.tailoredCvUrl,
     coverLetterUrl: app.coverLetterUrl,
-    bulletTraces: app.bulletTraces,
+    bulletTraces: normalizeBulletTraces(app.bulletTraces),
     documentsReviewedAt: app.documentsReviewedAt,
     approvedAt: app.approvedAt,
     submittedAt: app.submittedAt,
@@ -265,11 +292,113 @@ export async function setApplicationTemplate(
   };
 }
 
+/**
+ * Persist accept/reject on each bullet (HG-9: every trace must have chunkId).
+ * Does not unlock Apply — Confirm review still required.
+ */
+export async function updateBulletTraces(
+  userId: string,
+  id: string,
+  body: UpdateBulletsBody,
+) {
+  await getOwned(userId, id);
+  const normalized = normalizeBulletTraces(body.traces);
+  if (normalized.length !== body.traces.length) {
+    throw new ApplicationError(
+      "Every bullet must include text and chunkId (HG-9)",
+      400,
+    );
+  }
+
+  const [updated] = await db
+    .update(applications)
+    .set({
+      bulletTraces: normalized,
+      documentsReviewedAt: null,
+      approvedAt: null,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(applications.id, id), eq(applications.userId, userId)))
+    .returning();
+
+  if (!updated) throw new ApplicationError("Application not found", 404);
+  return { application: toPublic(updated) };
+}
+
+/**
+ * Regenerate one section; keep accepted bullets from other/same sections.
+ */
+export async function regenerateSection(
+  userId: string,
+  id: string,
+  body: RegenerateSectionBody,
+) {
+  const app = await getOwned(userId, id);
+  const section = body.section.trim().toLowerCase();
+  const current = normalizeBulletTraces(app.bulletTraces);
+  const accepted = current.filter(
+    (t) => t.status === "accepted" && t.section.toLowerCase() !== section,
+  );
+  // Also keep accepted bullets in the same section? Spec: regenerate section —
+  // typically replace all non-accepted in that section. Keep accepted in that section.
+  const acceptedInSection = current.filter(
+    (t) => t.status === "accepted" && t.section.toLowerCase() === section,
+  );
+  const keep = [...accepted, ...acceptedInSection];
+
+  const [updated] = await db
+    .update(applications)
+    .set({
+      documentsReviewedAt: null,
+      approvedAt: null,
+      tailoredCvContent: null,
+      coverLetterContent: null,
+      status: "draft",
+      updatedAt: new Date(),
+    })
+    .where(and(eq(applications.id, id), eq(applications.userId, userId)))
+    .returning();
+
+  if (!updated) throw new ApplicationError("Application not found", 404);
+
+  try {
+    await enqueueGenerateDocs({
+      application_id: app.id,
+      user_id: userId,
+      job_id: app.jobId,
+      accepted_traces: keep.map((t) => ({
+        text: t.text,
+        chunk_id: t.chunkId,
+        section: t.section,
+        status: "accepted",
+      })),
+      regenerate_sections: [section],
+    });
+  } catch {
+    throw new ApplicationError("Failed to enqueue document generation", 503);
+  }
+
+  return {
+    application: toPublic(updated),
+    status: "generating" as const,
+  };
+}
+
 /** Mark documents reviewed — unlocks Apply (still no submit without P4 approve). */
 export async function markDocumentsReviewed(userId: string, id: string) {
   const app = await getOwned(userId, id);
   if (!app.tailoredCvContent || !app.coverLetterContent) {
     throw new ApplicationError("Documents not ready for review", 400);
+  }
+  const traces = normalizeBulletTraces(app.bulletTraces);
+  if (traces.some((t) => t.status === "pending")) {
+    throw new ApplicationError(
+      "Accept or reject every bullet before confirming review",
+      400,
+    );
+  }
+  if (traces.some((t) => !t.chunkId)) {
+    throw new ApplicationError("Untraced bullets cannot be saved (HG-9)", 400);
   }
 
   // Persist text artifacts to MinIO for download URLs

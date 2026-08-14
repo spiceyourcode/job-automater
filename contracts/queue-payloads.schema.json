@@ -53,7 +53,25 @@
       "properties": {
         "application_id": { "type": "string", "format": "uuid" },
         "user_id": { "type": "string", "format": "uuid" },
-        "job_id": { "type": "string", "format": "uuid" }
+        "job_id": { "type": "string", "format": "uuid" },
+        "accepted_traces": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["text", "chunk_id", "section"],
+            "properties": {
+              "text": { "type": "string" },
+              "chunk_id": { "type": "string" },
+              "section": { "type": "string" },
+              "status": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "regenerate_sections": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
       },
       "additionalProperties": false
     },

@@ -37,9 +37,37 @@ export const setTemplateBodySchema = z
   })
   .strict();
 
+export const bulletStatusSchema = z.enum(["accepted", "rejected", "pending"]);
+
+export const updateBulletsBodySchema = z
+  .object({
+    traces: z
+      .array(
+        z
+          .object({
+            text: z.string().min(8).max(2000),
+            chunkId: z.string().min(1).max(100),
+            section: z.string().min(1).max(50),
+            status: bulletStatusSchema,
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(100),
+  })
+  .strict();
+
+export const regenerateSectionBodySchema = z
+  .object({
+    section: z.string().min(1).max(50),
+  })
+  .strict();
+
 export type CreateApplicationBody = z.infer<typeof createApplicationBodySchema>;
 export type UpdateStageBody = z.infer<typeof updateStageBodySchema>;
 export type SetTemplateBody = z.infer<typeof setTemplateBodySchema>;
+export type UpdateBulletsBody = z.infer<typeof updateBulletsBodySchema>;
+export type RegenerateSectionBody = z.infer<typeof regenerateSectionBodySchema>;
 export type PipelineStage = z.infer<typeof pipelineStageSchema>;
 
 /** Map Kanban stage → applications.status */

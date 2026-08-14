@@ -30,7 +30,12 @@ export type ApplicationPublic = {
     | null;
   canApply: boolean;
   canApprove?: boolean;
-  bulletTraces: Array<{ text: string; chunkId: string; section: string }>;
+  bulletTraces: Array<{
+    text: string;
+    chunkId: string;
+    section: string;
+    status?: "accepted" | "rejected" | "pending";
+  }>;
   cvTemplate?: "modern" | "classic" | "minimal";
   clTemplate?: string;
   jobTitle?: string;
@@ -134,6 +139,64 @@ export async function setTemplateAction(
     if (!res.ok) {
       const body = (await res.json().catch(() => ({}))) as { error?: string };
       return { ok: false, error: body.error ?? "Template update failed" };
+    }
+    const data = (await res.json()) as { application: ApplicationPublic };
+    revalidatePath(`/applications/${id}/review`);
+    return { ok: true, data };
+  } catch {
+    return { ok: false, error: "Network error" };
+  }
+}
+
+export async function updateBulletsAction(
+  id: string,
+  traces: ApplicationPublic["bulletTraces"],
+): Promise<ActionResult<{ application: ApplicationPublic }>> {
+  const headers = await authHeaders();
+  if (!headers) return { ok: false, error: "Unauthorized" };
+  try {
+    const res = await fetch(`${API_URL}/api/v1/applications/${id}/bullets`, {
+      method: "PATCH",
+      headers: { ...headers, "content-type": "application/json" },
+      body: JSON.stringify({
+        traces: traces.map((t) => ({
+          text: t.text,
+          chunkId: t.chunkId,
+          section: t.section,
+          status: t.status ?? "pending",
+        })),
+      }),
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      return { ok: false, error: body.error ?? "Failed to update bullets" };
+    }
+    const data = (await res.json()) as { application: ApplicationPublic };
+    revalidatePath(`/applications/${id}/review`);
+    return { ok: true, data };
+  } catch {
+    return { ok: false, error: "Network error" };
+  }
+}
+
+export async function regenerateSectionAction(
+  id: string,
+  section: string,
+): Promise<ActionResult<{ application: ApplicationPublic }>> {
+  const headers = await authHeaders();
+  if (!headers) return { ok: false, error: "Unauthorized" };
+  try {
+    const res = await fetch(
+      `${API_URL}/api/v1/applications/${id}/regenerate-section`,
+      {
+        method: "POST",
+        headers: { ...headers, "content-type": "application/json" },
+        body: JSON.stringify({ section }),
+      },
+    );
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      return { ok: false, error: body.error ?? "Section regenerate failed" };
     }
     const data = (await res.json()) as { application: ApplicationPublic };
     revalidatePath(`/applications/${id}/review`);

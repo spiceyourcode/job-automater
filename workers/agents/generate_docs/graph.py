@@ -22,6 +22,8 @@ class DocsState(TypedDict, total=False):
     profile: dict[str, Any] | None
     cv_template: str
     cl_template: str
+    accepted_traces: list[dict[str, Any]]
+    regenerate_sections: list[str]
     draft: dict[str, Any]
     validated: dict[str, Any] | None
     error: str | None
@@ -34,6 +36,8 @@ def _generate_node(state: DocsState) -> dict[str, Any]:
         profile=state.get("profile"),
         cv_template=state.get("cv_template") or "modern",
         cl_template=state.get("cl_template") or "modern",
+        accepted_traces=state.get("accepted_traces") or [],
+        regenerate_sections=state.get("regenerate_sections") or [],
     )
     # Never log document bodies (HG-8)
     logger.info(
@@ -84,6 +88,8 @@ def run_generate_docs(
     profile: dict[str, Any] | None = None,
     cv_template: str = "modern",
     cl_template: str = "modern",
+    accepted_traces: list[dict[str, Any]] | None = None,
+    regenerate_sections: list[str] | None = None,
 ) -> dict[str, Any] | None:
     """Returns validated docs dict or None if HG-9 validation fails."""
     result = get_graph().invoke(
@@ -93,6 +99,8 @@ def run_generate_docs(
             "profile": profile,
             "cv_template": cv_template,
             "cl_template": cl_template,
+            "accepted_traces": accepted_traces or [],
+            "regenerate_sections": regenerate_sections or [],
         }
     )
     return result.get("validated")
