@@ -54,6 +54,7 @@ export function PipelineBoard({ initial }: Props) {
   const [interviewFor, setInterviewFor] = useState<string | null>(null);
   const [interviewStage, setInterviewStage] = useState("phone_screen");
   const [interviewWhen, setInterviewWhen] = useState("");
+  const [announce, setAnnounce] = useState("");
 
   const selectedIds = Object.entries(selected)
     .filter(([, v]) => v)
@@ -86,7 +87,11 @@ export function PipelineBoard({ initial }: Props) {
         setError(res.error);
         return;
       }
-      if (res.data?.application) applyUpdate(id, res.data.application);
+      if (res.data?.application) {
+        applyUpdate(id, res.data.application);
+        const label = COLUMNS.find((c) => c.id === stage)?.label ?? stage;
+        setAnnounce(`Moved application to ${label}`);
+      }
     });
   };
 
@@ -126,6 +131,9 @@ export function PipelineBoard({ initial }: Props) {
 
   return (
     <div className="space-y-4">
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {announce}
+      </div>
       {error && (
         <p className="text-sm text-destructive" role="alert">
           {error}
@@ -188,8 +196,9 @@ export function PipelineBoard({ initial }: Props) {
                   <label className="mb-2 flex items-start gap-2 text-sm">
                     <input
                       type="checkbox"
-                      className="mt-0.5 cursor-pointer"
+                      className="mt-0.5 min-h-4 min-w-4 cursor-pointer"
                       checked={Boolean(selected[app.id])}
+                      aria-label={`Select ${app.jobTitle ?? "application"} at ${app.jobCompany ?? ""}`}
                       onChange={(e) =>
                         setSelected((s) => ({
                           ...s,

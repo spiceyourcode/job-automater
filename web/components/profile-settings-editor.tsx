@@ -289,9 +289,10 @@ export function ProfileSettingsEditor({ profile }: { profile: ProfileRow }) {
                 variant="ghost"
                 size="icon"
                 className="cursor-pointer"
+                aria-label={`Remove role ${r.title || i + 1}`}
                 onClick={() => setRoles(roles.filter((_, j) => j !== i))}
               >
-                <Trash2 className="h-4 w-4" />
+                <Trash2 className="h-4 w-4" aria-hidden />
               </Button>
             </div>
           ))}
@@ -322,9 +323,10 @@ export function ProfileSettingsEditor({ profile }: { profile: ProfileRow }) {
                 variant="ghost"
                 size="icon"
                 className="cursor-pointer"
+                aria-label={`Remove location ${l.city || i + 1}`}
                 onClick={() => setLocations(locations.filter((_, j) => j !== i))}
               >
-                <Trash2 className="h-4 w-4" />
+                <Trash2 className="h-4 w-4" aria-hidden />
               </Button>
             </div>
           ))}

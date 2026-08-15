@@ -11,6 +11,7 @@ import {
   Settings,
   PanelLeftClose,
   PanelLeft,
+  Keyboard,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,9 @@ import { cn } from "@/lib/utils";
 import { logoutAction } from "@/lib/actions/auth";
 import { NotificationBell } from "@/components/notification-bell";
 import { RealtimeListener } from "@/components/realtime-listener";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
+import { MobileNav } from "@/components/mobile-nav";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -50,21 +54,30 @@ export function AppShell({
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-background focus:px-3 focus:py-2 focus:ring-2 focus:ring-ring"
+      >
+        Skip to main content
+      </a>
       <RealtimeListener />
+      <KeyboardShortcuts />
       <header className="sticky top-0 z-40 h-14 border-b bg-background/80 backdrop-blur-sm">
         <div className="flex h-full items-center gap-3 px-4">
+          <MobileNav items={NAV} />
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            className="cursor-pointer"
+            className="hidden cursor-pointer md:inline-flex"
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-expanded={!collapsed}
             onClick={() => setCollapsed((c) => !c)}
           >
             {collapsed ? (
-              <PanelLeft className="h-4 w-4" />
+              <PanelLeft className="h-4 w-4" aria-hidden />
             ) : (
-              <PanelLeftClose className="h-4 w-4" />
+              <PanelLeftClose className="h-4 w-4" aria-hidden />
             )}
           </Button>
           <Link
@@ -76,7 +89,10 @@ export function AppShell({
           {title ? (
             <span className="text-sm text-muted-foreground">/ {title}</span>
           ) : null}
-          <nav className="ml-auto hidden items-center gap-1 md:flex" aria-label="Primary">
+          <nav
+            className="ml-auto hidden items-center gap-1 md:flex"
+            aria-label="Primary"
+          >
             {NAV.map((item) => (
               <Button
                 key={item.href}
@@ -88,7 +104,21 @@ export function AppShell({
                 <Link href={item.href}>{item.label}</Link>
               </Button>
             ))}
+            <ThemeToggle />
             <NotificationBell />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="cursor-pointer"
+              aria-label="Keyboard shortcuts. Press question mark"
+              title="Keyboard shortcuts (?)"
+              onClick={() => {
+                window.dispatchEvent(new Event("jobautomater:shortcuts-help"));
+              }}
+            >
+              <Keyboard className="h-4 w-4" aria-hidden />
+            </Button>
             <form action={logoutAction}>
               <Button
                 type="submit"
@@ -101,6 +131,10 @@ export function AppShell({
               </Button>
             </form>
           </nav>
+          <div className="ml-auto flex items-center gap-1 md:hidden">
+            <ThemeToggle />
+            <NotificationBell />
+          </div>
         </div>
       </header>
 
@@ -112,7 +146,7 @@ export function AppShell({
           )}
           aria-label="Sidebar"
         >
-          <nav className="flex flex-col gap-1 p-2">
+          <nav className="flex flex-col gap-1 p-2" aria-label="Sidebar">
             {NAV.map((item) => {
               const Icon = item.icon;
               const active =
@@ -123,8 +157,10 @@ export function AppShell({
                 <Link
                   key={item.href}
                   href={item.href}
+                  aria-label={item.label}
+                  aria-current={active ? "page" : undefined}
                   className={cn(
-                    "flex items-center gap-2 rounded-md px-2 py-2 text-sm hover:bg-accent",
+                    "flex min-h-11 items-center gap-2 rounded-md px-2 py-2 text-sm hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring",
                     active && "bg-accent font-medium",
                     collapsed && "justify-center",
                   )}
@@ -141,8 +177,9 @@ export function AppShell({
                   <Link
                     key={s.href}
                     href={s.href}
+                    aria-current={pathname === s.href ? "page" : undefined}
                     className={cn(
-                      "block rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground",
+                      "block min-h-9 rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
                       pathname === s.href && "bg-accent text-foreground",
                     )}
                   >
@@ -154,7 +191,7 @@ export function AppShell({
           </nav>
         </aside>
 
-        <main className="flex-1 overflow-y-auto" id="main-content">
+        <main className="flex-1 overflow-y-auto" id="main-content" tabIndex={-1}>
           {children}
         </main>
       </div>

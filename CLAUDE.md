@@ -99,18 +99,18 @@ Full matrix + per-task AUTO SKILLS: **`AGENT-PROMPTS.md`**
 
 **Phase 11 — Comms & realtime** ✅ complete (P11.1–P11.6 — one commit each)
 
-**Phase 12 — Production launch** (next)
+**Phase 12 — Production launch** ✅ complete (P12.1–P12.4 — one commit each)
+
+**Phase 13 — Post-MVP** (next — only after local/staging validation)
 
 | Done | Task |
 |------|------|
-| ✓ | P12.1 CI + API rate limits |
-| ✓ | P12.2 Observability + OpenAPI |
-| ✓ | P12.3 Landing + runbooks |
-| | P12.4 A11y polish |
+| | P13.1 Interview prep agent |
+| | … see project-backlog.md |
 
-**Next:** **P12.4** — A11y polish
-Prompt: `AGENT-PROMPTS.md` → Phase 12 → P12.4
-Contract: `docs/contracts/phase-12-launch.md`
+**Next:** Local rigorous testing, then Phase 13 when ready.
+Prompt: `AGENT-PROMPTS.md` → Phase 13 (copy when kicking off)
+Backlog: `project-backlog.md`
 
 ---
 

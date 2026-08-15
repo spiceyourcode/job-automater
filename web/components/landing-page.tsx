@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 /**
  * Marketing landing — HG-1: no API keys or secrets in client bundle.
@@ -11,6 +12,7 @@ export function LandingPage() {
       <header className="absolute inset-x-0 top-0 z-20 flex items-center justify-between px-6 py-5 md:px-10">
         <p className="text-sm font-semibold tracking-tight">JobAutomater</p>
         <nav className="flex items-center gap-2" aria-label="Account">
+          <ThemeToggle />
           <Button asChild variant="ghost" size="sm" className="cursor-pointer">
             <Link href="/login">Log in</Link>
           </Button>
