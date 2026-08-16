@@ -109,6 +109,7 @@ Full matrix + per-task AUTO SKILLS: **`AGENT-PROMPTS.md`**
 | | … see project-backlog.md |
 
 **Next:** Local rigorous testing, then Phase 13 when ready.
+Recent smoke-test fixes (CV `parsed_text` extraction, generation failure UX, Windows Celery `solo`) are on `main` — re-upload/reindex CV before review regenerate.
 Prompt: `AGENT-PROMPTS.md` → Phase 13 (copy when kicking off)
 Backlog: `project-backlog.md`
 
