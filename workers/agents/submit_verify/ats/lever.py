@@ -58,7 +58,11 @@ def try_lever_submit(
         "name": name,
         "email": email,
         "resumeData": (application.get("tailored_cv_content") or "")[:50_000],
-        "comments": (application.get("cover_letter_content") or "")[:5_000],
+        "comments": (
+            application.get("cover_letter_text")
+            or application.get("cover_letter_content")
+            or ""
+        )[:5_000],
         "silent": True,
     }
 

@@ -13,8 +13,9 @@ import {
   users,
   userSessions,
 } from "../../db/schema/index.js";
-import { getPresignedGetUrl, uploadObject, deleteObject } from "../../lib/s3.js";
+import { getPresignedGetUrl, uploadObject, deleteObject, downloadObject } from "../../lib/s3.js";
 import { enqueueReindexCv } from "../../lib/queue.js";
+import { CvParseError, extractCvText } from "../../lib/cv-parse.js";
 import {
   ALLOWED_CV_EXTENSIONS,
   MAX_CV_BYTES,
@@ -26,7 +27,7 @@ import {
 export class ProfileError extends Error {
   constructor(
     message: string,
-    readonly statusCode: 400 | 403 | 404 | 413,
+    readonly statusCode: 400 | 403 | 404 | 413 | 422,
   ) {
     super(message);
     this.name = "ProfileError";
@@ -113,6 +114,20 @@ export async function uploadCv(
     throw new ProfileError("Invalid Content-Type for CV upload", 400);
   }
 
+  let parsedText: string;
+  try {
+    parsedText = await extractCvText({
+      data: file.data,
+      mimeType,
+      filename: file.filename,
+    });
+  } catch (err) {
+    if (err instanceof CvParseError) {
+      throw new ProfileError(err.message, 422);
+    }
+    throw err;
+  }
+
   const fileHash = createHash("sha256").update(file.data).digest("hex");
   const safeName = sanitizeFilename(file.filename);
   // UUID in key prevents S3 overwrite even under version races
@@ -157,6 +172,7 @@ export async function uploadCv(
           fileHash,
           fileSize: file.data.byteLength,
           mimeType,
+          parsedText,
           isActive: true,
         })
         .returning();
@@ -199,6 +215,24 @@ export async function uploadCv(
     throw err;
   }
 
+  const taskId = randomUUID();
+  try {
+    await enqueueReindexCv({
+      task_id: taskId,
+      user_id: userId,
+      cv_document_id: created!.id,
+    });
+  } catch {
+    // File + parsed text are saved; client can manually reindex
+    console.info(
+      JSON.stringify({
+        event: "cv_reindex_enqueue_failed",
+        userId,
+        cvDocumentId: created!.id,
+      }),
+    );
+  }
+
   const fileUrl = await getPresignedGetUrl(key);
 
   return {
@@ -213,7 +247,7 @@ export async function uploadCv(
       createdAt: created!.createdAt,
       // Intentionally omit parsedText / parsedSections (HG-8)
     },
-    taskId: null as string | null,
+    taskId,
   };
 }
 
@@ -374,21 +408,69 @@ export async function deleteCvVersion(userId: string, version: number) {
 }
 
 export async function reindexCv(userId: string, body: ReindexCvBody) {
-  let doc;
+  let doc: {
+    id: string;
+    version: number;
+    fileUrl: string;
+    mimeType?: string | null;
+    originalFilename?: string | null;
+    parsedText?: string | null;
+  };
   if (body.version != null) {
-    doc = await getCvByVersion(userId, body.version);
+    const full = await getCvByVersion(userId, body.version);
+    const [row] = await db
+      .select({
+        id: cvDocuments.id,
+        version: cvDocuments.version,
+        fileUrl: cvDocuments.fileUrl,
+        mimeType: cvDocuments.mimeType,
+        originalFilename: cvDocuments.originalFilename,
+        parsedText: cvDocuments.parsedText,
+      })
+      .from(cvDocuments)
+      .where(eq(cvDocuments.id, full.id))
+      .limit(1);
+    if (!row) throw new ProfileError("CV not found", 404);
+    doc = row;
   } else {
     const [active] = await db
       .select({
         id: cvDocuments.id,
         version: cvDocuments.version,
         fileUrl: cvDocuments.fileUrl,
+        mimeType: cvDocuments.mimeType,
+        originalFilename: cvDocuments.originalFilename,
+        parsedText: cvDocuments.parsedText,
       })
       .from(cvDocuments)
       .where(and(eq(cvDocuments.userId, userId), eq(cvDocuments.isActive, true)))
       .limit(1);
     if (!active) throw new ProfileError("No active CV to reindex", 404);
     doc = active;
+  }
+
+  // Backfill parsed_text for older uploads that never ran extraction
+  if (!doc.parsedText?.trim()) {
+    try {
+      const bytes = await downloadObject(doc.fileUrl);
+      const text = await extractCvText({
+        data: bytes,
+        mimeType: doc.mimeType || "application/pdf",
+        filename: doc.originalFilename || "cv.pdf",
+      });
+      await db
+        .update(cvDocuments)
+        .set({ parsedText: text })
+        .where(eq(cvDocuments.id, doc.id));
+    } catch (err) {
+      if (err instanceof CvParseError) {
+        throw new ProfileError(err.message, 422);
+      }
+      throw new ProfileError(
+        "Could not re-parse CV from storage — re-upload as PDF or DOCX",
+        422,
+      );
+    }
   }
 
   const taskId = randomUUID();

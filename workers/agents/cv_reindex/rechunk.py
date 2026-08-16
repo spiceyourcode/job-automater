@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 def split_paragraphs(text: str) -> list[str]:
@@ -37,6 +40,21 @@ def reindex_document(conn: Any, user_id: str, cv_document_id: str) -> dict[str, 
 
         parsed = doc.get("parsed_text") or ""
         paragraphs = split_paragraphs(parsed)
+        if not paragraphs:
+            logger.warning(
+                "reindex_cv_empty_parsed_text cv_document_id=%s",
+                cv_document_id,
+            )
+            cur.execute(
+                """
+                UPDATE cv_documents
+                SET chunk_count = 0, last_chunked_at = NOW()
+                WHERE id = %s::uuid AND user_id = %s::uuid
+                """,
+                (cv_document_id, user_id),
+            )
+            return {"status": "error", "error": "empty_parsed_text", "chunk_count": 0}
+
         for idx, content in enumerate(paragraphs):
             cur.execute(
                 """

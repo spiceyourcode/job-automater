@@ -89,6 +89,7 @@ def test_process_never_saves_on_grounding_failure():
         patch("tasks.generate_docs.load_profile_for_user", return_value={}),
         patch("tasks.generate_docs.run_generate_docs", return_value=None),
         patch("tasks.generate_docs.save_application_documents") as save,
+        patch("tasks.generate_docs.mark_application_generation_failed") as mark_fail,
     ):
         result = process_generate_docs(
             {
@@ -99,7 +100,46 @@ def test_process_never_saves_on_grounding_failure():
         )
 
     assert result["status"] == "error"
+    assert result["error"] == "grounding_failed"
     save.assert_not_called()
+    mark_fail.assert_called_once()
+
+
+def test_process_marks_failed_when_no_chunks():
+    user_id = "22222222-2222-2222-2222-222222222222"
+    app_id = "11111111-1111-1111-1111-111111111111"
+    job_id = "33333333-3333-3333-3333-333333333333"
+    mock_conn = MagicMock()
+    mock_cm = MagicMock()
+    mock_cm.__enter__.return_value = mock_conn
+    mock_cm.__exit__.return_value = False
+
+    with (
+        patch("tasks.generate_docs.connect", return_value=mock_cm),
+        patch(
+            "tasks.generate_docs.load_application",
+            return_value={"id": app_id, "job_id": job_id, "user_id": user_id},
+        ),
+        patch("tasks.generate_docs.load_job_for_user", return_value=JOB),
+        patch("tasks.generate_docs.load_cv_chunks_for_user", return_value=[]),
+        patch("tasks.generate_docs.mark_application_generation_failed") as mark_fail,
+        patch("tasks.generate_docs.save_application_documents") as save,
+    ):
+        result = process_generate_docs(
+            {
+                "application_id": app_id,
+                "user_id": user_id,
+                "job_id": job_id,
+            }
+        )
+
+    assert result == {
+        "status": "error",
+        "error": "no_cv_chunks",
+        "duration_ms": result["duration_ms"],
+    }
+    save.assert_not_called()
+    mark_fail.assert_called_once()
 
 
 def test_process_saves_draft_when_grounded():

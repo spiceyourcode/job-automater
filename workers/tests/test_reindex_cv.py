@@ -37,6 +37,25 @@ def test_reindex_document_deletes_then_inserts():
     assert sum(1 for sql in executed if "INSERT INTO cv_chunks" in sql) == 2
 
 
+def test_reindex_document_empty_parsed_text():
+    conn = MagicMock()
+    cur = MagicMock()
+    conn.cursor.return_value.__enter__.return_value = cur
+    cur.fetchone.return_value = {
+        "id": "cv-1",
+        "user_id": "u-1",
+        "parsed_text": "",
+        "chunk_count": 0,
+    }
+
+    result = reindex_document(conn, "u-1", "cv-1")
+    assert result["status"] == "error"
+    assert result["error"] == "empty_parsed_text"
+    assert result["chunk_count"] == 0
+    executed = [call.args[0] for call in cur.execute.call_args_list]
+    assert not any("INSERT INTO cv_chunks" in sql for sql in executed)
+
+
 def test_reindex_document_missing():
     conn = MagicMock()
     cur = MagicMock()

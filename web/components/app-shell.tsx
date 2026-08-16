@@ -89,28 +89,30 @@ export function AppShell({
           {title ? (
             <span className="text-sm text-muted-foreground">/ {title}</span>
           ) : null}
-          <nav
-            className="ml-auto hidden items-center gap-1 md:flex"
-            aria-label="Primary"
-          >
-            {NAV.map((item) => (
-              <Button
-                key={item.href}
-                asChild
-                variant="ghost"
-                size="sm"
-                className="cursor-pointer"
-              >
-                <Link href={item.href}>{item.label}</Link>
-              </Button>
-            ))}
+          <div className="ml-auto flex items-center gap-1">
+            <nav
+              className="hidden items-center gap-1 md:flex"
+              aria-label="Primary"
+            >
+              {NAV.map((item) => (
+                <Button
+                  key={item.href}
+                  asChild
+                  variant="ghost"
+                  size="sm"
+                  className="cursor-pointer"
+                >
+                  <Link href={item.href}>{item.label}</Link>
+                </Button>
+              ))}
+            </nav>
             <ThemeToggle />
             <NotificationBell />
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              className="cursor-pointer"
+              className="hidden cursor-pointer md:inline-flex"
               aria-label="Keyboard shortcuts. Press question mark"
               title="Keyboard shortcuts (?)"
               onClick={() => {
@@ -119,7 +121,7 @@ export function AppShell({
             >
               <Keyboard className="h-4 w-4" aria-hidden />
             </Button>
-            <form action={logoutAction}>
+            <form action={logoutAction} className="hidden md:block">
               <Button
                 type="submit"
                 variant="ghost"
@@ -130,10 +132,6 @@ export function AppShell({
                 Sign out
               </Button>
             </form>
-          </nav>
-          <div className="ml-auto flex items-center gap-1 md:hidden">
-            <ThemeToggle />
-            <NotificationBell />
           </div>
         </div>
       </header>

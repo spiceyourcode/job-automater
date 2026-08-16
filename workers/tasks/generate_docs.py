@@ -16,6 +16,7 @@ from db import (
     load_cv_chunks_for_user,
     load_job_for_user,
     load_profile_for_user,
+    mark_application_generation_failed,
     save_application_documents,
 )
 
@@ -32,6 +33,38 @@ class GenerateDocsJob(BaseModel):
     model_config = {"extra": "forbid"}
 
 
+def _fail(
+    conn: Any,
+    *,
+    job: GenerateDocsJob,
+    error: str,
+    started: float,
+) -> dict[str, Any]:
+    duration_ms = int((time.perf_counter() - started) * 1000)
+    mark_application_generation_failed(
+        conn,
+        application_id=job.application_id,
+        user_id=job.user_id,
+        error_code=error,
+        duration_ms=duration_ms,
+    )
+    try:
+        from tasks.realtime import publish_event
+
+        publish_event(
+            job.user_id,
+            {
+                "type": "documents_ready",
+                "application_id": job.application_id,
+                "status": "error",
+                "error": error,
+            },
+        )
+    except Exception:  # noqa: BLE001
+        pass
+    return {"status": "error", "error": error, "duration_ms": duration_ms}
+
+
 def process_generate_docs(payload: dict[str, Any]) -> dict[str, Any]:
     started = time.perf_counter()
     job = GenerateDocsJob.model_validate(payload)
@@ -44,16 +77,16 @@ def process_generate_docs(payload: dict[str, Any]) -> dict[str, Any]:
             logger.warning("generate_docs_missing_app")
             return {"status": "error", "error": "application_not_found"}
         if str(app_row["job_id"]) != job.job_id:
-            return {"status": "error", "error": "job_mismatch"}
+            return _fail(conn, job=job, error="job_mismatch", started=started)
 
         job_row = load_job_for_user(conn, job_id=job.job_id, user_id=job.user_id)
         if job_row is None:
-            return {"status": "error", "error": "job_not_found"}
+            return _fail(conn, job=job, error="job_not_found", started=started)
 
         chunks = load_cv_chunks_for_user(conn, job.user_id)
         if not chunks:
             logger.warning("generate_docs_no_chunks")
-            return {"status": "error", "error": "no_cv_chunks"}
+            return _fail(conn, job=job, error="no_cv_chunks", started=started)
 
         profile = load_profile_for_user(conn, job.user_id)
         cv_template = str(app_row.get("cv_template") or "modern")
@@ -69,7 +102,8 @@ def process_generate_docs(payload: dict[str, Any]) -> dict[str, Any]:
         )
         if validated is None:
             # HG-9: never persist ungrounded docs
-            return {"status": "error", "error": "grounding_failed"}
+            logger.warning("generate_docs_grounding_failed")
+            return _fail(conn, job=job, error="grounding_failed", started=started)
 
         duration_ms = int((time.perf_counter() - started) * 1000)
         save_application_documents(
@@ -97,6 +131,7 @@ def process_generate_docs(payload: dict[str, Any]) -> dict[str, Any]:
                 {
                     "type": "documents_ready",
                     "application_id": job.application_id,
+                    "status": "ok",
                 },
             )
         except Exception:  # noqa: BLE001

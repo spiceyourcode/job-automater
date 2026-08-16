@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -33,6 +34,33 @@ type Props = {
   };
 };
 
+const GEN_ERROR_HELP: Record<string, { title: string; body: string }> = {
+  no_cv_chunks: {
+    title: "No indexed CV chunks",
+    body: "Document generation needs searchable pieces of your CV. Upload a CV (or re-index) under Settings → CV & Documents, wait until indexing finishes, then regenerate.",
+  },
+  grounding_failed: {
+    title: "Grounding check failed",
+    body: "Draft text could not be verified against your CV (HG-9). Try regenerate. If it keeps failing, re-upload your CV.",
+  },
+  job_not_found: {
+    title: "Job missing",
+    body: "The linked job could not be loaded. Return to the dashboard and open the match again.",
+  },
+  job_mismatch: {
+    title: "Job mismatch",
+    body: "This application no longer matches its job. Create a new application from the job card.",
+  },
+};
+
+function generationStage(elapsedSec: number): string {
+  if (elapsedSec < 4) return "Queued for the document worker";
+  if (elapsedSec < 12) return "Reading your indexed CV chunks";
+  if (elapsedSec < 30) return "Drafting tailored CV and cover letter";
+  if (elapsedSec < 60) return "Validating every bullet against your CV (HG-9)";
+  return "Still working — large CVs or a busy worker can take a minute";
+}
+
 export function DocumentReviewPanel({ applicationId, initial }: Props) {
   const router = useRouter();
   const [app, setApp] = useState(initial.application);
@@ -43,30 +71,58 @@ export function DocumentReviewPanel({ applicationId, initial }: Props) {
   );
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-
-  // Poll until documents arrive
-  useEffect(() => {
-    if (app.tailoredCvContent && app.coverLetterContent) return;
-    const t = setInterval(() => {
-      startTransition(async () => {
-        const res = await getApplicationAction(applicationId);
-        if (res.ok && res.data?.application) {
-          setApp(res.data.application);
-          if (res.data.application.cvTemplate) {
-            setTemplate(
-              res.data.application.cvTemplate as
-                | "modern"
-                | "classic"
-                | "minimal",
-            );
-          }
-        }
-      });
-    }, 2000);
-    return () => clearInterval(t);
-  }, [applicationId, app.tailoredCvContent, app.coverLetterContent]);
+  const [elapsedSec, setElapsedSec] = useState(0);
 
   const ready = Boolean(app.tailoredCvContent && app.coverLetterContent);
+  const genError = app.generationError ?? null;
+  const failed =
+    Boolean(genError) || app.documentsStatus === "failed" || Boolean(
+      app.generationModel?.startsWith("error:"),
+    );
+  const generating = !ready && !failed;
+
+  const refreshApp = async () => {
+    try {
+      const res = await getApplicationAction(applicationId);
+      if (res.ok && res.data?.application) {
+        setApp(res.data.application);
+        if (res.data.application.cvTemplate) {
+          setTemplate(
+            res.data.application.cvTemplate as "modern" | "classic" | "minimal",
+          );
+        }
+      }
+    } catch {
+      // ignore transport errors while polling
+    }
+  };
+
+  // Poll until documents arrive or generation fails
+  useEffect(() => {
+    if (!generating) return;
+    void refreshApp();
+    const t = setInterval(() => void refreshApp(), 2000);
+    const onReady = () => void refreshApp();
+    window.addEventListener("jobautomater:documents", onReady);
+    return () => {
+      clearInterval(t);
+      window.removeEventListener("jobautomater:documents", onReady);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applicationId, generating]);
+
+  useEffect(() => {
+    if (!generating) {
+      setElapsedSec(0);
+      return;
+    }
+    const started = Date.now();
+    const t = setInterval(() => {
+      setElapsedSec(Math.floor((Date.now() - started) / 1000));
+    }, 1000);
+    return () => clearInterval(t);
+  }, [generating, applicationId, app.updatedAt]);
+
   const reviewed = Boolean(app.documentsReviewedAt);
   const canApprove = Boolean(app.canApprove ?? app.canApply);
   const approved = Boolean(app.approvedAt) || app.status === "approved";
@@ -75,6 +131,17 @@ export function DocumentReviewPanel({ applicationId, initial }: Props) {
     (t) => !t.status || t.status === "pending",
   ).length;
   const sections = Array.from(new Set(traces.map((t) => t.section)));
+  const errorCode =
+    genError ||
+    (app.generationModel?.startsWith("error:")
+      ? app.generationModel.slice("error:".length)
+      : null);
+  const errorHelp = errorCode
+    ? GEN_ERROR_HELP[errorCode] ?? {
+        title: "Document generation failed",
+        body: `Worker reported: ${errorCode}. Fix the issue, then regenerate.`,
+      }
+    : null;
 
   const setBulletStatus = (
     index: number,
@@ -91,6 +158,21 @@ export function DocumentReviewPanel({ applicationId, initial }: Props) {
     });
   };
 
+  const markLocalPending = () => {
+    setApp((a) => ({
+      ...a,
+      tailoredCvContent: null,
+      coverLetterContent: null,
+      documentsReviewedAt: null,
+      canApply: false,
+      canApprove: false,
+      generationError: null,
+      documentsStatus: "pending",
+      generationModel: "pending",
+    }));
+    setElapsedSec(0);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -98,23 +180,26 @@ export function DocumentReviewPanel({ applicationId, initial }: Props) {
           <h1 className="text-2xl font-semibold tracking-tight">
             Review documents
           </h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground" aria-live="polite">
             {job
               ? `${job.title} at ${job.company}`
               : "Application draft"}{" "}
             · Status: {app.status}
-            {!ready && " · Generating…"}
+            {generating && " · Generating…"}
+            {failed && " · Generation failed"}
+            {ready && " · Ready for review"}
           </p>
         </div>
         <div className="w-full space-y-1.5 sm:w-48">
           <Label htmlFor="cv-template">Template</Label>
           <Select
             value={template}
-            disabled={pending}
+            disabled={pending || generating}
             onValueChange={(v) => {
               const next = v as "modern" | "classic" | "minimal";
               setTemplate(next);
               setError(null);
+              markLocalPending();
               startTransition(async () => {
                 const res = await setTemplateAction(applicationId, next, next);
                 if (!res.ok) {
@@ -131,6 +216,9 @@ export function DocumentReviewPanel({ applicationId, initial }: Props) {
                   canApprove: false,
                   cvTemplate: next,
                   clTemplate: next,
+                  documentsStatus: "pending",
+                  generationModel: "pending",
+                  generationError: null,
                 }));
               });
             }}
@@ -153,12 +241,89 @@ export function DocumentReviewPanel({ applicationId, initial }: Props) {
         </p>
       )}
 
-      {!ready ? (
-        <p className="rounded-md border bg-muted/40 p-4 text-sm text-muted-foreground">
-          Tailoring your CV and cover letter from your CV chunks ({template}{" "}
-          template). This page refreshes automatically.
-        </p>
-      ) : (
+      {failed && errorHelp ? (
+        <div
+          className="space-y-3 rounded-md border border-destructive/40 bg-destructive/5 p-4"
+          role="alert"
+        >
+          <p className="text-sm font-medium text-destructive">{errorHelp.title}</p>
+          <p className="text-sm text-muted-foreground">{errorHelp.body}</p>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline" className="cursor-pointer">
+              <Link href="/settings/cv">Open CV & Documents</Link>
+            </Button>
+            <Button
+              type="button"
+              className="cursor-pointer"
+              disabled={pending}
+              onClick={() => {
+                setError(null);
+                markLocalPending();
+                startTransition(async () => {
+                  const res = await regenerateApplicationAction(applicationId);
+                  if (!res.ok) setError(res.error);
+                });
+              }}
+            >
+              Regenerate
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      {generating ? (
+        <div className="space-y-4">
+          <div
+            className="rounded-md border bg-muted/40 p-4"
+            aria-live="polite"
+            aria-busy="true"
+          >
+            <p className="text-sm font-medium">
+              Tailoring your CV and cover letter ({template} template)
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {generationStage(elapsedSec)}
+              {elapsedSec > 0 ? ` · ${elapsedSec}s` : null}
+            </p>
+            <ol className="mt-3 space-y-1 text-xs text-muted-foreground">
+              <li>{elapsedSec >= 0 ? "✓" : "·"} Queue worker</li>
+              <li>{elapsedSec >= 4 ? "✓" : "·"} Load CV chunks</li>
+              <li>{elapsedSec >= 12 ? "✓" : "·"} Draft CV + cover letter</li>
+              <li>{elapsedSec >= 30 ? "✓" : "·"} Grounding validation</li>
+            </ol>
+            {elapsedSec >= 45 ? (
+              <p className="mt-3 text-xs text-muted-foreground">
+                Taking longer than usual? Confirm your CV is indexed under{" "}
+                <Link href="/settings/cv" className="underline">
+                  Settings → CV & Documents
+                </Link>
+                .
+              </p>
+            ) : null}
+          </div>
+          <div className="grid gap-4 md:grid-cols-2" aria-hidden>
+            <div className="rounded-lg border p-4">
+              <p className="mb-2 text-sm font-medium">Tailored CV (preview)</p>
+              <div className="space-y-2">
+                <div className="h-3 w-3/4 animate-pulse rounded bg-muted" />
+                <div className="h-3 w-full animate-pulse rounded bg-muted" />
+                <div className="h-3 w-[83%] animate-pulse rounded bg-muted" />
+                <div className="h-3 w-2/3 animate-pulse rounded bg-muted" />
+              </div>
+            </div>
+            <div className="rounded-lg border p-4">
+              <p className="mb-2 text-sm font-medium">Cover letter (preview)</p>
+              <div className="space-y-2">
+                <div className="h-3 w-1/2 animate-pulse rounded bg-muted" />
+                <div className="h-3 w-full animate-pulse rounded bg-muted" />
+                <div className="h-3 w-[80%] animate-pulse rounded bg-muted" />
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {ready ? (
         <div className="grid gap-4 md:grid-cols-2">
           <section
             aria-labelledby="orig-cv-heading"
@@ -201,7 +366,9 @@ export function DocumentReviewPanel({ applicationId, initial }: Props) {
                         <Button
                           type="button"
                           size="icon"
-                          variant={status === "rejected" ? "destructive" : "outline"}
+                          variant={
+                            status === "rejected" ? "destructive" : "outline"
+                          }
                           className="h-8 w-8 cursor-pointer"
                           disabled={pending}
                           aria-label="Reject bullet"
@@ -226,6 +393,7 @@ export function DocumentReviewPanel({ applicationId, initial }: Props) {
                     className="cursor-pointer"
                     disabled={pending}
                     onClick={() => {
+                      markLocalPending();
                       startTransition(async () => {
                         const res = await regenerateSectionAction(
                           applicationId,
@@ -240,6 +408,9 @@ export function DocumentReviewPanel({ applicationId, initial }: Props) {
                             coverLetterContent: null,
                             documentsReviewedAt: null,
                             canApply: false,
+                            documentsStatus: "pending",
+                            generationModel: "pending",
+                            generationError: null,
                           }));
                         }
                       });
@@ -279,7 +450,7 @@ export function DocumentReviewPanel({ applicationId, initial }: Props) {
             </div>
           </section>
         </div>
-      )}
+      ) : null}
 
       <Separator />
 
@@ -288,20 +459,13 @@ export function DocumentReviewPanel({ applicationId, initial }: Props) {
           type="button"
           variant="outline"
           className="cursor-pointer"
-          disabled={!ready || pending}
+          disabled={(!ready && !failed) || pending}
           onClick={() => {
+            setError(null);
+            markLocalPending();
             startTransition(async () => {
               const res = await regenerateApplicationAction(applicationId);
               if (!res.ok) setError(res.error);
-              else {
-                setApp((a) => ({
-                  ...a,
-                  tailoredCvContent: null,
-                  coverLetterContent: null,
-                  documentsReviewedAt: null,
-                  canApply: false,
-                }));
-              }
             });
           }}
         >

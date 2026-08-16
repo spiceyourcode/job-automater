@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Bell } from "lucide-react";
 import {
   listNotificationsAction,
@@ -14,29 +14,42 @@ export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [unread, setUnread] = useState(0);
-  const [pending, startTransition] = useTransition();
+  const [pending, setPending] = useState(false);
 
-  const load = () => {
-    startTransition(async () => {
+  const load = useCallback(async () => {
+    try {
       const res = await listNotificationsAction();
       if (res.ok && res.data) {
-        setItems(res.data.notifications);
-        setUnread(res.data.unreadCount);
+        setItems(res.data.notifications ?? []);
+        setUnread(res.data.unreadCount ?? 0);
       }
-    });
-  };
+    } catch {
+      // Server-action transport errors must not crash the shell
+    }
+  }, []);
 
   useEffect(() => {
-    load();
-    const t = setInterval(load, 60_000);
-    const onRealtime = () => load();
+    void load();
+    const t = setInterval(() => void load(), 60_000);
+    const onRealtime = () => void load();
     window.addEventListener("jobautomater:notification", onRealtime);
     return () => {
       clearInterval(t);
       window.removeEventListener("jobautomater:notification", onRealtime);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [load]);
+
+  const run = async (fn: () => Promise<unknown>) => {
+    setPending(true);
+    try {
+      await fn();
+      await load();
+    } catch {
+      // ignore
+    } finally {
+      setPending(false);
+    }
+  };
 
   return (
     <div className="relative">
@@ -48,10 +61,10 @@ export function NotificationBell() {
         aria-label={`Notifications${unread ? `, ${unread} unread` : ""}`}
         onClick={() => {
           setOpen((o) => !o);
-          if (!open) load();
+          if (!open) void load();
         }}
       >
-        <Bell className="h-4 w-4" />
+        <Bell className="h-4 w-4" aria-hidden />
         {unread > 0 ? (
           <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-destructive" />
         ) : null}
@@ -70,12 +83,7 @@ export function NotificationBell() {
               size="sm"
               className="h-7 cursor-pointer text-xs"
               disabled={pending || unread === 0}
-              onClick={() => {
-                startTransition(async () => {
-                  await markAllNotificationsReadAction();
-                  load();
-                });
-              }}
+              onClick={() => void run(() => markAllNotificationsReadAction())}
             >
               Mark all read
             </Button>
@@ -91,12 +99,11 @@ export function NotificationBell() {
                   <button
                     type="button"
                     className="w-full cursor-pointer rounded-md px-2 py-2 text-left hover:bg-accent"
-                    onClick={() => {
-                      startTransition(async () => {
+                    onClick={() =>
+                      void run(async () => {
                         if (!n.isRead) await markNotificationReadAction(n.id);
-                        load();
-                      });
-                    }}
+                      })
+                    }
                   >
                     <p className="text-sm font-medium leading-snug">{n.title}</p>
                     {n.message ? (

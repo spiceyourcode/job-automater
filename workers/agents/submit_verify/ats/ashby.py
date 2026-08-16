@@ -68,7 +68,11 @@ def try_ashby_submit(
             "name": name,
             "email": email,
             "resumeText": (application.get("tailored_cv_content") or "")[:50_000],
-            "coverLetter": (application.get("cover_letter_content") or "")[:5_000],
+            "coverLetter": (
+                application.get("cover_letter_text")
+                or application.get("cover_letter_content")
+                or ""
+            )[:5_000],
         },
     }
 

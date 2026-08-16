@@ -21,6 +21,10 @@ export type ApplicationPublic = {
   submittedAt?: string | null;
   submittedVia?: string | null;
   submitError?: string | null;
+  generationModel?: string | null;
+  generationError?: string | null;
+  documentsStatus?: "ready" | "failed" | "pending" | "idle";
+  generationDurationMs?: number | null;
   pipelineStage?:
     | "applied"
     | "screening"

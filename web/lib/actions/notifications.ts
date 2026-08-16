@@ -36,11 +36,18 @@ export async function listNotificationsAction(): Promise<
       cache: "no-store",
     });
     if (!res.ok) return { ok: false, error: "Failed to load notifications" };
+    const body = (await res.json()) as {
+      notifications?: NotificationItem[];
+      unreadCount?: number;
+    };
     return {
       ok: true,
-      data: (await res.json()) as {
-        notifications: NotificationItem[];
-        unreadCount: number;
+      data: {
+        notifications: Array.isArray(body.notifications)
+          ? body.notifications
+          : [],
+        unreadCount:
+          typeof body.unreadCount === "number" ? body.unreadCount : 0,
       },
     };
   } catch {

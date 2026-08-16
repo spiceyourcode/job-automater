@@ -18,12 +18,14 @@ A user can never read or write another user's profile or CV.
 
 ## CV upload
 
-- Allowed: `.pdf`, `.docx`, `.doc` (MIME inferred from extension if omitted)
+- Allowed: `.pdf`, `.docx` (legacy `.doc` rejected at parse time)
 - Max size: 10 MB
+- Text extracted on upload (`pdf-parse` / `mammoth`) into `parsed_text`, then Celery `reindex_cv` builds `cv_chunks`
+- Reindex backfills `parsed_text` from MinIO when missing (older uploads)
 - Stored at `cvs/{userId}/{uuid}/{filename}` in MinIO (UUID key avoids overwrite races)
 - Version allocated under Postgres advisory lock per user
 - DB stores object key; API responses return time-limited presigned GET URLs
-- Metadata logged only (filename, size, mime) — never file body (HG-8)
+- Metadata logged only (filename, size, mime) — never file body or parsed text (HG-8)
 - Salary fields remain integer cents (HG-3); partial PATCH merges against stored min/max
 
 ## GDPR (P6.2)

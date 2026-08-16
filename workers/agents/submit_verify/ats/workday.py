@@ -69,7 +69,11 @@ def try_workday_submit(
             "lastName": last or (name.split(" ")[-1] if " " in name else "Applicant"),
         },
         "resumeText": (application.get("tailored_cv_content") or "")[:50_000],
-        "coverLetterText": (application.get("cover_letter_content") or "")[:5_000],
+        "coverLetterText": (
+            application.get("cover_letter_text")
+            or application.get("cover_letter_content")
+            or ""
+        )[:5_000],
     }
 
     own_client = client is None

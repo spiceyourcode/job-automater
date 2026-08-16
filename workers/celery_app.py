@@ -1,4 +1,6 @@
 """Celery application — configure once, import everywhere."""
+import sys
+
 from celery import Celery
 from celery.schedules import crontab
 
@@ -23,19 +25,25 @@ app = Celery(
     ],
 )
 
-app.conf.update(
-    task_serializer="json",
-    accept_content=["json"],
-    result_serializer="json",
-    timezone="UTC",
-    enable_utc=True,
-    task_track_started=True,
-    worker_prefetch_multiplier=1,
-    task_acks_late=True,
-    beat_schedule={
+# Prefork/billiard on Windows hits WinError 6 (invalid handle) and drops tasks.
+_conf: dict = {
+    "task_serializer": "json",
+    "accept_content": ["json"],
+    "result_serializer": "json",
+    "timezone": "UTC",
+    "enable_utc": True,
+    "task_track_started": True,
+    "worker_prefetch_multiplier": 1,
+    "task_acks_late": True,
+    "beat_schedule": {
         "weekly-digest-hourly": {
             "task": "tasks.weekly_digest",
             "schedule": crontab(minute=5),
         },
     },
-)
+}
+if sys.platform == "win32":
+    _conf["worker_pool"] = "solo"
+    _conf["worker_concurrency"] = 1
+
+app.conf.update(**_conf)

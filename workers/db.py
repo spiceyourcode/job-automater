@@ -544,7 +544,7 @@ def save_application_documents(
             """
             UPDATE applications SET
                 tailored_cv_content = %s,
-                cover_letter_content = %s,
+                cover_letter_text = %s,
                 bullet_traces = %s::jsonb,
                 generation_model = %s,
                 generation_duration_ms = %s,
@@ -562,6 +562,34 @@ def save_application_documents(
                 application_id,
                 user_id,
             ),
+        )
+
+
+def mark_application_generation_failed(
+    conn: psycopg.Connection,
+    *,
+    application_id: str,
+    user_id: str,
+    error_code: str,
+    duration_ms: int | None = None,
+) -> None:
+    """Persist a short error code so the review UI can stop polling (HG-8: no PII)."""
+    code = "".join(c for c in error_code if c.isalnum() or c in "_-:")[:40]
+    model = f"error:{code}"[:50]
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE applications SET
+                tailored_cv_content = NULL,
+                cover_letter_text = NULL,
+                bullet_traces = '[]'::jsonb,
+                generation_model = %s,
+                generation_duration_ms = %s,
+                documents_reviewed_at = NULL,
+                updated_at = NOW()
+            WHERE id = %s::uuid AND user_id = %s::uuid
+            """,
+            (model, duration_ms, application_id, user_id),
         )
 
 

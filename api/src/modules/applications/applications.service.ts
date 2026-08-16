@@ -79,6 +79,16 @@ function toPublic(app: Application) {
     reviewed &&
     APPROVABLE_STATUSES.has(app.status) &&
     Boolean(app.tailoredCvContent && app.coverLetterContent);
+  const model = app.generationModel ?? null;
+  const generationError =
+    model?.startsWith("error:") ? model.slice("error:".length) : null;
+  const documentsStatus = app.tailoredCvContent && app.coverLetterContent
+    ? ("ready" as const)
+    : generationError
+      ? ("failed" as const)
+      : model === "pending"
+        ? ("pending" as const)
+        : ("idle" as const);
   return {
     id: app.id,
     jobId: app.jobId,
@@ -96,6 +106,9 @@ function toPublic(app: Application) {
     submitError: app.submitError,
     pipelineStage: statusToStage(app.status),
     generationModel: app.generationModel,
+    generationError,
+    documentsStatus,
+    generationDurationMs: app.generationDurationMs,
     cvTemplate: app.cvTemplate,
     clTemplate: app.clTemplate,
     userNotes: app.userNotes,
@@ -201,6 +214,8 @@ export async function createApplication(
         tailoredCvContent: null,
         coverLetterContent: null,
         bulletTraces: [],
+        generationModel: "pending",
+        generationDurationMs: null,
         updatedAt: new Date(),
       })
       .where(eq(applications.id, existing.id))
@@ -215,6 +230,7 @@ export async function createApplication(
         jobId: body.jobId,
         cvVersion: profile?.cvVersion ?? 1,
         status: "draft",
+        generationModel: "pending",
       })
       .returning();
     if (!created) throw new ApplicationError("Failed to create application", 400);
@@ -325,6 +341,8 @@ export async function regenerateDocuments(userId: string, id: string) {
       tailoredCvContent: null,
       coverLetterContent: null,
       bulletTraces: [],
+      generationModel: "pending",
+      generationDurationMs: null,
       status: "draft",
       updatedAt: new Date(),
     })
@@ -364,6 +382,8 @@ export async function setApplicationTemplate(
       tailoredCvContent: null,
       coverLetterContent: null,
       bulletTraces: [],
+      generationModel: "pending",
+      generationDurationMs: null,
       status: "draft",
       updatedAt: new Date(),
     })
@@ -449,6 +469,8 @@ export async function regenerateSection(
       approvedAt: null,
       tailoredCvContent: null,
       coverLetterContent: null,
+      generationModel: "pending",
+      generationDurationMs: null,
       status: "draft",
       updatedAt: new Date(),
     })

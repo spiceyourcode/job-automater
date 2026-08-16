@@ -63,6 +63,16 @@ export async function deleteObject(key: string): Promise<void> {
   );
 }
 
+/** Download object bytes by key — never logs body (HG-8). */
+export async function downloadObject(key: string): Promise<Buffer> {
+  const res = await s3.send(
+    new GetObjectCommand({ Bucket: env.s3Bucket, Key: key }),
+  );
+  const bytes = await res.Body?.transformToByteArray();
+  if (!bytes) throw new Error("Empty S3 object");
+  return Buffer.from(bytes);
+}
+
 /** Time-limited download URL for a private object (default 1 hour). */
 export async function getPresignedGetUrl(
   key: string,
