@@ -56,7 +56,10 @@ def _google_embed(texts: list[str], timeout: float) -> list[list[float]]:
         for text in texts:
             res = client.post(
                 url,
-                params={"key": settings.google_api_key},
+                headers={
+                    "content-type": "application/json",
+                    "x-goog-api-key": settings.google_api_key,
+                },
                 json={
                     "content": {"parts": [{"text": text[:8000]}]},
                     "outputDimensionality": EMBED_DIM,

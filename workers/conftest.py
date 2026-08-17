@@ -26,6 +26,7 @@ def no_live_llm_keys(monkeypatch):
     """Unit tests must not call live providers even if .env has keys."""
     monkeypatch.setattr("config.settings.openai_api_key", "")
     monkeypatch.setattr("config.settings.qrok_api_key", "")
+    monkeypatch.setattr("config.settings.groq_api_key", "")
     monkeypatch.setattr("config.settings.google_api_key", "")
     monkeypatch.setattr("config.settings.cerebras_api_key", "")
 

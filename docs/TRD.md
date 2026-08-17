@@ -354,7 +354,7 @@ stages:
 ### 7.1 Agent Framework
 - **Language:** Python 3.11+ (for LLM ecosystem)
 - **Orchestration:** n8n custom nodes + direct Python execution
-- **LLM Interface:** Unified wrapper (`workers/lib/llm.py`) — OpenAI, xAI Grok (`QROK_API_KEY`), Google Gemini, Cerebras. **No Anthropic.**
+- **LLM Interface:** Unified wrapper (`workers/lib/llm.py`) — OpenAI, Groq (`QROK_API_KEY` / `GROQ_API_KEY`), Google Gemini (`gemini-2.5-flash`), Cerebras (`gpt-oss-120b`). **No Anthropic.**
 - **Structured Output:** Pydantic models + Instructor for validation
 - **Prompt Management:** Versioned in DB, A/B testable, fallback prompts
 

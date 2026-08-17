@@ -16,9 +16,10 @@ class Settings(BaseSettings):
 
     celery_broker_url: str = "redis://localhost:6379/0"
     celery_result_backend: str = "redis://localhost:6379/1"
-    # LLM providers — no Anthropic (user stack: OpenAI, Qrok, Google, Cerebras)
+    # LLM providers — no Anthropic (OpenAI, Groq via QROK_/GROQ_, Google, Cerebras)
     openai_api_key: str = ""
-    qrok_api_key: str = ""
+    qrok_api_key: str = ""  # Groq key (project alias); see also groq_api_key
+    groq_api_key: str = ""  # official Groq env name — https://console.groq.com/docs/overview
     google_api_key: str = ""
     cerebras_api_key: str = ""
     database_url: str = (
