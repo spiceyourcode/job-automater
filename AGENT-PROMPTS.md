@@ -869,9 +869,59 @@ FAILURE: Unlabeled icon-only controls; focus traps.
 
 ---
 
+## Phase 12.5 — AI infrastructure
+
+**Contract:** `docs/contracts/phase-12.5-ai.md`
+
+Providers (server-side only): `OPENAI_API_KEY`, `QROK_API_KEY` (xAI Grok), `GOOGLE_API_KEY`, `CEREBRAS_API_KEY`. **No Anthropic.**
+
+### P12.5.1 — LLM router
+
+```
+Task P12.5.1: workers/lib/llm.py chat JSON router.
+
+GOAL: Purpose-based provider order; tests without live keys.
+FAILURE: Hard-require OpenAI when another key is set; log prompt/CV/email bodies.
+AUTO SKILLS: 08-skills/job-agent-skill.md
+```
+
+### P12.5.2 — Embeddings
+
+```
+Task P12.5.2: 1536-d embeddings on cv_chunks at reindex; cosine search.
+
+GOAL: FR-CV-03/04 against existing vector(1536). ILIKE if no embed key.
+FAILURE: Wrong dimension; embeddings from another user's chunks.
+AUTO SKILLS: 08-skills/job-agent-skill.md
+```
+
+### P12.5.3 — Extract + docs LLM
+
+```
+Task P12.5.3: Enable ExtractNormalize LLM when any chat key exists; GenerateDocs LLM draft.
+
+GOAL: Pydantic extract; HG-9 grounding or heuristic docs.
+FAILURE: Persist ungrounded CV/CL; use_llm with no heuristic fallback.
+AUTO SKILLS: 08-skills/job-agent-skill.md + 08-skills/safety-moderation-skill.md
+REQUIRED: @subagent-verification-loops
+```
+
+### P12.5.4 — Match + email LLM
+
+```
+Task P12.5.4: LLM match reasoning (numeric scores stay heuristic); LLM email classify.
+
+GOAL: FR-JM-06, FR-EM-03; existing auto-update thresholds unchanged.
+FAILURE: Classifier auto-updates at/below threshold; logs email body.
+AUTO SKILLS: 08-skills/job-agent-skill.md
+REQUIRED: @subagent-verification-loops
+```
+
+---
+
 ## Phase 13 — Post-MVP
 
-Do not start until Phase 12 is marked done. Tasks are listed in `project-backlog.md` (interview prep, salary bench, WhatsApp source, billing, mobile). Copy a new prompt when kicking off.
+Phase 12.5 is done. Restart Celery and re-index CVs before kicking off P13.1. Tasks are listed in `project-backlog.md` (interview prep, salary bench, WhatsApp source, billing, mobile). Copy a new prompt when kicking off.
 
 ---
 
@@ -883,7 +933,7 @@ Review the work just completed for task [TASK_ID].
 AUTO-INVOKE: @subagent-verification-loops (required if task AUTO SKILLS lists REQUIRED)
 
 Check against docs/contracts/[phase].md FAILURE clauses.
-Check hard gates HG-1 through HG-10 that apply.
+Check hard gates HG-1 through HG-11 that apply.
 Run: typecheck, tests, bash 07-tools-mcp/drizzle-validator.sh (if api touched).
 
 Output:
@@ -892,7 +942,8 @@ Output:
 3. Subagent verification VERDICT: PASS | ISSUES_FOUND | CRITICAL
 4. Tests run and results
 5. Files changed
-6. Update phase-orchestrator.md — mark task [x] if PASS
+6. **Git commit** for [TASK_ID] with task ID in message (HG-11) — stage only files for this task
+7. Update phase-orchestrator.md + project-backlog.md `[x]` — mark task [x] only after commit
 
 If any FAILURE clause hit or VERDICT ≠ PASS: fix before marking done.
 If user corrected you during task: @self-modifying-rules to save preference.

@@ -22,7 +22,8 @@
 3. PLAN  → .agent-settings/active-plan.md (HG-7)
 4. CODE  → CONVENTIONS.md
 5. CHECK → Verification block in AGENT-PROMPTS.md
-6. SYNC  → Update CLAUDE.md "Current phase" + project-backlog.md status when a task completes
+6. COMMIT → One git commit per completed backlog ID (HG-11); message includes task ID
+7. SYNC  → Update CLAUDE.md "Current phase" + project-backlog.md `[x]` **after** commit
 ```
 
 ---
@@ -41,6 +42,7 @@
 | HG-8 | NO PII in logs |
 | HG-9 | NO hallucinated CV content |
 | HG-10 | NO n8n — BullMQ + Celery only |
+| HG-11 | NO marking backlog `[x]` without a commit for that task ID — one commit per sub-task, sequential |
 
 ---
 
@@ -101,6 +103,8 @@ Full matrix + per-task AUTO SKILLS: **`AGENT-PROMPTS.md`**
 
 **Phase 12 — Production launch** ✅ complete (P12.1–P12.4 — one commit each)
 
+**Phase 12.5 — AI infrastructure** ✅ complete (P12.5.1–P12.5.4)
+
 **Phase 13 — Post-MVP** (next — only after local/staging validation)
 
 | Done | Task |
@@ -108,10 +112,10 @@ Full matrix + per-task AUTO SKILLS: **`AGENT-PROMPTS.md`**
 | | P13.1 Interview prep agent |
 | | … see project-backlog.md |
 
-**Next:** Local rigorous testing, then Phase 13 when ready.
-Recent smoke-test fixes (CV `parsed_text` extraction, generation failure UX, Windows Celery `solo`) are on `main` — re-upload/reindex CV before review regenerate.
-Prompt: `AGENT-PROMPTS.md` → Phase 13 (copy when kicking off)
-Backlog: `project-backlog.md`
+**Next:** Restart Celery so workers pick up `lib/`; re-index CVs so `cv_chunks.embedding` is filled. Then Phase 13 when ready.  
+Prompt: `AGENT-PROMPTS.md` → Phase 13  
+Contract: `docs/contracts/phase-12.5-ai.md` (done)  
+Keys: `OPENAI_API_KEY`, `QROK_API_KEY`, `GOOGLE_API_KEY`, `CEREBRAS_API_KEY` (no Anthropic).
 
 ---
 

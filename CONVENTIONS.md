@@ -99,14 +99,20 @@ npx shadcn@latest add button card dialog  # or MCP get_add_command_for_items
 
 ## Commit Convention
 
+**HG-11:** When a backlog task (e.g. `P12.5.1`) passes verification, **commit immediately** before marking `[x]` in `project-backlog.md`. One commit per sub-task ID — do not batch unrelated tasks or defer commits to end-of-phase.
+
 ```
-feat(api): add source CRUD endpoints (FR-JC-01)
-feat(workers): RSS collector plugin
+feat(api): P2.1 source CRUD endpoints (FR-JC-01)
+feat(workers): P12.5.1 LLM chat JSON router
+feat(workers): P12.5.2 CV embeddings 1536-d + cosine search
 fix(web): approval gate before submit button
+chore(docs): P12.5 contract and backlog sync
 ```
+
+Include the **task ID** (`P<n>.<m>`) in the subject when the change maps to a backlog row.
 
 ---
 
 ## Definition of Done
 
-Meets phase contract FAILURE clauses; tests pass; HG gates satisfied; `active-plan.md` updated.
+Meets phase contract FAILURE clauses; tests pass; HG gates satisfied; **git commit for task ID (HG-11)**; `active-plan.md` updated.
