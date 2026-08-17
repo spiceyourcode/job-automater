@@ -54,12 +54,14 @@ def process_normalize_jobs(payload: dict[str, Any]) -> dict[str, Any]:
                 continue
 
             source_type = str(row.get("source_type") or raw_data.get("format") or "unknown")
+            from lib.llm import has_chat_provider
+
             validated = run_extract_normalize(
                 raw_data=raw_data,
                 source_type=source_type,
                 source_external_id=row.get("source_id"),
                 source_url=row.get("source_url"),
-                use_llm=False,
+                use_llm=has_chat_provider(),
             )
             if validated is None:
                 # HG-9: never insert unvalidated payload

@@ -9,7 +9,7 @@ from langgraph.graph import END, START, StateGraph
 
 from agents.extract_normalize.heuristic import extract_heuristic
 from agents.extract_normalize.schema import NormalizedJob, validate_normalized
-from config import settings
+from lib.llm import has_chat_provider
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ class ExtractState(TypedDict, total=False):
 
 def _extract_node(state: ExtractState) -> dict[str, Any]:
     """Prefer heuristic; optional LLM when configured (still must validate)."""
-    use_llm = bool(state.get("use_llm")) and bool(settings.openai_api_key)
+    use_llm = bool(state.get("use_llm")) and has_chat_provider()
     draft = extract_heuristic(
         state["raw_data"],
         source_type=state.get("source_type") or "unknown",
@@ -35,11 +35,13 @@ def _extract_node(state: ExtractState) -> dict[str, Any]:
         source_url=state.get("source_url"),
     )
     if use_llm:
-        # LLM path is opt-in; failures fall back to heuristic draft.
+        # LLM path is opt-in; invalid JSON/schema falls back to heuristic (never persist unvalidated).
         try:
             from agents.extract_normalize.llm import llm_refine
 
-            draft = llm_refine(state["raw_data"], draft)
+            refined = llm_refine(state["raw_data"], draft)
+            validate_normalized(refined)
+            draft = refined
         except Exception:  # noqa: BLE001
             logger.warning("extract_llm_fallback source_type=%s", state.get("source_type"))
     return {"draft": draft, "error": None}

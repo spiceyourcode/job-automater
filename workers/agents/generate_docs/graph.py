@@ -8,6 +8,7 @@ from typing import Any, TypedDict
 from langgraph.graph import END, START, StateGraph
 
 from agents.generate_docs.heuristic import generate_from_chunks
+from agents.generate_docs.llm import llm_generate_docs
 from agents.generate_docs.schema import (
     assert_grounded_in_chunks,
     validate_generated,
@@ -30,7 +31,7 @@ class DocsState(TypedDict, total=False):
 
 
 def _generate_node(state: DocsState) -> dict[str, Any]:
-    draft = generate_from_chunks(
+    heuristic = generate_from_chunks(
         chunks=state["chunks"],
         job=state["job"],
         profile=state.get("profile"),
@@ -39,6 +40,24 @@ def _generate_node(state: DocsState) -> dict[str, Any]:
         accepted_traces=state.get("accepted_traces") or [],
         regenerate_sections=state.get("regenerate_sections") or [],
     )
+    draft = heuristic
+    llm_draft = None
+    if not (state.get("accepted_traces") or state.get("regenerate_sections")):
+        llm_draft = llm_generate_docs(
+            chunks=state["chunks"],
+            job=state["job"],
+            profile=state.get("profile"),
+            cv_template=state.get("cv_template") or "modern",
+            cl_template=state.get("cl_template") or "modern",
+        )
+    if llm_draft:
+        try:
+            docs = validate_generated(llm_draft)
+            assert_grounded_in_chunks(docs, state["chunks"])
+            draft = docs.model_dump(mode="json")
+        except Exception:  # noqa: BLE001
+            logger.warning("generate_docs_llm_ungrounded_fallback")
+            draft = heuristic
     # Never log document bodies (HG-8)
     logger.info(
         "generate_docs_draft traces=%s model=%s",

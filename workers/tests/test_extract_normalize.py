@@ -37,6 +37,29 @@ def test_ten_fixtures_schema_valid_rate():
     assert rate >= 0.95, f"valid rate {rate:.0%} < 95% ({ok}/{len(SAMPLES)})"
 
 
+def test_invalid_llm_refine_falls_back_to_heuristic():
+    """P12.5.3: extra/invalid LLM keys must not drop a schema-valid heuristic job."""
+    sample = SAMPLES[0]
+    with (
+        patch("agents.extract_normalize.graph.has_chat_provider", return_value=True),
+        patch("agents.extract_normalize.llm.llm_refine") as refine,
+    ):
+        refine.return_value = {
+            "title": "X",
+            "company": "Y",
+            "source": "api",
+        }
+        job = run_extract_normalize(
+            raw_data=sample["raw_data"],
+            source_type=sample["source_type"],
+            source_external_id=sample.get("source_external_id"),
+            source_url=sample.get("source_url"),
+            use_llm=True,
+        )
+    assert job is not None
+    assert job.title != "X"
+
+
 def test_rejects_unvalidated_llm_shaped_payload():
     """HG-9: garbage without confidence must not validate."""
     with pytest.raises(Exception):
@@ -144,6 +167,7 @@ def test_process_normalize_inserts_only_validated():
         patch("tasks.normalize_jobs.insert_normalized_job", return_value="job-1") as insert,
         patch("tasks.normalize_jobs.mark_jobs_raw_processed") as mark,
         patch("tasks.match_score.match_score") as match_task,
+        patch("tasks.enrich_company.enrich_company") as enrich_task,
     ):
         result = process_normalize_jobs({"job_ids": [raw_id], "user_id": user_id})
 
