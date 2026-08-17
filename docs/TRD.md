@@ -103,7 +103,7 @@ This document defines the technical specifications, architecture decisions, and 
 |----|-------------|----------|---------|
 | FR-CV-01 | Multi-format parsing | P0 | PDF (pdf-parse), DOCX (mammoth), TXT |
 | FR-CV-02 | Semantic chunking | P0 | Section-aware (experience, skills, education, projects), 512 tokens, 50 overlap |
-| FR-CV-03 | Embedding generation | P0 | text-embedding-3-large (3072 dim), batch API |
+| FR-CV-03 | Embedding generation | P0 | text-embedding-3-small (1536 dim, matches `cv_chunks.embedding`); Gemini 1536 fallback |
 | FR-CV-04 | Vector storage & search | P0 | pgvector HNSW index, cosine similarity, metadata filtering |
 | FR-CV-05 | Version management | P1 | Multiple CV versions, active version flag, diff view |
 | FR-CV-06 | Incremental re-indexing | P1 | Only re-embed changed chunks on CV update |
@@ -242,9 +242,9 @@ See PRD Section 8 for complete DDL. Key design decisions:
 
 | Use Case | Embedding Model | Dimensions | Index Type | Query Pattern |
 |----------|----------------|------------|------------|---------------|
-| CV Chunks | text-embedding-3-large | 3072 | HNSW | Top-k semantic search |
-| Job Descriptions | text-embedding-3-large | 3072 | HNSW | Deduplication, similar jobs |
-| Skill Ontology | text-embedding-3-small | 1536 | IVFFlat | Skill expansion, related terms |
+| CV Chunks | text-embedding-3-small (Gemini 1536 fallback) | **1536** (schema) | HNSW | Top-k cosine; ILIKE if no vectors |
+| Job Descriptions | (not shipped — heuristic dedup) | 1536 reserved | HNSW | Deduplication, similar jobs |
+| Skill Ontology | (not shipped) | 1536 | IVFFlat | Skill expansion, related terms |
 
 ### 4.3 Data Flow Patterns
 
@@ -354,7 +354,7 @@ stages:
 ### 7.1 Agent Framework
 - **Language:** Python 3.11+ (for LLM ecosystem)
 - **Orchestration:** n8n custom nodes + direct Python execution
-- **LLM Interface:** Unified wrapper (LangChain-lite) supporting OpenAI + Anthropic
+- **LLM Interface:** Unified wrapper (`workers/lib/llm.py`) — OpenAI, xAI Grok (`QROK_API_KEY`), Google Gemini, Cerebras. **No Anthropic.**
 - **Structured Output:** Pydantic models + Instructor for validation
 - **Prompt Management:** Versioned in DB, A/B testable, fallback prompts
 
@@ -466,9 +466,11 @@ JWT_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----
 JWT_PUBLIC_KEY=-----BEGIN PUBLIC KEY-----
 REFRESH_TOKEN_SECRET=...
 
-# LLM
+# LLM (Phase 12.5 — no Anthropic). Router: workers/lib/llm.py
 OPENAI_API_KEY=sk-...
-ANTHROPIC_API_KEY=sk-ant-...
+QROK_API_KEY=xai-...
+GOOGLE_API_KEY=...
+CEREBRAS_API_KEY=...
 
 # Storage
 R2_ACCOUNT_ID=...
@@ -481,9 +483,7 @@ GREENHOUSE_API_KEY=...
 LEVER_API_KEY=...
 CLEARBIT_API_KEY=...
 
-# n8n
-N8N_ENCRYPTION_KEY=...
-N8N_WEBHOOK_URL=https://n8n.domain.com/webhook
+# Orchestration is BullMQ + Celery (HG-10). Do not add n8n.
 ```
 
 ### 10.2 Feature Flags (LaunchDarkly / Unleash)

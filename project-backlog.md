@@ -183,9 +183,24 @@ Phases **0–6** are the shipped MVP slice (contracts `phase-1` … `phase-6`). 
 
 ---
 
-## Phase 13 — Post-MVP (after launch)
+## Phase 12.5 — AI infrastructure
 
-From PRD §14 and Implementation Plan §7. Do not start until Phase 12 exit criteria pass.
+**Why:** TRD §7 / FR-NE-01, FR-CV-03, FR-JM-06, FR-DG-01, FR-EM-03. Phases 2–5 shipped **heuristic** LangGraph agents. Env keys exist but are unused. No Anthropic; no n8n (HG-10).
+
+| # | Task | Service | Status | Source |
+|---|------|---------|--------|--------|
+| 12.5.1 | Unified chat JSON router + purpose routing | workers | [x] | TRD §7.1, contract phase-12.5 |
+| 12.5.2 | CV embeddings (1536-d) + cosine search | workers | [x] | TRD FR-CV-03/04 (dim = schema, not 3072) |
+| 12.5.3 | ExtractNormalize + GenerateDocs LLM with Pydantic/HG-9 fallback | workers | [x] | FR-NE-01, FR-DG-01 |
+| 12.5.4 | MatchScore LLM reasoning + email LLM classify | workers | [x] | FR-JM-06, FR-EM-03 |
+
+**Contract:** [`docs/contracts/phase-12.5-ai.md`](./docs/contracts/phase-12.5-ai.md)
+
+---
+
+## Phase 13 — Post-MVP (after 12.5)
+
+From PRD §14 and Implementation Plan §7. Phase 12.5 is done — restart Celery, re-index CVs, then start P13.1.
 
 | # | Task | Priority | Status | Source |
 |---|------|----------|--------|--------|

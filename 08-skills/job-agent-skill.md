@@ -30,9 +30,21 @@ class BaseCollector(ABC):
 
 Register in `workers/collectors/registry.py`. Types: `rss`, `api`, `imap`, `playwright`, `telegram`, `career_page`.
 
+## LLM (Phase 12.5)
+
+Use `workers/lib/llm.py` and `workers/lib/embeddings.py` — never call a vendor SDK ad hoc.
+
+| Purpose | Prefer |
+|---------|--------|
+| extract / docs | OpenAI → Qrok/Google |
+| classify / match prose | Cerebras → Google → OpenAI |
+| embed | OpenAI `text-embedding-3-small` (1536) → Gemini 1536 |
+
+Heuristic graphs stay the fallback. GenerateDocs must still pass `assert_grounded_in_chunks` (HG-9).
+
 ## Rules
 
-- **Token budget:** Log token usage per task; cap daily per user in API before enqueue.
+- **Token budget:** Log provider, model, token counts; never log prompt/CV/email bodies (HG-8).
 - **Structured output:** All LLM extraction uses JSON schema validation (Pydantic).
 - **No submit without approval:** `SubmitApplicationJob` must include `approved_at` timestamp.
 - **Idempotency:** Collect and normalize tasks keyed by `(source_id, source_external_id)`.

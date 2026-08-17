@@ -156,7 +156,7 @@ CREATE TABLE cv_chunks (
     section_type VARCHAR(50),  -- experience, education, skills, projects, summary
     metadata JSONB DEFAULT '{}'::jsonb,  -- {"company": "Stripe", "role": "Senior Engineer", "dates": "2020-2023"}
     
-    -- Vector Embedding (1536 dimensions for text-embedding-3-large)
+    -- Vector Embedding (1536 — text-embedding-3-small / Gemini outputDimensionality=1536)
     embedding VECTOR(1536),
     
     created_at TIMESTAMPTZ DEFAULT NOW(),

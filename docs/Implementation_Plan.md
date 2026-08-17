@@ -28,8 +28,8 @@ Build a production-ready AI job automation platform that:
 Frontend:     React 18 + TypeScript + Vite + TanStack Query + Radix UI + Tailwind
 Backend:      Node.js 20 (Hono/Fastify) + Python 3.11 (Agents) + Drizzle ORM
 Database:     PostgreSQL 16 + pgvector
-Orchestration: n8n (self-hosted)
-AI:           OpenAI GPT-4o / Anthropic Claude 3.5 Sonnet
+Orchestration: BullMQ + Celery (HG-10; no n8n)
+AI:           OpenAI + xAI Grok (Qrok) + Google Gemini + Cerebras (no Anthropic; Phase 12.5)
 Browser:      Playwright (Python)
 Storage:      Cloudflare R2
 Auth:         JWT + OAuth 2.0 (Google, GitHub, LinkedIn)
@@ -389,8 +389,8 @@ Observability: Sentry + PostHog + Grafana + Prometheus
 ### 3.2 External Dependencies
 | Service | Purpose | Cost Estimate (Monthly) |
 |---------|---------|-------------------------|
-| OpenAI API (GPT-4o, embeddings) | All AI agents | $500-2000 |
-| Anthropic API (Claude) | Backup/alternative | $200-1000 |
+| OpenAI API (gpt-4o-mini + text-embedding-3-small) | Extract, docs, embeddings | $200-1500 |
+| xAI Grok / Google Gemini / Cerebras | Fallback chat (Qrok, Gemini, llama3.1-8b) | $50-400 |
 | PostgreSQL (Managed) | Primary DB | $100-500 |
 | Redis (Managed) | Cache, queues | $50-200 |
 | Cloudflare R2 | File storage | $10-50 |
