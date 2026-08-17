@@ -158,17 +158,25 @@ export function JobDetailDialog({
           </>
         )}
 
-        {job.description && (
+        {job.description || job.requirements ? (
           <>
             <Separator />
             <section aria-labelledby="job-desc-heading">
               <h3 id="job-desc-heading" className="mb-2 text-sm font-medium">
-                Description
+                {job.description ? "Description" : "Requirements"}
               </h3>
               <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
-                {job.description}
+                {job.description || job.requirements}
               </p>
             </section>
+          </>
+        ) : (
+          <>
+            <Separator />
+            <p className="text-sm text-muted-foreground">
+              No job description was captured from this source. Open the posting
+              for the full details.
+            </p>
           </>
         )}
 

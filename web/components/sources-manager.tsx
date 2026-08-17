@@ -11,6 +11,7 @@ import {
   Trash2,
   FlaskConical,
   History,
+  Pencil,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,9 +30,18 @@ import {
   listSourceRunsAction,
   runSourceAction,
   testSourceAction,
+  updateSourceAction,
   type SourcePublic,
   type SourceRunPublic,
 } from "@/lib/actions/sources";
+
+type SourceType =
+  | "rss"
+  | "api"
+  | "imap"
+  | "playwright"
+  | "career_page"
+  | "telegram";
 
 type Props = {
   initialSources: SourcePublic[];
@@ -41,9 +51,8 @@ export function SourcesManager({ initialSources }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [showForm, setShowForm] = useState(false);
-  const [sourceType, setSourceType] = useState<
-    "rss" | "api" | "imap" | "playwright" | "career_page" | "telegram"
-  >("rss");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [sourceType, setSourceType] = useState<SourceType>("rss");
   const [name, setName] = useState("");
   const [feedUrl, setFeedUrl] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
@@ -65,9 +74,96 @@ export function SourcesManager({ initialSources }: Props) {
     router.refresh();
   }
 
+  function resetForm() {
+    setShowForm(false);
+    setEditingId(null);
+    setName("");
+    setFeedUrl("");
+    setBaseUrl("");
+    setImapServer("");
+    setImapUsername("");
+    setImapPassword("");
+    setStartUrl("");
+    setJobListPath("/careers");
+    setJobCardSelector(".job-card");
+    setTitleSelector(".job-title a");
+    setUrlSelector("");
+    setBotToken("");
+    setChannelId("");
+    setMessageFilter("");
+    setSourceType("rss");
+  }
+
+  function beginEdit(s: SourcePublic) {
+    const cfg = s.config ?? {};
+    setEditingId(s.id);
+    setShowForm(true);
+    setSourceType(s.sourceType as SourceType);
+    setName(s.name);
+    setFeedUrl(String(cfg.feedUrl ?? ""));
+    setBaseUrl(String(cfg.baseUrl ?? ""));
+    setImapServer(String(cfg.imapServer ?? ""));
+    setImapUsername(String(cfg.username ?? ""));
+    setImapPassword("");
+    setStartUrl(String(cfg.startUrl ?? ""));
+    setJobListPath(String(cfg.jobListPath ?? "/careers"));
+    setJobCardSelector(String(cfg.jobCardSelector ?? ".job-card"));
+    setTitleSelector(String(cfg.titleSelector ?? ".job-title a"));
+    setUrlSelector(String(cfg.urlSelector ?? ""));
+    setBotToken("");
+    setChannelId(String(cfg.channelId ?? ""));
+    setMessageFilter(String(cfg.messageFilter ?? ""));
+  }
+
   function onCreate(e: React.FormEvent) {
     e.preventDefault();
     startTransition(async () => {
+      if (editingId) {
+        const result = await updateSourceAction({
+          id: editingId,
+          sourceType,
+          name,
+          feedUrl: sourceType === "rss" ? feedUrl : undefined,
+          baseUrl:
+            sourceType === "api" || sourceType === "career_page"
+              ? baseUrl
+              : undefined,
+          imapServer: sourceType === "imap" ? imapServer : undefined,
+          imapUsername: sourceType === "imap" ? imapUsername : undefined,
+          imapPassword:
+            sourceType === "imap" && imapPassword
+              ? imapPassword
+              : undefined,
+          startUrl: sourceType === "playwright" ? startUrl : undefined,
+          jobListPath: sourceType === "career_page" ? jobListPath : undefined,
+          jobCardSelector:
+            sourceType === "playwright" || sourceType === "career_page"
+              ? jobCardSelector
+              : undefined,
+          titleSelector:
+            sourceType === "playwright" || sourceType === "career_page"
+              ? titleSelector
+              : undefined,
+          urlSelector:
+            sourceType === "playwright" || sourceType === "career_page"
+              ? urlSelector || undefined
+              : undefined,
+          botToken:
+            sourceType === "telegram" && botToken ? botToken : undefined,
+          channelId: sourceType === "telegram" ? channelId : undefined,
+          messageFilter:
+            sourceType === "telegram" ? messageFilter || undefined : undefined,
+        });
+        if (!result.ok) {
+          toast.error(result.error);
+          return;
+        }
+        toast.success("Source updated");
+        resetForm();
+        refresh();
+        return;
+      }
+
       const result = await createSourceAction({
         sourceType,
         name,
@@ -103,12 +199,7 @@ export function SourcesManager({ initialSources }: Props) {
         return;
       }
       toast.success("Source added");
-      setShowForm(false);
-      setName("");
-      setFeedUrl("");
-      setBaseUrl("");
-      setImapPassword("");
-      setBotToken("");
+      resetForm();
       refresh();
     });
   }
@@ -157,7 +248,10 @@ export function SourcesManager({ initialSources }: Props) {
         <Button
           type="button"
           className="cursor-pointer"
-          onClick={() => setShowForm((v) => !v)}
+          onClick={() => {
+            if (showForm) resetForm();
+            else setShowForm(true);
+          }}
         >
           <Plus className="mr-2 h-4 w-4" aria-hidden />
           Add source
@@ -167,9 +261,11 @@ export function SourcesManager({ initialSources }: Props) {
       {showForm && (
         <Card>
           <CardHeader>
-            <CardTitle>New source</CardTitle>
+            <CardTitle>{editingId ? "Edit source" : "New source"}</CardTitle>
             <CardDescription>
-              Configure a collector. Secrets are never shown again after save.
+              {editingId
+                ? "Update the name or URL/config. Leave password/token blank to keep the saved secret."
+                : "Configure a collector. Secrets are never shown again after save."}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -178,18 +274,11 @@ export function SourcesManager({ initialSources }: Props) {
                 <Label htmlFor="source-type">Type</Label>
                 <select
                   id="source-type"
-                  className="border-input bg-background h-9 w-full rounded-md border px-2 text-sm"
+                  className="border-input bg-background h-9 w-full rounded-md border px-2 text-sm disabled:opacity-60"
                   value={sourceType}
+                  disabled={Boolean(editingId)}
                   onChange={(e) =>
-                    setSourceType(
-                      e.target.value as
-                        | "rss"
-                        | "api"
-                        | "imap"
-                        | "playwright"
-                        | "career_page"
-                        | "telegram",
-                    )
+                    setSourceType(e.target.value as SourceType)
                   }
                 >
                   <option value="rss">RSS</option>
@@ -265,8 +354,11 @@ export function SourcesManager({ initialSources }: Props) {
                       type="password"
                       value={imapPassword}
                       onChange={(e) => setImapPassword(e.target.value)}
-                      required
+                      required={!editingId}
                       autoComplete="current-password"
+                      placeholder={
+                        editingId ? "Leave blank to keep current" : undefined
+                      }
                     />
                   </div>
                 </>
@@ -369,9 +461,13 @@ export function SourcesManager({ initialSources }: Props) {
                       type="password"
                       value={botToken}
                       onChange={(e) => setBotToken(e.target.value)}
-                      required
+                      required={!editingId}
                       autoComplete="off"
-                      placeholder="123456:ABC..."
+                      placeholder={
+                        editingId
+                          ? "Leave blank to keep current"
+                          : "123456:ABC..."
+                      }
                     />
                   </div>
                   <div className="space-y-2">
@@ -395,16 +491,29 @@ export function SourcesManager({ initialSources }: Props) {
                   </div>
                 </>
               )}
-              <Button
-                type="submit"
-                className="cursor-pointer"
-                disabled={isPending}
-              >
-                {isPending && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="submit"
+                  className="cursor-pointer"
+                  disabled={isPending}
+                >
+                  {isPending && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                  )}
+                  {editingId ? "Save changes" : "Save source"}
+                </Button>
+                {editingId && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="cursor-pointer"
+                    disabled={isPending}
+                    onClick={() => resetForm()}
+                  >
+                    Cancel
+                  </Button>
                 )}
-                Save source
-              </Button>
+              </div>
             </form>
           </CardContent>
         </Card>
@@ -464,6 +573,17 @@ export function SourcesManager({ initialSources }: Props) {
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="cursor-pointer"
+                      disabled={isPending}
+                      onClick={() => beginEdit(s)}
+                    >
+                      <Pencil className="mr-1 h-4 w-4" aria-hidden />
+                      Edit
+                    </Button>
                     <Button
                       type="button"
                       size="sm"

@@ -92,7 +92,17 @@ def score_skills(
         user_skills |= {_norm_skill(h) for h in vector_hits}
     job_skills = _skills_from_job(job)
     if not job_skills:
-        return 70.0, [], []  # neutral when job lists no skills
+        # Sparse posting (no JD/tags) — do not pretend a strong skill match (~70).
+        # Title-only overlap still helps when profile skills appear in the title.
+        title = str(job.get("title") or "").lower()
+        title_hits = [s for s in user_skills if s and s in title]
+        if title_hits:
+            return (
+                round(min(65.0, 35.0 + len(title_hits) * 10), 2),
+                [{"skill": s, "match": 0.6} for s in title_hits[:8]],
+                [],
+            )
+        return 40.0, [], []
     matched = [s for s in job_skills if s in user_skills]
     missing = [s for s in job_skills if s not in user_skills]
     ratio = len(matched) / len(job_skills)
@@ -146,8 +156,11 @@ def score_location(profile: dict[str, Any], job: dict[str, Any]) -> float:
     willing = bool(profile.get("willing_to_relocate"))
 
     if remote or remote_type in ("fully_remote", "remote_ok"):
-        if any("remote" in p for p in pref_strs) or not pref_strs:
+        if any("remote" in p for p in pref_strs):
             return 95.0
+        # Empty prefs: mild positive, not a near-perfect score for every remote job.
+        if not pref_strs:
+            return 70.0
         return 85.0
     if not job_loc:
         return 60.0
@@ -194,9 +207,12 @@ def score_salary(profile: dict[str, Any], job: dict[str, Any]) -> float:
 def score_culture(profile: dict[str, Any], job: dict[str, Any]) -> float:
     """Light heuristic from employment type + soft preference overlap."""
     emp = profile.get("employment_types") or ["full-time"]
-    job_emp = str(job.get("employment_type") or "full-time").lower()
+    job_emp = str(job.get("employment_type") or "").lower()
     emp_norm = [str(e).lower() for e in emp] if isinstance(emp, list) else ["full-time"]
-    base = 80.0 if job_emp in emp_norm or not job_emp else 50.0
+    if not job_emp:
+        base = 50.0  # unknown employment type — do not default to strong culture fit
+    else:
+        base = 80.0 if job_emp in emp_norm else 50.0
     # Soft skills mentioned in description
     soft = profile.get("soft_skills") or []
     blob = str(job.get("description") or "").lower()
@@ -250,6 +266,11 @@ def compute_match_score(
         + cult * w["culture"],
         2,
     )
+    # Incomplete postings (no JD / requirements) cannot claim high confidence matches.
+    desc = str(job.get("description") or "").strip()
+    reqs = str(job.get("requirements") or "").strip()
+    if len(desc) < 40 and len(reqs) < 40:
+        overall = round(max(15.0, overall - 8.0), 2)
     reasoning = build_reasoning(
         overall=overall,
         skill=skill,

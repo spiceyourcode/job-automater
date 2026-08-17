@@ -86,6 +86,28 @@ def test_salary_must_be_integer_cents():
         )
 
 
+def test_playwright_raw_keeps_snippet_as_description():
+    from agents.extract_normalize.heuristic import extract_heuristic
+
+    draft = extract_heuristic(
+        {
+            "format": "playwright",
+            "title": "Backend Engineer",
+            "url": "https://example.com/jobs/1",
+            "location": "Remote",
+            "department": "Engineering",
+            "snippet": "Build APIs with Python and FastAPI. Remote friendly.",
+        },
+        source_type="playwright",
+        source_external_id="abc",
+        source_url="https://example.com/jobs/1",
+    )
+    assert draft["description"]
+    assert "FastAPI" in draft["description"]
+    assert "python" in draft["tags"]
+    assert draft["location"] == "Remote"
+
+
 def test_process_normalize_never_inserts_on_validation_failure():
     user_id = "22222222-2222-2222-2222-222222222222"
     raw_id = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"

@@ -213,6 +213,89 @@ export async function testSourceAction(id: string): Promise<ActionResult> {
   }
 }
 
+const updateSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1).max(255).optional(),
+  feedUrl: z.string().url().optional(),
+  baseUrl: z.string().url().optional(),
+  imapServer: z.string().optional(),
+  imapUsername: z.string().optional(),
+  imapPassword: z.string().optional(),
+  startUrl: z.string().url().optional(),
+  jobListPath: z.string().optional(),
+  jobCardSelector: z.string().optional(),
+  titleSelector: z.string().optional(),
+  urlSelector: z.string().optional(),
+  botToken: z.string().optional(),
+  channelId: z.string().optional(),
+  messageFilter: z.string().optional(),
+  isActive: z.boolean().optional(),
+});
+
+export async function updateSourceAction(
+  input: z.infer<typeof updateSchema> & { sourceType: string },
+): Promise<ActionResult> {
+  const parsed = updateSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid" };
+  }
+  const headers = await authHeaders();
+  if (!headers) return { ok: false, error: "Unauthorized" };
+
+  const d = parsed.data;
+  const config: Record<string, unknown> = {};
+  const t = input.sourceType;
+
+  if (t === "rss" && d.feedUrl) config.feedUrl = d.feedUrl;
+  if ((t === "api" || t === "career_page") && d.baseUrl) config.baseUrl = d.baseUrl;
+  if (t === "imap") {
+    if (d.imapServer) config.imapServer = d.imapServer;
+    if (d.imapUsername) config.username = d.imapUsername;
+    if (d.imapPassword) config.password = d.imapPassword;
+  }
+  if (t === "playwright") {
+    if (d.startUrl) config.startUrl = d.startUrl;
+    if (d.jobCardSelector) config.jobCardSelector = d.jobCardSelector;
+    if (d.titleSelector) config.titleSelector = d.titleSelector;
+    if (d.urlSelector !== undefined) config.urlSelector = d.urlSelector || undefined;
+  }
+  if (t === "career_page") {
+    if (d.jobListPath) config.jobListPath = d.jobListPath;
+    if (d.jobCardSelector) config.jobCardSelector = d.jobCardSelector;
+    if (d.titleSelector) config.titleSelector = d.titleSelector;
+    if (d.urlSelector !== undefined) config.urlSelector = d.urlSelector || undefined;
+  }
+  if (t === "telegram") {
+    if (d.botToken) config.botToken = d.botToken;
+    if (d.channelId) config.channelId = d.channelId;
+    if (d.messageFilter !== undefined) {
+      config.messageFilter = d.messageFilter || undefined;
+    }
+  }
+
+  const body: Record<string, unknown> = {};
+  if (d.name) body.name = d.name;
+  if (d.isActive !== undefined) body.isActive = d.isActive;
+  if (Object.keys(config).length > 0) body.config = config;
+
+  try {
+    const res = await fetch(`${API_URL}/api/v1/sources/${d.id}`, {
+      method: "PATCH",
+      headers: { ...headers, "content-type": "application/json" },
+      body: JSON.stringify(body),
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      const errBody = (await res.json().catch(() => ({}))) as { error?: string };
+      return { ok: false, error: errBody.error ?? "Update failed" };
+    }
+    revalidatePath("/settings/sources");
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "Network error — is the API running?" };
+  }
+}
+
 export async function deleteSourceAction(id: string): Promise<ActionResult> {
   const headers = await authHeaders();
   if (!headers) return { ok: false, error: "Unauthorized" };

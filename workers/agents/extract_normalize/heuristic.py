@@ -179,6 +179,57 @@ def extract_heuristic(
         conf["company"] = 0.5
         conf["description"] = 0.7 if description else 0.2
 
+    elif fmt in ("playwright", "career_page"):
+        title = str(raw_data.get("title") or "").strip()
+        company = str(raw_data.get("company") or "Unknown").strip()
+        location = raw_data.get("location")
+        department = raw_data.get("department")
+        description = _strip_html(
+            str(
+                raw_data.get("description")
+                or raw_data.get("snippet")
+                or raw_data.get("body")
+                or ""
+            )
+        )
+        if not description:
+            # Still surface list metadata so the dialog is not empty.
+            bits = [b for b in (title, department, location) if b]
+            description = " · ".join(str(b) for b in bits)
+        application_url = (
+            str(raw_data.get("url") or raw_data.get("link") or source_url or "")
+            or source_url
+        )
+        conf["title"] = 0.9 if title else 0.2
+        conf["company"] = 0.35
+        conf["description"] = 0.65 if description else 0.15
+        blob = f"{title} {description} {location or ''} {department or ''}"
+        is_remote, remote_type = _remote_flags(blob)
+        salary_min, salary_max = _parse_salary_cents(blob)
+        tags = _tags_from_text(blob)
+        if salary_min is not None:
+            conf["salary_min"] = 0.45
+        if salary_max is not None:
+            conf["salary_max"] = 0.45
+        return {
+            "title": title or "Untitled role",
+            "company": company or "Unknown",
+            "location": str(location) if location else None,
+            "is_remote": is_remote,
+            "remote_type": remote_type,
+            "description": description or None,
+            "application_url": application_url,
+            "salary_min": salary_min,
+            "salary_max": salary_max,
+            "salary_currency": "USD",
+            "tags": tags,
+            "keywords": tags,
+            "source": source_type,
+            "source_id": source_external_id,
+            "source_url": source_url,
+            "field_confidence": conf,
+        }
+
     else:
         # Generic fallback
         title = str(raw_data.get("title") or raw_data.get("subject") or "Untitled role").strip()

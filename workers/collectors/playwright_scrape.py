@@ -30,6 +30,7 @@ def cards_to_raw_jobs(
         if not external:
             continue
         source_id = hashlib.sha256(external.encode("utf-8")).hexdigest()[:64]
+        snippet = (card.get("snippet") or "").strip() or None
         jobs.append(
             RawJob(
                 source_external_id=source_id,
@@ -42,6 +43,8 @@ def cards_to_raw_jobs(
                     "url": href,
                     "location": location,
                     "department": department,
+                    "snippet": snippet,
+                    "description": snippet,
                     "format": "playwright",
                 },
             )
@@ -106,12 +109,21 @@ async def extract_cards_with_playwright(
             except Exception:  # noqa: BLE001
                 pass
         if title or url:
+            # Card text fills JD when list pages have no dedicated description node.
+            snippet = None
+            try:
+                raw_text = (await card.inner_text()).strip()
+                if raw_text:
+                    snippet = raw_text[:2000]
+            except Exception:  # noqa: BLE001
+                snippet = None
             out.append(
                 {
                     "title": title,
                     "url": url,
                     "location": location,
                     "department": department,
+                    "snippet": snippet,
                 }
             )
     return out

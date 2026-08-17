@@ -52,7 +52,12 @@ def parse_feed_xml(xml_text: str, feed_url: str) -> list[RawJob]:
             elif name == "guid":
                 guid = _text(child)
             elif name == "description":
-                description = _text(child)
+                description = _text(child) or description
+            elif name in ("encoded", "content"):
+                # content:encoded / media body often holds the full JD
+                richer = "".join(child.itertext()).strip() or _text(child)
+                if len(richer) > len(description):
+                    description = richer
             elif name == "pubDate":
                 pub_date = _text(child)
         external = guid or link or title
@@ -96,7 +101,9 @@ def parse_feed_xml(xml_text: str, feed_url: str) -> list[RawJob]:
             elif name == "id":
                 entry_id = _text(child)
             elif name == "summary" or name == "content":
-                summary = _text(child) or summary
+                richer = "".join(child.itertext()).strip() or _text(child)
+                if len(richer) > len(summary):
+                    summary = richer
             elif name == "updated" or name == "published":
                 updated = _text(child) or updated
             elif name == "link":
@@ -120,6 +127,7 @@ def parse_feed_xml(xml_text: str, feed_url: str) -> list[RawJob]:
                     "link": link,
                     "id": entry_id,
                     "summary": summary,
+                    "description": summary,
                     "updated": updated,
                     "format": "atom",
                 },

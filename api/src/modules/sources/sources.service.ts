@@ -248,9 +248,14 @@ export async function patchSource(
   const updates: Record<string, unknown> = { ...body, updatedAt: new Date() };
 
   if (body.config) {
+    // Shallow-merge onto stored config so clients can PATCH just feedUrl/startUrl.
+    const withExisting = {
+      ...(existing.config as Record<string, unknown>),
+      ...body.config,
+    };
     const merged = mergePreservedSecrets(
       sourceType,
-      body.config,
+      withExisting,
       existing.config as Record<string, unknown>,
     );
     updates.config = parseTypedConfig(sourceType, merged);

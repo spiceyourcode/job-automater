@@ -57,6 +57,37 @@ def test_strong_pair_scores_above_85():
     assert validated.weights["skills"] == 0.40
 
 
+def test_sparse_job_not_stuck_near_74():
+    """Missing JD used to push every remote job to ~74 via neutral defaults."""
+    sparse = {
+        "title": "Account Executive",
+        "company": "Acme",
+        "location": None,
+        "is_remote": True,
+        "remote_type": "fully_remote",
+        "employment_type": None,
+        "experience_level": None,
+        "salary_min": None,
+        "salary_max": None,
+        "description": None,
+        "tags": [],
+        "keywords": [],
+        "tech_stack": [],
+    }
+    thin_profile = {
+        "years_experience": 7,
+        "technical_skills": [{"name": "Python"}, {"name": "FastAPI"}],
+        "preferred_locations": [],
+        "salary_min": None,
+        "salary_max": None,
+        "employment_types": ["full-time"],
+    }
+    result = compute_match_score(thin_profile, sparse)
+    assert result["skill_match"] < 70
+    assert result["overall_score"] < 70
+    assert abs(result["overall_score"] - 74) > 3
+
+
 def test_score_without_reasoning_rejected():
     bad = compute_match_score(STRONG_PROFILE, STRONG_JOB)
     bad["reasoning"] = "short"
