@@ -9,8 +9,10 @@ import { ThemeToggle } from "@/components/theme-toggle";
 export function LandingPage() {
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
-      <header className="absolute inset-x-0 top-0 z-20 flex items-center justify-between px-6 py-5 md:px-10">
-        <p className="text-sm font-semibold tracking-tight">JobAutomater</p>
+      <header className="absolute inset-x-0 top-0 z-20 flex items-center justify-between border-b border-border/60 bg-background/80 px-6 py-5 backdrop-blur-sm md:px-10">
+        <p className="text-sm font-semibold tracking-tight text-foreground">
+          JobAutomater
+        </p>
         <nav className="flex items-center gap-2" aria-label="Account">
           <ThemeToggle />
           <Button asChild variant="ghost" size="sm" className="cursor-pointer">
@@ -28,7 +30,7 @@ export function LandingPage() {
       >
         {/* Full-bleed atmosphere — product pipeline silhouette, not a card */}
         <div
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_20%_20%,oklch(0.92_0_0),transparent_55%),radial-gradient(ellipse_at_80%_10%,oklch(0.88_0_0),transparent_50%),linear-gradient(180deg,oklch(0.97_0_0),oklch(1_0_0)_45%,oklch(0.96_0_0))]"
+          className="landing-hero-atmosphere pointer-events-none absolute inset-0"
           aria-hidden
         />
         <div

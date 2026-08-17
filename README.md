@@ -1,40 +1,108 @@
 # JobAutomater
 
-AI job application automation platform.
+JobAutomater is an AI-assisted job search product. It collects openings from the sources you configure, scores them against your CV, drafts tailored application documents, and **never submits until you approve**.
 
-## For agents
+## What it does
 
-| Step | File |
-|------|------|
-| 1 | [`AGENTS.md`](./AGENTS.md) or [`CLAUDE.md`](./CLAUDE.md) |
-| 2 | [`AGENT-PROMPTS.md`](./AGENT-PROMPTS.md) — task prompt |
-| 3 | [`.agent-settings/phase-orchestrator.md`](./.agent-settings/phase-orchestrator.md) |
+1. **Collect** — RSS, REST APIs, IMAP (including LinkedIn job alerts), career pages, Playwright site scrapes, and Telegram.
+2. **Normalize & match** — Deduplicate listings and score fit against your indexed CV (skills, experience, location, salary, culture).
+3. **Generate** — Produce a tailored CV and cover letter grounded in your uploaded content.
+4. **Approve & apply** — Review traces, approve, then submit (ATS APIs or Playwright). Auto-submit without approval is blocked.
+5. **Follow-up** — Classify recruiter email, track pipeline stages, and show analytics.
 
-## For humans
+## Stack
+
+| Layer | Path | Tech |
+|-------|------|------|
+| API | `api/` | Hono, Drizzle ORM, BullMQ, PostgreSQL |
+| Web | `web/` | Next.js 16, shadcn/ui (`new-york` / `neutral`) |
+| Workers | `workers/` | Celery, LangGraph, Playwright |
+| Infra | `docker-compose.yml` | Postgres (pgvector), Redis, MinIO |
+
+Queue payloads between API and workers are defined in `contracts/queue-payloads.schema.json`.
+
+## Run locally
+
+**Prerequisites:** Node 20+, Python 3.12+, Docker.
 
 ```bash
 cp .env.example .env
 docker compose up -d
 ```
 
-## Folder map
+Postgres is `postgresql://jobautomater:jobautomater@127.0.0.1:5432/jobautomater`. Prefer `127.0.0.1` over `localhost` on Windows. If a local Postgres already owns port 5432, stop it first.
 
-```
-job_automater/
-├── CLAUDE.md              Agent protocol
-├── AGENT-PROMPTS.md       All task prompts (start → launch)
-├── CONVENTIONS.md         Code standards
-├── project-backlog.md     Phase checklist
-├── docs/                  Product docs (ONLY copy)
-├── docs/contracts/        Phase success criteria
-├── .agent-settings/       Live task queue
-├── 08-skills/             Domain rules
-├── contracts/             Queue JSON schemas
-├── api/                   TypeScript API (scaffold)
-├── web/                   Next.js (scaffold)
-└── workers/               Python agents (scaffold)
+**API** (default `http://localhost:3001`):
+
+```bash
+cd api
+npm install
+npm run db:migrate
+npm run dev
 ```
 
-## Removed duplicates
+**Web** (default `http://localhost:3000`):
 
-Product docs live **only** in `docs/`. Root copies of PRD/TRD/AppFlow/etc. and the bootstrap template folder were removed.
+```bash
+cd web
+npm install
+npm run dev
+```
+
+**Workers:**
+
+```bash
+cd workers
+python -m venv .venv
+# Windows: .venv\Scripts\activate
+# macOS/Linux: source .venv/bin/activate
+pip install -e ".[dev]"
+celery -A celery_app worker -l info
+```
+
+On Windows the worker uses `--pool=solo`. After adding Playwright sources, run `python -m playwright install chromium` once.
+
+Confirm the API with `GET http://localhost:3001/health`.
+
+## Configuration
+
+Copy `.env.example` to `.env`. Required for local run: `DATABASE_URL`, `JWT_SECRET` (≥32 chars), Redis, and MinIO/S3 keys. Optional:
+
+- OAuth: `OAUTH_GOOGLE_*`, `OAUTH_GITHUB_*`, `OAUTH_LINKEDIN_*`
+- LLM: `OPENAI_API_KEY`, `QROK_API_KEY`, `GOOGLE_API_KEY`, `CEREBRAS_API_KEY` (server-side only)
+- Apply: `GREENHOUSE_JOB_BOARD_API_KEY`, `LEVER_API_KEY`; keep `SUBMIT_DRY_RUN=true` until you intend live submits
+- `SENTRY_DSN` for API error reporting
+
+Never put secrets in `NEXT_PUBLIC_*` variables.
+
+## Repository layout
+
+```
+api/          HTTP API, auth, jobs, applications, analytics
+web/          Dashboard, settings, document review, landing
+workers/      Collectors, LangGraph agents, Celery tasks
+contracts/    Shared queue JSON schemas
+docs/         Product specs and runbooks
+.github/      CI and issue templates
+```
+
+## Tests & CI
+
+```bash
+cd api && npm run typecheck && npm test
+cd web && npm run typecheck
+cd workers && python -m pytest -q
+```
+
+GitHub Actions runs those three jobs on `main` (see `.github/workflows/ci.yml`).
+
+## Product docs
+
+| Doc | Path |
+|-----|------|
+| Requirements | `docs/PRD.md` |
+| Technical design | `docs/TRD.md` |
+| App flow | `docs/AppFlow.md` |
+| Database | `docs/Backend_Schema.md` |
+| UI | `docs/UIUX_Design.md` |
+| Ops | `docs/runbooks/` |

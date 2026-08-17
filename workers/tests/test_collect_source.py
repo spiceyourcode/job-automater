@@ -12,7 +12,14 @@ from tasks.collect_source import CollectFailed, CollectSourceJob, process_collec
 
 
 def test_registry_has_phase2_collectors():
-    assert list_collectors() == ["api", "imap", "rss"]
+    assert list_collectors() == [
+        "api",
+        "career_page",
+        "imap",
+        "playwright",
+        "rss",
+        "telegram",
+    ]
     assert get_collector("rss").source_type == "rss"
 
 

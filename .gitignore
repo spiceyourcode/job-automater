@@ -74,6 +74,18 @@ data/
 07-tools-mcp/
 active/
 
+# Agent protocol / blueprints — keep local; do not commit
+AGENTS.md
+AGENT-PROMPTS.md
+CLAUDE.md
+CONVENTIONS.md
+project-backlog.md
+08-skills/
+docs/contracts/
+docs/Implementation_Plan.md
+web/AGENTS.md
+web/CLAUDE.md
+
 # --- Workers Python artifacts ---
 workers/.venv/
 workers/__pycache__/

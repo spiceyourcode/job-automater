@@ -54,6 +54,7 @@ export type ApplicationPublic = {
   followupCount?: number;
   jobTitle?: string;
   jobCompany?: string;
+  updatedAt?: string | null;
 };
 
 export type PipelineStage =

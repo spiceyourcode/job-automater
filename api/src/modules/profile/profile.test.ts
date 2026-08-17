@@ -223,7 +223,7 @@ describe("POST /api/v1/profile/cv", () => {
         isActive: true,
         createdAt: new Date(),
       },
-      taskId: null,
+      taskId: "11111111-1111-4111-8111-111111111111",
     });
 
     const form = new FormData();

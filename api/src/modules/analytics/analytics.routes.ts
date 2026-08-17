@@ -69,11 +69,12 @@ analyticsRoutes.get(
       userId,
       c.req.valid("query"),
     );
-    c.header("Content-Type", file.contentType);
-    c.header(
-      "Content-Disposition",
-      `attachment; filename="${file.filename}"`,
-    );
-    return c.body(file.body);
+    return new Response(new Uint8Array(file.body), {
+      status: 200,
+      headers: {
+        "Content-Type": file.contentType,
+        "Content-Disposition": `attachment; filename="${file.filename}"`,
+      },
+    });
   },
 );

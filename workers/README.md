@@ -1,36 +1,31 @@
 # Workers — Celery + collectors + agents
 
-**Status:** P1.5 + P2.2 collectors + P2.3 extract_normalize + **P2.4 match_score**.
-
-## Contract
-
-- `docs/contracts/phase-2-collection.md`
-- `08-skills/job-agent-skill.md`
-- `contracts/queue-payloads.schema.json` → Collect / Normalize / MatchScore
+Collectors, LangGraph agents, and Celery tasks that process jobs, documents, email, and apply flows. Queue payloads match `contracts/queue-payloads.schema.json`.
 
 ## Structure
 
 ```
 workers/
-├── collectors/
-├── agents/
-│   ├── extract_normalize/
-│   └── match_score/          # dedup → score → validate (reasoning required)
-├── tasks/
-│   ├── collect_source.py
-│   ├── normalize_jobs.py
-│   └── match_score.py
+├── collectors/          rss, api, imap, playwright, career_page, telegram
+├── agents/              extract_normalize, match_score, generate_docs, …
+├── lib/                 LLM + embeddings helpers
+├── tasks/               Celery entrypoints
 └── tests/
 ```
 
-Weights (TRD): skills 40%, experience 25%, location 15%, salary 10%, culture 10%.
+Match weights (see `docs/TRD.md`): skills 40%, experience 25%, location 15%, salary 10%, culture 10%.
 
-Pipeline: collect → normalize → match_score. Scores are user-scoped (IDOR-safe).
+Pipeline: collect → normalize → match_score. Scores are user-scoped.
 
 ## Run worker (local)
 
+From the repo root, `cp .env.example .env` and start Docker (Postgres, Redis, MinIO). Then:
+
 ```bash
-# Activate .venv first
+cd workers
+python -m venv .venv
+# Windows: .venv\Scripts\activate
+pip install -e ".[dev]"
 celery -A celery_app worker -l info
 ```
 
@@ -48,8 +43,8 @@ python -m playwright install chromium
 
 Playwright sources need real CSS selectors for that site (`startUrl`, `jobCardSelector`, `titleSelector`). A bare careers URL with `.job-card` usually yields 0 jobs.
 
-## Tests (WSL + rtk)
+## Tests
 
 ```bash
-wsl -d Debian -- bash -lc 'export PATH=/home/linuxbrew/.linuxbrew/bin:$PATH; cd /mnt/c/.../workers && rtk proxy ./.venv/Scripts/python.exe -m pytest -q'
+python -m pytest -q
 ```
