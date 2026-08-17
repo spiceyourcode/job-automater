@@ -260,6 +260,26 @@ def compute_match_score(
         matched=matched,
         missing=missing,
     )
+    model_used = "heuristic-v1"
+    try:
+        from lib.llm import has_chat_provider
+
+        if has_chat_provider():
+            from agents.match_score.llm import rewrite_reasoning
+
+            rewritten = rewrite_reasoning(
+                reasoning=reasoning,
+                overall=overall,
+                matched_names=[m["skill"] for m in matched[:8]],
+                missing_names=[m["skill"] for m in missing[:5]],
+                job_title=str(job.get("title") or ""),
+                company=str(job.get("company") or ""),
+            )
+            if rewritten:
+                reasoning = rewritten
+                model_used = "hybrid-match-v1"
+    except Exception:  # noqa: BLE001
+        pass
     return {
         "overall_score": overall,
         "skill_match": skill,
@@ -273,5 +293,5 @@ def compute_match_score(
         "nice_to_have_skills": [],
         "reasoning": reasoning,
         "confidence": 0.75,
-        "model_used": "heuristic-v1",
+        "model_used": model_used,
     }

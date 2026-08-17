@@ -36,6 +36,17 @@ def _classify_node(state: EmailState) -> dict[str, Any]:
         snippet=state.get("snippet"),
         from_email=state.get("from_email"),
     )
+    try:
+        from agents.email_classifier.llm import llm_classify_email
+
+        llm = llm_classify_email(
+            subject=state.get("subject"),
+            snippet=state.get("snippet"),
+        )
+        if llm is not None:
+            result = llm
+    except Exception:  # noqa: BLE001
+        pass
     return {"classification": result.model_dump(mode="json")}
 
 
