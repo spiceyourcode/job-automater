@@ -35,7 +35,7 @@ py-modules = ["celery_app", "config", "db", "storage"]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["tasks*", "agents*", "collectors*"]
+include = ["tasks*", "agents*", "collectors*", "lib*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

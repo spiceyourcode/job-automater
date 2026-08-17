@@ -55,24 +55,60 @@ def reindex_document(conn: Any, user_id: str, cv_document_id: str) -> dict[str, 
             )
             return {"status": "error", "error": "empty_parsed_text", "chunk_count": 0}
 
+        vectors: list[list[float] | None] = [None] * len(paragraphs)
+        try:
+            from lib.embeddings import embed_texts
+
+            vectors = embed_texts(paragraphs)
+        except Exception:  # noqa: BLE001
+            logger.warning("reindex_embed_skipped")
+            vectors = [None] * len(paragraphs)
+
+        embedded = 0
         for idx, content in enumerate(paragraphs):
-            cur.execute(
-                """
-                INSERT INTO cv_chunks (
-                  cv_document_id, user_id, chunk_index, content, token_count, section_type
-                ) VALUES (
-                  %s::uuid, %s::uuid, %s, %s, %s, %s
+            vec = vectors[idx] if idx < len(vectors) else None
+            if vec is not None:
+                from lib.embeddings import vector_literal
+
+                lit = vector_literal(vec)
+                cur.execute(
+                    """
+                    INSERT INTO cv_chunks (
+                      cv_document_id, user_id, chunk_index, content,
+                      token_count, section_type, embedding
+                    ) VALUES (
+                      %s::uuid, %s::uuid, %s, %s, %s, %s, %s::vector
+                    )
+                    """,
+                    (
+                        cv_document_id,
+                        user_id,
+                        idx,
+                        content,
+                        max(1, len(content.split())),
+                        "body",
+                        lit,
+                    ),
                 )
-                """,
-                (
-                    cv_document_id,
-                    user_id,
-                    idx,
-                    content,
-                    max(1, len(content.split())),
-                    "body",
-                ),
-            )
+                embedded += 1
+            else:
+                cur.execute(
+                    """
+                    INSERT INTO cv_chunks (
+                      cv_document_id, user_id, chunk_index, content, token_count, section_type
+                    ) VALUES (
+                      %s::uuid, %s::uuid, %s, %s, %s, %s
+                    )
+                    """,
+                    (
+                        cv_document_id,
+                        user_id,
+                        idx,
+                        content,
+                        max(1, len(content.split())),
+                        "body",
+                    ),
+                )
 
         cur.execute(
             """
@@ -91,4 +127,8 @@ def reindex_document(conn: Any, user_id: str, cv_document_id: str) -> dict[str, 
             (user_id,),
         )
 
-    return {"status": "ok", "chunk_count": len(paragraphs)}
+    return {
+        "status": "ok",
+        "chunk_count": len(paragraphs),
+        "embedded_count": embedded,
+    }

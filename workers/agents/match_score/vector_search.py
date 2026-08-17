@@ -10,6 +10,32 @@ import psycopg
 logger = logging.getLogger(__name__)
 
 
+def _keyword_search(
+    cur: Any,
+    *,
+    user_id: str,
+    query_text: str,
+    limit: int,
+) -> list[dict[str, Any]]:
+    tokens = [t for t in query_text.lower().split() if len(t) > 2][:8]
+    if not tokens:
+        return []
+    like_clauses = " OR ".join(["content ILIKE %s"] * len(tokens))
+    params: list[Any] = [user_id] + [f"%{t}%" for t in tokens]
+    cur.execute(
+        f"""
+        SELECT id, content, section_type
+        FROM cv_chunks
+        WHERE user_id = %s::uuid
+          AND ({like_clauses})
+        ORDER BY chunk_index
+        LIMIT %s
+        """,
+        (*params, limit),
+    )
+    return [dict(r) for r in cur.fetchall()]
+
+
 def search_cv_chunks(
     conn: psycopg.Connection,
     *,
@@ -18,48 +44,35 @@ def search_cv_chunks(
     limit: int = 5,
 ) -> list[dict[str, Any]]:
     """
-    Text similarity over cv_chunks.embedding for this user only.
-    Returns [] when no embeddings exist (P2.4 still scores via profile skills).
+    Cosine search over cv_chunks.embedding for this user only.
+    Falls back to ILIKE when embeddings or the embed API are missing.
     """
-    # Without an embedding API in-test, use ILIKE keyword fallback on user's chunks
-    tokens = [t for t in query_text.lower().split() if len(t) > 2][:8]
-    if not tokens:
-        return []
     try:
         with conn.cursor() as cur:
-            # Prefer vector search when embeddings present
-            cur.execute(
-                """
-                SELECT id, content, section_type,
-                       (embedding IS NOT NULL) AS has_embedding
-                FROM cv_chunks
-                WHERE user_id = %s::uuid
-                LIMIT 1
-                """,
-                (user_id,),
-            )
-            probe = cur.fetchone()
-            if not probe:
-                return []
+            from lib.embeddings import embed_one, vector_literal
 
-            # Keyword fallback (safe, user-scoped) — vector path needs query embedding
-            like_clauses = " OR ".join(["content ILIKE %s"] * len(tokens))
-            params: list[Any] = [user_id] + [f"%{t}%" for t in tokens]
-            cur.execute(
-                f"""
-                SELECT id, content, section_type
-                FROM cv_chunks
-                WHERE user_id = %s::uuid
-                  AND ({like_clauses})
-                ORDER BY chunk_index
-                LIMIT %s
-                """,
-                (*params, limit),
-            )
-            rows = [dict(r) for r in cur.fetchall()]
-            logger.info("cv_search_hits user_scoped=%s count=%s", True, len(rows))
+            qvec = embed_one(query_text)
+            lit = vector_literal(qvec) if qvec else None
+            if lit:
+                cur.execute(
+                    """
+                    SELECT id, content, section_type
+                    FROM cv_chunks
+                    WHERE user_id = %s::uuid
+                      AND embedding IS NOT NULL
+                    ORDER BY embedding <=> %s::vector
+                    LIMIT %s
+                    """,
+                    (user_id, lit, limit),
+                )
+                rows = [dict(r) for r in cur.fetchall()]
+                if rows:
+                    logger.info("cv_search_hits mode=vector user_scoped=%s count=%s", True, len(rows))
+                    return rows
+            rows = _keyword_search(cur, user_id=user_id, query_text=query_text, limit=limit)
+            logger.info("cv_search_hits mode=keyword user_scoped=%s count=%s", True, len(rows))
             return rows
-    except Exception:  # noqa: BLE001 — table may be empty / extension edge cases
+    except Exception:  # noqa: BLE001
         logger.warning("cv_search_unavailable")
         return []
 
