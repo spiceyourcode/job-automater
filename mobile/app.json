@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "JobAutomater",
+    "slug": "jobautomater",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "platforms": ["ios", "android"],
+    "extra": {
+      "apiUrl": "http://localhost:3001"
+    }
+  }
+}
