@@ -174,17 +174,41 @@ export type JobStats = {
   byStatus: Array<{ status: string; count: number }>;
 };
 
-export async function getJobStatsAction(): Promise<ActionResult<JobStats>> {
+    return { ok: true, data };
+  } catch {
+    return { ok: false, error: "Network error — is the API running?" };
+  }
+}
+
+export type SalaryBenchmark = {
+  sampleSize: number;
+  currency: string;
+  p25Cents: number | null;
+  p50Cents: number | null;
+  p75Cents: number | null;
+  minCents: number | null;
+  maxCents: number | null;
+  title: string | null;
+  location: string | null;
+};
+
+export async function getSalaryBenchmarkAction(params?: {
+  title?: string;
+  location?: string;
+}): Promise<ActionResult<SalaryBenchmark>> {
   const headers = await authHeaders();
   if (!headers) return { ok: false, error: "Unauthorized" };
+  const qs = new URLSearchParams();
+  if (params?.title) qs.set("title", params.title);
+  if (params?.location) qs.set("location", params.location);
+  const q = qs.toString();
   try {
-    const res = await fetch(`${API_URL}/api/v1/jobs/stats`, {
-      headers,
-      cache: "no-store",
-    });
-    if (!res.ok) return { ok: false, error: "Failed to load stats" };
-    const data = (await res.json()) as JobStats;
-    return { ok: true, data };
+    const res = await fetch(
+      `${API_URL}/api/v1/jobs/salary-benchmark${q ? `?${q}` : ""}`,
+      { headers, cache: "no-store" },
+    );
+    if (!res.ok) return { ok: false, error: "Failed to load salary benchmark" };
+    return { ok: true, data: (await res.json()) as SalaryBenchmark };
   } catch {
     return { ok: false, error: "Network error — is the API running?" };
   }

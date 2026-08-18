@@ -4,7 +4,7 @@ import { db } from "../../db/index.js";
 import { jobs, jobScores, savedJobs } from "../../db/schema/index.js";
 import { enqueueMatchScore } from "../../lib/queue.js";
 import { assertPublicHttpUrl } from "../../lib/safe-url.js";
-import type { ImportJobBody, ListJobsQuery } from "./jobs.schema.js";
+import type { ImportJobBody, ListJobsQuery, SalaryBenchmarkQuery } from "./jobs.schema.js";
 
 
 export class JobError extends Error {
@@ -400,4 +400,65 @@ export async function unsaveJob(userId: string, jobId: string) {
     if (!owned) throw new JobError("Job not found", 404);
   }
   return { success: true as const };
+}
+
+function percentileCents(sorted: number[], p: number): number | null {
+  if (sorted.length === 0) return null;
+  const idx = Math.min(
+    sorted.length - 1,
+    Math.max(0, Math.round((p / 100) * (sorted.length - 1))),
+  );
+  return sorted[idx] ?? null;
+}
+
+/** Owner-scoped market from collected jobs. Values are integer cents (HG-3). */
+export async function getSalaryBenchmark(
+  userId: string,
+  query: SalaryBenchmarkQuery,
+) {
+  const filters = [eq(jobs.userId, userId), isNotNull(jobs.salaryMin)];
+  if (query.title) {
+    filters.push(ilike(jobs.title, `%${query.title}%`));
+  }
+  if (query.location) {
+    filters.push(ilike(jobs.location, `%${query.location}%`));
+  }
+  const rows = await db
+    .select({
+      salaryMin: jobs.salaryMin,
+      salaryMax: jobs.salaryMax,
+      salaryCurrency: jobs.salaryCurrency,
+      userId: jobs.userId,
+    })
+    .from(jobs)
+    .where(and(...filters));
+
+  for (const row of rows) {
+    if (row.userId !== userId) {
+      throw new JobError("Forbidden", 403);
+    }
+  }
+
+  const mids: number[] = [];
+  for (const row of rows) {
+    const min = row.salaryMin;
+    const max = row.salaryMax;
+    if (typeof min !== "number") continue;
+    const mid =
+      typeof max === "number" ? Math.round((min + max) / 2) : min;
+    if (Number.isInteger(mid) && mid >= 0) mids.push(mid);
+  }
+  mids.sort((a, b) => a - b);
+  const currency = rows[0]?.salaryCurrency ?? "USD";
+  return {
+    sampleSize: mids.length,
+    currency,
+    p25Cents: percentileCents(mids, 25),
+    p50Cents: percentileCents(mids, 50),
+    p75Cents: percentileCents(mids, 75),
+    minCents: mids[0] ?? null,
+    maxCents: mids.length ? mids[mids.length - 1]! : null,
+    title: query.title ?? null,
+    location: query.location ?? null,
+  };
 }

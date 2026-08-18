@@ -45,5 +45,13 @@ export const similarJobsQuerySchema = z
   })
   .strict();
 
+export const salaryBenchmarkQuerySchema = z
+  .object({
+    title: z.string().min(1).max(200).optional(),
+    location: z.string().max(255).optional(),
+  })
+  .strict();
+
 export type ListJobsQuery = z.infer<typeof listJobsQuerySchema>;
 export type ImportJobBody = z.infer<typeof importJobBodySchema>;
+export type SalaryBenchmarkQuery = z.infer<typeof salaryBenchmarkQuerySchema>;

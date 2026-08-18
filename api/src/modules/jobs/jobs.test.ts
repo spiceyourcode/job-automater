@@ -14,6 +14,7 @@ vi.mock("./jobs.service.js", async (importOriginal) => {
     listSimilarJobs: vi.fn(),
     saveJob: vi.fn(),
     unsaveJob: vi.fn(),
+    getSalaryBenchmark: vi.fn(),
     JobError: actual.JobError,
   };
 });
@@ -273,5 +274,39 @@ describe("GET /api/v1/jobs/stats", () => {
     });
     expect(res.status).toBe(200);
     expect(mockService.getJobStats).toHaveBeenCalledWith("user-a");
+  });
+});
+
+describe("GET /api/v1/jobs/salary-benchmark", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("401 without auth", async () => {
+    const res = await buildApp().request("/api/v1/jobs/salary-benchmark");
+    expect(res.status).toBe(401);
+  });
+
+  it("200 returns integer-cent percentiles for the caller", async () => {
+    mockService.getSalaryBenchmark.mockResolvedValue({
+      sampleSize: 3,
+      currency: "USD",
+      p25Cents: 12000000,
+      p50Cents: 14000000,
+      p75Cents: 16000000,
+      minCents: 12000000,
+      maxCents: 16000000,
+      title: "Python",
+      location: null,
+    });
+    const res = await buildApp().request(
+      "/api/v1/jobs/salary-benchmark?title=Python",
+      { headers: { Authorization: await authHeader("user-a") } },
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { p50Cents: number };
+    expect(Number.isInteger(body.p50Cents)).toBe(true);
+    expect(mockService.getSalaryBenchmark).toHaveBeenCalledWith(
+      "user-a",
+      expect.objectContaining({ title: "Python" }),
+    );
   });
 });

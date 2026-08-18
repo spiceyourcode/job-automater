@@ -6,6 +6,7 @@ import {
   listJobsQuerySchema,
   importJobBodySchema,
   similarJobsQuerySchema,
+  salaryBenchmarkQuerySchema,
 } from "./jobs.schema.js";
 import * as jobsService from "./jobs.service.js";
 
@@ -28,6 +29,19 @@ jobsRoutes.get("/stats", async (c) => {
   const result = await jobsService.getJobStats(userId);
   return c.json(result, 200);
 });
+
+jobsRoutes.get(
+  "/salary-benchmark",
+  zValidator("query", salaryBenchmarkQuerySchema),
+  async (c) => {
+    const { userId } = c.get("auth");
+    const result = await jobsService.getSalaryBenchmark(
+      userId,
+      c.req.valid("query"),
+    );
+    return c.json(result, 200);
+  },
+);
 
 jobsRoutes.post(
   "/import",
