@@ -1,14 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { Hono } from "hono";
-import { createHmac } from "node:crypto";
 import { testAuthHeader } from "../../test/auth-header.js";
-import { billingRoutes, billingWebhookRoutes } from "./billing.routes.js";
+import { registerRoutes } from "./index.js";
 import { getBillingStatus } from "./billing.service.js";
 
 const buildApp = () => {
   const app = new Hono();
-  app.route("/api/v1/billing", billingRoutes);
-  app.route("/api/v1/billing/webhook", billingWebhookRoutes);
+  // Webhook must be registered before authed /billing (HG-2 exception: Stripe HMAC).
+  registerRoutes(app);
   return app;
 };
 
@@ -45,5 +44,3 @@ describe("getBillingStatus", () => {
     expect("stripeSecretKey" in status).toBe(false);
   });
 });
-
-void createHmac;
