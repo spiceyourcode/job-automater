@@ -31,6 +31,14 @@ analyticsRoutes.get("/cv-ab", async (c) => {
   return c.json(await analyticsService.getCvAbReport(userId), 200);
 });
 
+analyticsRoutes.get("/team", async (c) => {
+  const { userId, role } = c.get("auth");
+  if (role !== "owner") {
+    return c.json({ error: "forbidden" }, 403);
+  }
+  return c.json(await analyticsService.getDashboardSummary(userId, {}), 200);
+});
+
 analyticsRoutes.get("/pipeline", async (c) => {
   const { userId } = c.get("auth");
   return c.json(await analyticsService.getPipelineFunnel(userId), 200);

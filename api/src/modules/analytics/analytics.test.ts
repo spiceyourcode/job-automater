@@ -187,3 +187,17 @@ describe("GET /api/v1/analytics/cv-ab", () => {
     expect(mockService.getCvAbReport).toHaveBeenCalledWith("user-a");
   });
 });
+
+describe("GET /api/v1/analytics/team", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("403 for non-owner", async () => {
+    const res = await buildApp().request("/api/v1/analytics/team", {
+      headers: {
+        Authorization: await testAuthHeader("user-a", "member"),
+      },
+    });
+    expect(res.status).toBe(403);
+    expect(mockService.getDashboardSummary).not.toHaveBeenCalled();
+  });
+});

@@ -41,6 +41,9 @@ const envSchema = z
     GMAIL_PUBSUB_TOPIC: z.string().optional(),
     GMAIL_PUSH_TOKEN: z.string().optional(),
     SENTRY_DSN: z.string().url().optional(),
+    STRIPE_SECRET_KEY: z.string().optional(),
+    STRIPE_WEBHOOK_SECRET: z.string().optional(),
+    STRIPE_PRICE_ID: z.string().optional(),
   })
   .strict();
 
@@ -82,6 +85,9 @@ const parsed = envSchema.safeParse({
   GMAIL_PUBSUB_TOPIC: process.env.GMAIL_PUBSUB_TOPIC || undefined,
   GMAIL_PUSH_TOKEN: process.env.GMAIL_PUSH_TOKEN || undefined,
   SENTRY_DSN: process.env.SENTRY_DSN || undefined,
+  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || undefined,
+  STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET || undefined,
+  STRIPE_PRICE_ID: process.env.STRIPE_PRICE_ID || undefined,
 });
 
 if (!parsed.success) {
@@ -119,4 +125,7 @@ export const env = {
   gmailPubsubTopic: parsed.data.GMAIL_PUBSUB_TOPIC,
   gmailPushToken: parsed.data.GMAIL_PUSH_TOKEN,
   sentryDsn: parsed.data.SENTRY_DSN,
+  stripeSecretKey: parsed.data.STRIPE_SECRET_KEY,
+  stripeWebhookSecret: parsed.data.STRIPE_WEBHOOK_SECRET,
+  stripePriceId: parsed.data.STRIPE_PRICE_ID,
 } as const;
