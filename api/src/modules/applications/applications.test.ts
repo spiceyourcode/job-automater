@@ -24,6 +24,8 @@ vi.mock("./applications.service.js", async (importOriginal) => {
     patchInterview: vi.fn(),
     patchApplicationMeta: vi.fn(),
     bulkAction: vi.fn(),
+    requestInterviewPrep: vi.fn(),
+    getInterviewPrep: vi.fn(),
     ApplicationError: actual.ApplicationError,
   };
 });
@@ -643,5 +645,59 @@ describe("POST /api/v1/applications/bulk-action", () => {
       }),
     });
     expect(res.status).toBe(404);
+  });
+});
+
+describe("POST /api/v1/applications/:id/prep", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("401 without auth", async () => {
+    const res = await buildApp().request(
+      `/api/v1/applications/${sampleApp.id}/prep`,
+      { method: "POST" },
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("202 queues interview prep", async () => {
+    mockService.requestInterviewPrep.mockResolvedValue({
+      status: "generating",
+      applicationId: sampleApp.id,
+    });
+    const res = await buildApp().request(
+      `/api/v1/applications/${sampleApp.id}/prep`,
+      { method: "POST", headers: { Authorization: await authHeader() } },
+    );
+    expect(res.status).toBe(202);
+  });
+
+  it("404 IDOR — other user cannot generate prep", async () => {
+    mockService.requestInterviewPrep.mockRejectedValue(
+      new applicationsService.ApplicationError("Application not found", 404),
+    );
+    const res = await buildApp().request(
+      `/api/v1/applications/${sampleApp.id}/prep`,
+      {
+        method: "POST",
+        headers: { Authorization: await authHeader("user-b") },
+      },
+    );
+    expect(res.status).toBe(404);
+  });
+});
+
+describe("GET /api/v1/applications/:id/prep", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("200 returns idle when none", async () => {
+    mockService.getInterviewPrep.mockResolvedValue({
+      prep: null,
+      status: "idle",
+    });
+    const res = await buildApp().request(
+      `/api/v1/applications/${sampleApp.id}/prep`,
+      { headers: { Authorization: await authHeader() } },
+    );
+    expect(res.status).toBe(200);
   });
 });

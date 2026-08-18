@@ -517,7 +517,8 @@ def load_job_for_user(
         cur.execute(
             """
             SELECT id, user_id, title, company, location, description, requirements,
-                   is_remote, employment_type, source, application_url, source_url
+                   is_remote, employment_type, source, application_url, source_url,
+                   salary_min, salary_max, salary_currency
             FROM jobs
             WHERE id = %s::uuid AND user_id = %s::uuid
             LIMIT 1
@@ -862,3 +863,50 @@ def _post_webhook(url: str, title: str, channel: str) -> None:
         logger.info("webhook_sent channel=%s", channel)
     except (urllib.error.URLError, TimeoutError, OSError):
         logger.warning("webhook_failed channel=%s", channel)
+
+
+def save_interview_prep(
+    conn: psycopg.Connection,
+    *,
+    application_id: str,
+    user_id: str,
+    job_id: str,
+    status: str,
+    questions: list[dict[str, Any]],
+    star_stories: list[dict[str, Any]],
+    negotiation: dict[str, Any] | None,
+    model_used: str | None,
+    error_code: str | None = None,
+) -> None:
+    """Upsert owner-scoped prep. Never log question/STAR bodies (HG-8)."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO interview_preps (
+                user_id, application_id, job_id, status, questions, star_stories,
+                negotiation, model_used, error_code, updated_at
+            ) VALUES (
+                %s::uuid, %s::uuid, %s::uuid, %s, %s::jsonb, %s::jsonb,
+                %s::jsonb, %s, %s, NOW()
+            )
+            ON CONFLICT (user_id, application_id) DO UPDATE SET
+                status = EXCLUDED.status,
+                questions = EXCLUDED.questions,
+                star_stories = EXCLUDED.star_stories,
+                negotiation = EXCLUDED.negotiation,
+                model_used = EXCLUDED.model_used,
+                error_code = EXCLUDED.error_code,
+                updated_at = NOW()
+            """,
+            (
+                user_id,
+                application_id,
+                job_id,
+                status,
+                json.dumps(questions),
+                json.dumps(star_stories),
+                json.dumps(negotiation) if negotiation is not None else None,
+                model_used,
+                error_code,
+            ),
+        )

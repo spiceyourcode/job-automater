@@ -21,6 +21,7 @@ MONITOR_EMAIL_KEY = "jobautomater:monitor_email"
 REINDEX_CV_KEY = "jobautomater:reindex_cv"
 MATCH_SCORE_KEY = "jobautomater:match_score"
 ENRICH_COMPANY_KEY = "jobautomater:enrich_company"
+INTERVIEW_PREP_KEY = "jobautomater:interview_prep"
 
 _stop = threading.Event()
 _thread: threading.Thread | None = None
@@ -95,6 +96,14 @@ def _dispatch(key: str, payload: dict[str, Any]) -> None:
             payload.get("user_id"),
             len(payload.get("job_ids") or []),
         )
+    elif key == INTERVIEW_PREP_KEY:
+        from tasks.interview_prep import interview_prep
+
+        interview_prep.delay(payload)
+        logger.info(
+            "bridge_interview_prep application_id=%s",
+            payload.get("application_id"),
+        )
 
 
 def _loop() -> None:
@@ -111,6 +120,7 @@ def _loop() -> None:
                     REINDEX_CV_KEY,
                     MATCH_SCORE_KEY,
                     ENRICH_COMPANY_KEY,
+                    INTERVIEW_PREP_KEY,
                 ],
                 timeout=2,
             )

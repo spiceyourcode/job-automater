@@ -84,6 +84,16 @@
         "approved_at": { "type": "string", "format": "date-time" }
       },
       "additionalProperties": false
+    },
+    "InterviewPrepJob": {
+      "type": "object",
+      "required": ["application_id", "user_id", "job_id"],
+      "properties": {
+        "application_id": { "type": "string", "format": "uuid" },
+        "user_id": { "type": "string", "format": "uuid" },
+        "job_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
     }
   }
 }

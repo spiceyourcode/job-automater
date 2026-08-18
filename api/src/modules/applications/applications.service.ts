@@ -2,6 +2,7 @@ import { and, desc, eq, gte, inArray, notInArray, sql } from "drizzle-orm";
 import { db } from "../../db/index.js";
 import {
   applications,
+  interviewPreps,
   jobScores,
   jobs,
   profiles,
@@ -9,6 +10,7 @@ import {
 } from "../../db/schema/index.js";
 import {
   enqueueGenerateDocs,
+  enqueueInterviewPrep,
   enqueueSubmitApplication,
 } from "../../lib/queue.js";
 import { getPresignedGetUrl, uploadObject } from "../../lib/s3.js";
@@ -902,4 +904,132 @@ export async function bulkAction(userId: string, body: BulkActionBody) {
     action: body.action,
     submitEnqueued: false as const,
   };
+}
+
+function asStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((x): x is string => typeof x === "string");
+}
+
+function toPublicPrep(row: typeof interviewPreps.$inferSelect) {
+  const questionsRaw = Array.isArray(row.questions) ? row.questions : [];
+  const storiesRaw = Array.isArray(row.starStories) ? row.starStories : [];
+  const neg = row.negotiation as Record<string, unknown> | null;
+  return {
+    id: row.id,
+    applicationId: row.applicationId,
+    jobId: row.jobId,
+    status: row.status,
+    questions: questionsRaw.map((q) => {
+      const o = q as Record<string, unknown>;
+      return {
+        question: String(o.question ?? ""),
+        suggestedAnswer: String(o.suggestedAnswer ?? o.suggested_answer ?? ""),
+        category: String(o.category ?? "behavioral"),
+        chunkIds: asStringArray(o.chunkIds ?? o.chunk_ids),
+      };
+    }),
+    starStories: storiesRaw.map((s) => {
+      const o = s as Record<string, unknown>;
+      return {
+        title: String(o.title ?? ""),
+        situation: String(o.situation ?? ""),
+        task: String(o.task ?? ""),
+        action: String(o.action ?? ""),
+        result: String(o.result ?? ""),
+        chunkIds: asStringArray(o.chunkIds ?? o.chunk_ids),
+      };
+    }),
+    negotiation: neg
+      ? {
+          currency: String(neg.currency ?? "USD"),
+          rangeMinCents:
+            typeof neg.rangeMinCents === "number"
+              ? neg.rangeMinCents
+              : typeof neg.range_min_cents === "number"
+                ? neg.range_min_cents
+                : null,
+          rangeMaxCents:
+            typeof neg.rangeMaxCents === "number"
+              ? neg.rangeMaxCents
+              : typeof neg.range_max_cents === "number"
+                ? neg.range_max_cents
+                : null,
+          targetCents:
+            typeof neg.targetCents === "number"
+              ? neg.targetCents
+              : typeof neg.target_cents === "number"
+                ? neg.target_cents
+                : null,
+          walkawayCents:
+            typeof neg.walkawayCents === "number"
+              ? neg.walkawayCents
+              : typeof neg.walkaway_cents === "number"
+                ? neg.walkaway_cents
+                : null,
+          talkingPoints: asStringArray(neg.talkingPoints ?? neg.talking_points),
+          chunkIds: asStringArray(neg.chunkIds ?? neg.chunk_ids),
+        }
+      : null,
+    modelUsed: row.modelUsed,
+    errorCode: row.errorCode,
+    updatedAt: row.updatedAt,
+  };
+}
+
+export async function requestInterviewPrep(userId: string, id: string) {
+  const app = await getOwned(userId, id);
+  const [existing] = await db
+    .select()
+    .from(interviewPreps)
+    .where(
+      and(
+        eq(interviewPreps.userId, userId),
+        eq(interviewPreps.applicationId, id),
+      ),
+    )
+    .limit(1);
+  if (existing) {
+    await db
+      .update(interviewPreps)
+      .set({
+        status: "pending",
+        errorCode: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(interviewPreps.id, existing.id));
+  } else {
+    await db.insert(interviewPreps).values({
+      userId,
+      applicationId: id,
+      jobId: app.jobId,
+      status: "pending",
+    });
+  }
+  try {
+    await enqueueInterviewPrep({
+      application_id: id,
+      user_id: userId,
+      job_id: app.jobId,
+    });
+  } catch {
+    throw new ApplicationError("Failed to enqueue interview prep", 503);
+  }
+  return { status: "generating" as const, applicationId: id };
+}
+
+export async function getInterviewPrep(userId: string, id: string) {
+  await getOwned(userId, id);
+  const [row] = await db
+    .select()
+    .from(interviewPreps)
+    .where(
+      and(
+        eq(interviewPreps.userId, userId),
+        eq(interviewPreps.applicationId, id),
+      ),
+    )
+    .limit(1);
+  if (!row) return { prep: null, status: "idle" as const };
+  return { prep: toPublicPrep(row), status: row.status };
 }

@@ -385,6 +385,8 @@ export function PipelineBoard({ initial }: Props) {
                       className="mt-1 h-auto px-0 text-xs"
                     >
                       <a href={`/applications/${app.id}/review`}>Documents</a>
+                      {" · "}
+                      <a href={`/applications/${app.id}/prep`}>Prep</a>
                     </Button>
                   )}
                 </li>

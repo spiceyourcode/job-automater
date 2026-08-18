@@ -189,3 +189,25 @@ export async function enqueueEnrichCompany(
     await client.quit().catch(() => {});
   }
 }
+
+export type InterviewPrepPayload = {
+  application_id: string;
+  user_id: string;
+  job_id: string;
+};
+
+/** Publish InterviewPrepJob — never logs STAR/Q&A bodies (HG-8). */
+export async function enqueueInterviewPrep(
+  payload: InterviewPrepPayload,
+): Promise<void> {
+  const client = createClient({ url: env.redisUrl });
+  try {
+    await client.connect();
+    await client.lPush(
+      "jobautomater:interview_prep",
+      JSON.stringify(payload),
+    );
+  } finally {
+    await client.quit().catch(() => {});
+  }
+}

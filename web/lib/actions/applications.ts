@@ -445,3 +445,83 @@ export async function patchApplicationMetaAction(
     return { ok: false, error: "Network error" };
   }
 }
+
+export type InterviewPrepPublic = {
+  id: string;
+  applicationId: string;
+  jobId: string;
+  status: string;
+  questions: Array<{
+    question: string;
+    suggestedAnswer: string;
+    category: string;
+    chunkIds: string[];
+  }>;
+  starStories: Array<{
+    title: string;
+    situation: string;
+    task: string;
+    action: string;
+    result: string;
+    chunkIds: string[];
+  }>;
+  negotiation: {
+    currency: string;
+    rangeMinCents: number | null;
+    rangeMaxCents: number | null;
+    targetCents: number | null;
+    walkawayCents: number | null;
+    talkingPoints: string[];
+    chunkIds: string[];
+  } | null;
+  modelUsed: string | null;
+  errorCode: string | null;
+  updatedAt: string | Date;
+};
+
+export async function getInterviewPrepAction(
+  id: string,
+): Promise<ActionResult<{ prep: InterviewPrepPublic | null; status: string }>> {
+  const headers = await authHeaders();
+  if (!headers) return { ok: false, error: "Unauthorized" };
+  try {
+    const res = await fetch(`${API_URL}/api/v1/applications/${id}/prep`, {
+      headers,
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      const err = (await res.json().catch(() => ({}))) as { error?: string };
+      return { ok: false, error: err.error ?? "Could not load prep" };
+    }
+    return {
+      ok: true,
+      data: (await res.json()) as {
+        prep: InterviewPrepPublic | null;
+        status: string;
+      },
+    };
+  } catch {
+    return { ok: false, error: "Network error" };
+  }
+}
+
+export async function generateInterviewPrepAction(
+  id: string,
+): Promise<ActionResult<{ status: string }>> {
+  const headers = await authHeaders();
+  if (!headers) return { ok: false, error: "Unauthorized" };
+  try {
+    const res = await fetch(`${API_URL}/api/v1/applications/${id}/prep`, {
+      method: "POST",
+      headers,
+    });
+    if (!res.ok) {
+      const err = (await res.json().catch(() => ({}))) as { error?: string };
+      return { ok: false, error: err.error ?? "Could not generate prep" };
+    }
+    revalidatePath(`/applications/${id}/prep`);
+    return { ok: true, data: (await res.json()) as { status: string } };
+  } catch {
+    return { ok: false, error: "Network error" };
+  }
+}

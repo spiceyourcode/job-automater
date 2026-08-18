@@ -22,6 +22,7 @@ app = Celery(
         "tasks.enrich_company",
         "tasks.reindex_cv",
         "tasks.weekly_digest",
+        "tasks.interview_prep",
     ],
 )
 

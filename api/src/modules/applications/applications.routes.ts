@@ -360,6 +360,52 @@ applicationsRoutes.patch(
   },
 );
 
+applicationsRoutes.post(
+  "/:id/prep",
+  requireRole("owner", "member"),
+  zValidator("param", applicationIdParamSchema),
+  async (c) => {
+    const { userId } = c.get("auth");
+    try {
+      return c.json(
+        await applicationsService.requestInterviewPrep(
+          userId,
+          c.req.valid("param").id,
+        ),
+        202,
+      );
+    } catch (err) {
+      if (isAppError(err)) {
+        return c.json({ error: err.message }, err.statusCode);
+      }
+      throw err;
+    }
+  },
+);
+
+applicationsRoutes.get(
+  "/:id/prep",
+  requireRole("owner", "member", "viewer"),
+  zValidator("param", applicationIdParamSchema),
+  async (c) => {
+    const { userId } = c.get("auth");
+    try {
+      return c.json(
+        await applicationsService.getInterviewPrep(
+          userId,
+          c.req.valid("param").id,
+        ),
+        200,
+      );
+    } catch (err) {
+      if (isAppError(err)) {
+        return c.json({ error: err.message }, err.statusCode);
+      }
+      throw err;
+    }
+  },
+);
+
 applicationsRoutes.get(
   "/:id/download/:kind",
   requireRole("owner", "member", "viewer"),
