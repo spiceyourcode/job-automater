@@ -211,3 +211,22 @@ export async function enqueueInterviewPrep(
     await client.quit().catch(() => {});
   }
 }
+
+export type VideoCoverPayload = {
+  application_id: string;
+  user_id: string;
+  job_id: string;
+};
+
+/** Publish VideoCoverJob — never logs script bodies (HG-8). */
+export async function enqueueVideoCover(
+  payload: VideoCoverPayload,
+): Promise<void> {
+  const client = createClient({ url: env.redisUrl });
+  try {
+    await client.connect();
+    await client.lPush("jobautomater:video_cover", JSON.stringify(payload));
+  } finally {
+    await client.quit().catch(() => {});
+  }
+}

@@ -387,6 +387,8 @@ export function PipelineBoard({ initial }: Props) {
                       <a href={`/applications/${app.id}/review`}>Documents</a>
                       {" · "}
                       <a href={`/applications/${app.id}/prep`}>Prep</a>
+                      {" · "}
+                      <a href={`/applications/${app.id}/video-script`}>Video</a>
                     </Button>
                   )}
                 </li>

@@ -5,6 +5,7 @@ import {
   recruiterInteractions,
 } from "../../db/schema/index.js";
 import type {
+  ContactKind,
   CreateContactBody,
   CreateInteractionBody,
   PatchContactBody,
@@ -29,16 +30,19 @@ function toPublicContact(row: typeof recruiterContacts.$inferSelect) {
     role: row.role,
     linkedinUrl: row.linkedinUrl,
     notes: row.notes,
+    kind: row.kind,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
 }
 
-export async function listContacts(userId: string) {
+export async function listContacts(userId: string, kind?: ContactKind) {
+  const filters = [eq(recruiterContacts.userId, userId)];
+  if (kind) filters.push(eq(recruiterContacts.kind, kind));
   const rows = await db
     .select()
     .from(recruiterContacts)
-    .where(eq(recruiterContacts.userId, userId))
+    .where(and(...filters))
     .orderBy(desc(recruiterContacts.updatedAt));
   return { contacts: rows.map(toPublicContact) };
 }
@@ -54,6 +58,7 @@ export async function createContact(userId: string, body: CreateContactBody) {
       role: body.role,
       linkedinUrl: body.linkedinUrl,
       notes: body.notes,
+      kind: body.kind ?? "recruiter",
     })
     .returning();
   return { contact: toPublicContact(row!) };

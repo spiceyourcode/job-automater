@@ -22,6 +22,7 @@ export const recruiterContacts = pgTable(
     role: varchar("role", { length: 200 }),
     linkedinUrl: text("linkedin_url"),
     notes: text("notes"),
+    kind: varchar("kind", { length: 40 }).notNull().default("recruiter"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),

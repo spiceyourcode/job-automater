@@ -910,3 +910,56 @@ def save_interview_prep(
                 error_code,
             ),
         )
+
+
+def save_video_cover_script(
+    conn: psycopg.Connection,
+    *,
+    application_id: str,
+    user_id: str,
+    job_id: str,
+    status: str,
+    script: str | None,
+    hook: str | None,
+    close: str | None,
+    chunk_ids: list[str],
+    estimated_seconds: int | None,
+    model_used: str | None,
+    error_code: str | None = None,
+) -> None:
+    """Upsert owner-scoped video script. Never log script bodies (HG-8)."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO video_cover_scripts (
+                user_id, application_id, job_id, status, script, hook, close,
+                chunk_ids, estimated_seconds, model_used, error_code, updated_at
+            ) VALUES (
+                %s::uuid, %s::uuid, %s::uuid, %s, %s, %s, %s,
+                %s::jsonb, %s, %s, %s, NOW()
+            )
+            ON CONFLICT (user_id, application_id) DO UPDATE SET
+                status = EXCLUDED.status,
+                script = EXCLUDED.script,
+                hook = EXCLUDED.hook,
+                close = EXCLUDED.close,
+                chunk_ids = EXCLUDED.chunk_ids,
+                estimated_seconds = EXCLUDED.estimated_seconds,
+                model_used = EXCLUDED.model_used,
+                error_code = EXCLUDED.error_code,
+                updated_at = NOW()
+            """,
+            (
+                user_id,
+                application_id,
+                job_id,
+                status,
+                script,
+                hook,
+                close,
+                json.dumps(chunk_ids),
+                estimated_seconds,
+                model_used,
+                error_code,
+            ),
+        )

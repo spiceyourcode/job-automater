@@ -26,6 +26,8 @@ vi.mock("./applications.service.js", async (importOriginal) => {
     bulkAction: vi.fn(),
     requestInterviewPrep: vi.fn(),
     getInterviewPrep: vi.fn(),
+    requestVideoCover: vi.fn(),
+    getVideoCover: vi.fn(),
     ApplicationError: actual.ApplicationError,
   };
 });
@@ -699,5 +701,43 @@ describe("GET /api/v1/applications/:id/prep", () => {
       { headers: { Authorization: await authHeader() } },
     );
     expect(res.status).toBe(200);
+  });
+});
+
+describe("POST /api/v1/applications/:id/video-script", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("401 without auth", async () => {
+    const res = await buildApp().request(
+      `/api/v1/applications/${sampleApp.id}/video-script`,
+      { method: "POST" },
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("202 queues video cover script", async () => {
+    mockService.requestVideoCover.mockResolvedValue({
+      status: "generating",
+      applicationId: sampleApp.id,
+    });
+    const res = await buildApp().request(
+      `/api/v1/applications/${sampleApp.id}/video-script`,
+      { method: "POST", headers: { Authorization: await authHeader() } },
+    );
+    expect(res.status).toBe(202);
+  });
+
+  it("404 IDOR — other user cannot generate video script", async () => {
+    mockService.requestVideoCover.mockRejectedValue(
+      new applicationsService.ApplicationError("Application not found", 404),
+    );
+    const res = await buildApp().request(
+      `/api/v1/applications/${sampleApp.id}/video-script`,
+      {
+        method: "POST",
+        headers: { Authorization: await authHeader("user-b") },
+      },
+    );
+    expect(res.status).toBe(404);
   });
 });

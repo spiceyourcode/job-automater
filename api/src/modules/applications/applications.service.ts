@@ -6,12 +6,14 @@ import {
   jobScores,
   jobs,
   profiles,
+  videoCoverScripts,
   type Application,
 } from "../../db/schema/index.js";
 import {
   enqueueGenerateDocs,
   enqueueInterviewPrep,
   enqueueSubmitApplication,
+  enqueueVideoCover,
 } from "../../lib/queue.js";
 import { getPresignedGetUrl, uploadObject } from "../../lib/s3.js";
 import { buildApplicationZip, textToAtsPdf } from "../../lib/ats-pdf.js";
@@ -1032,4 +1034,78 @@ export async function getInterviewPrep(userId: string, id: string) {
     .limit(1);
   if (!row) return { prep: null, status: "idle" as const };
   return { prep: toPublicPrep(row), status: row.status };
+}
+
+function toPublicVideoScript(row: typeof videoCoverScripts.$inferSelect) {
+  return {
+    id: row.id,
+    applicationId: row.applicationId,
+    jobId: row.jobId,
+    status: row.status,
+    script: row.script,
+    hook: row.hook,
+    close: row.close,
+    chunkIds: row.chunkIds ?? [],
+    estimatedSeconds: row.estimatedSeconds,
+    modelUsed: row.modelUsed,
+    errorCode: row.errorCode,
+    updatedAt: row.updatedAt,
+  };
+}
+
+export async function requestVideoCover(userId: string, id: string) {
+  const app = await getOwned(userId, id);
+  const [existing] = await db
+    .select()
+    .from(videoCoverScripts)
+    .where(
+      and(
+        eq(videoCoverScripts.userId, userId),
+        eq(videoCoverScripts.applicationId, id),
+      ),
+    )
+    .limit(1);
+  if (existing) {
+    await db
+      .update(videoCoverScripts)
+      .set({
+        status: "pending",
+        errorCode: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(videoCoverScripts.id, existing.id));
+  } else {
+    await db.insert(videoCoverScripts).values({
+      userId,
+      applicationId: id,
+      jobId: app.jobId,
+      status: "pending",
+    });
+  }
+  try {
+    await enqueueVideoCover({
+      application_id: id,
+      user_id: userId,
+      job_id: app.jobId,
+    });
+  } catch {
+    throw new ApplicationError("Failed to enqueue video cover script", 503);
+  }
+  return { status: "generating" as const, applicationId: id };
+}
+
+export async function getVideoCover(userId: string, id: string) {
+  await getOwned(userId, id);
+  const [row] = await db
+    .select()
+    .from(videoCoverScripts)
+    .where(
+      and(
+        eq(videoCoverScripts.userId, userId),
+        eq(videoCoverScripts.applicationId, id),
+      ),
+    )
+    .limit(1);
+  if (!row) return { script: null, status: "idle" as const };
+  return { script: toPublicVideoScript(row), status: row.status };
 }

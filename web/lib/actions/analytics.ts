@@ -94,6 +94,16 @@ export type SkillDemand = {
   avgSalaryCents: number | null;
 };
 
+export type CourseSuggestion = {
+  title: string;
+  provider: string;
+  url: string;
+};
+
+export type SkillGap = SkillDemand & {
+  course: CourseSuggestion;
+};
+
 export type SkillGapReport = {
   range: { from: string; to: string };
   inDemand: SkillDemand[];
@@ -103,7 +113,7 @@ export type SkillGapReport = {
     inDemandCovered: number;
     coveragePct: number;
   };
-  gaps: SkillDemand[];
+  gaps: SkillGap[];
 };
 
 export async function getSkillGapsAction(range?: {

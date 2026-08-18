@@ -174,7 +174,16 @@ export type JobStats = {
   byStatus: Array<{ status: string; count: number }>;
 };
 
-    return { ok: true, data };
+export async function getJobStatsAction(): Promise<ActionResult<JobStats>> {
+  const headers = await authHeaders();
+  if (!headers) return { ok: false, error: "Unauthorized" };
+  try {
+    const res = await fetch(`${API_URL}/api/v1/jobs/stats`, {
+      headers,
+      cache: "no-store",
+    });
+    if (!res.ok) return { ok: false, error: "Failed to load job stats" };
+    return { ok: true, data: (await res.json()) as JobStats };
   } catch {
     return { ok: false, error: "Network error — is the API running?" };
   }

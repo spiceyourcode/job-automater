@@ -525,3 +525,65 @@ export async function generateInterviewPrepAction(
     return { ok: false, error: "Network error" };
   }
 }
+
+export type VideoCoverPublic = {
+  id: string;
+  applicationId: string;
+  jobId: string;
+  status: string;
+  script: string | null;
+  hook: string | null;
+  close: string | null;
+  chunkIds: string[];
+  estimatedSeconds: number | null;
+  modelUsed: string | null;
+  errorCode: string | null;
+  updatedAt: string | Date;
+};
+
+export async function getVideoCoverAction(
+  id: string,
+): Promise<ActionResult<{ script: VideoCoverPublic | null; status: string }>> {
+  const headers = await authHeaders();
+  if (!headers) return { ok: false, error: "Unauthorized" };
+  try {
+    const res = await fetch(
+      `${API_URL}/api/v1/applications/${id}/video-script`,
+      { headers, cache: "no-store" },
+    );
+    if (!res.ok) {
+      const err = (await res.json().catch(() => ({}))) as { error?: string };
+      return { ok: false, error: err.error ?? "Could not load video script" };
+    }
+    return {
+      ok: true,
+      data: (await res.json()) as {
+        script: VideoCoverPublic | null;
+        status: string;
+      },
+    };
+  } catch {
+    return { ok: false, error: "Network error" };
+  }
+}
+
+export async function generateVideoCoverAction(
+  id: string,
+): Promise<ActionResult<{ status: string }>> {
+  const headers = await authHeaders();
+  if (!headers) return { ok: false, error: "Unauthorized" };
+  try {
+    const res = await fetch(
+      `${API_URL}/api/v1/applications/${id}/video-script`,
+      { method: "POST", headers },
+    );
+    if (!res.ok) {
+      const err = (await res.json().catch(() => ({}))) as { error?: string };
+      return { ok: false, error: err.error ?? "Could not generate video script" };
+    }
+    revalidatePath(`/applications/${id}/video-script`);
+    return { ok: true, data: (await res.json()) as { status: string } };
+  } catch {
+    return { ok: false, error: "Network error" };
+  }
+}

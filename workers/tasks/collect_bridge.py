@@ -22,6 +22,7 @@ REINDEX_CV_KEY = "jobautomater:reindex_cv"
 MATCH_SCORE_KEY = "jobautomater:match_score"
 ENRICH_COMPANY_KEY = "jobautomater:enrich_company"
 INTERVIEW_PREP_KEY = "jobautomater:interview_prep"
+VIDEO_COVER_KEY = "jobautomater:video_cover"
 
 _stop = threading.Event()
 _thread: threading.Thread | None = None
@@ -104,6 +105,14 @@ def _dispatch(key: str, payload: dict[str, Any]) -> None:
             "bridge_interview_prep application_id=%s",
             payload.get("application_id"),
         )
+    elif key == VIDEO_COVER_KEY:
+        from tasks.video_cover import video_cover
+
+        video_cover.delay(payload)
+        logger.info(
+            "bridge_video_cover application_id=%s",
+            payload.get("application_id"),
+        )
 
 
 def _loop() -> None:
@@ -121,6 +130,7 @@ def _loop() -> None:
                     MATCH_SCORE_KEY,
                     ENRICH_COMPANY_KEY,
                     INTERVIEW_PREP_KEY,
+                    VIDEO_COVER_KEY,
                 ],
                 timeout=2,
             )

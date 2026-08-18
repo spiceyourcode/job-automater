@@ -10,7 +10,7 @@ export default async function CrmPage() {
       <div className="mb-6 space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">Recruiter CRM</h1>
         <p className="text-sm text-muted-foreground">
-          Track conversations and follow-ups. Contacts stay private to you.
+          Track recruiters, referrals, and follow-ups. Contacts stay private to you.
         </p>
       </div>
       {!listed.ok ? (

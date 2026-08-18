@@ -5,6 +5,7 @@ import {
   contactIdParamSchema,
   createContactBodySchema,
   createInteractionBodySchema,
+  listContactsQuerySchema,
   patchContactBodySchema,
 } from "./recruiters.schema.js";
 import * as recruitersService from "./recruiters.service.js";
@@ -16,10 +17,18 @@ const isErr = (err: unknown): err is recruitersService.RecruiterError =>
 
 recruitersRoutes.use("*", requireAuth);
 
-recruitersRoutes.get("/", requireRole("owner", "member", "viewer"), async (c) => {
-  const { userId } = c.get("auth");
-  return c.json(await recruitersService.listContacts(userId), 200);
-});
+recruitersRoutes.get(
+  "/",
+  requireRole("owner", "member", "viewer"),
+  zValidator("query", listContactsQuerySchema),
+  async (c) => {
+    const { userId } = c.get("auth");
+    return c.json(
+      await recruitersService.listContacts(userId, c.req.valid("query").kind),
+      200,
+    );
+  },
+);
 
 recruitersRoutes.post(
   "/",

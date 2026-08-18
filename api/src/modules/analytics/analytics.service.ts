@@ -18,6 +18,7 @@ import type {
   AnalyticsExportQuery,
   AnalyticsRangeQuery,
 } from "./analytics.schema.js";
+import { suggestCourse, type CourseSuggestion } from "./courses.js";
 
 function rangeBounds(
   query: AnalyticsRangeQuery,
@@ -243,6 +244,10 @@ export type SkillDemand = {
   avgSalaryCents: number | null;
 };
 
+export type SkillGap = SkillDemand & {
+  course: CourseSuggestion;
+};
+
 export type SkillGapReport = {
   range: { from: string; to: string };
   inDemand: SkillDemand[];
@@ -252,7 +257,7 @@ export type SkillGapReport = {
     inDemandCovered: number;
     coveragePct: number;
   };
-  gaps: SkillDemand[];
+  gaps: SkillGap[];
 };
 
 /** Skill-gap for this user only — never mix another user's jobs/scores (HG-6 analytics exception). */
@@ -355,7 +360,9 @@ export async function getSkillGaps(
   const inDemandCovered = inDemand.filter((d) =>
     mySet.has(d.skill.toLowerCase()),
   ).length;
-  const gaps = inDemand.filter((d) => !mySet.has(d.skill.toLowerCase()));
+  const gaps: SkillGap[] = inDemand
+    .filter((d) => !mySet.has(d.skill.toLowerCase()))
+    .map((d) => ({ ...d, course: suggestCourse(d.skill) }));
 
   return {
     range: { from: from.toISOString(), to: to.toISOString() },

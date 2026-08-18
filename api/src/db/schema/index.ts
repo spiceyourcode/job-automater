@@ -95,6 +95,11 @@ export {
   type RecruiterInteraction,
 } from "./recruiter-crm.js";
 export {
+  videoCoverScripts,
+  type VideoCoverScript,
+  type NewVideoCoverScript,
+} from "./video-cover-scripts.js";
+export {
   sourceRuns,
   type SourceRun,
   type NewSourceRun,

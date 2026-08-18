@@ -37,7 +37,41 @@ describe("GET /api/v1/recruiters", () => {
       headers: { Authorization: await testAuthHeader("user-a") },
     });
     expect(res.status).toBe(200);
-    expect(mockService.listContacts).toHaveBeenCalledWith("user-a");
+    expect(mockService.listContacts).toHaveBeenCalledWith("user-a", undefined);
+  });
+});
+
+describe("POST /api/v1/recruiters", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("201 creates a referral contact", async () => {
+    mockService.createContact.mockResolvedValue({
+      contact: {
+        id: "11111111-1111-4111-8111-111111111111",
+        name: "Ada",
+        company: "Acme",
+        email: null,
+        role: null,
+        linkedinUrl: null,
+        notes: null,
+        kind: "referral",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    });
+    const res = await buildApp().request("/api/v1/recruiters", {
+      method: "POST",
+      headers: {
+        Authorization: await testAuthHeader("user-a"),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ name: "Ada", kind: "referral" }),
+    });
+    expect(res.status).toBe(201);
+    expect(mockService.createContact).toHaveBeenCalledWith(
+      "user-a",
+      expect.objectContaining({ name: "Ada", kind: "referral" }),
+    );
   });
 });
 

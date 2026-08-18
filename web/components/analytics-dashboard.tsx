@@ -240,12 +240,23 @@ export function AnalyticsDashboard({
               <p className="text-sm">No gaps in the current range.</p>
             ) : (
               skills.gaps.slice(0, 12).map((g) => (
-                <BarRow
-                  key={g.skill}
-                  label={g.skill}
-                  value={g.count}
-                  max={Math.max(1, ...skills.gaps.map((x) => x.count))}
-                />
+                <div key={g.skill} className="space-y-1">
+                  <BarRow
+                    label={g.skill}
+                    value={g.count}
+                    max={Math.max(1, ...skills.gaps.map((x) => x.count))}
+                  />
+                  {g.course ? (
+                    <a
+                      href={g.course.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-muted-foreground underline-offset-4 hover:underline"
+                    >
+                      {g.course.provider}: {g.course.title}
+                    </a>
+                  ) : null}
+                </div>
               ))
             )}
           </div>

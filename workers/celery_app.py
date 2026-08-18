@@ -23,6 +23,7 @@ app = Celery(
         "tasks.reindex_cv",
         "tasks.weekly_digest",
         "tasks.interview_prep",
+        "tasks.video_cover",
     ],
 )
 

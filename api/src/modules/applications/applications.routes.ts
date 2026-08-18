@@ -406,6 +406,52 @@ applicationsRoutes.get(
   },
 );
 
+applicationsRoutes.post(
+  "/:id/video-script",
+  requireRole("owner", "member"),
+  zValidator("param", applicationIdParamSchema),
+  async (c) => {
+    const { userId } = c.get("auth");
+    try {
+      return c.json(
+        await applicationsService.requestVideoCover(
+          userId,
+          c.req.valid("param").id,
+        ),
+        202,
+      );
+    } catch (err) {
+      if (isAppError(err)) {
+        return c.json({ error: err.message }, err.statusCode);
+      }
+      throw err;
+    }
+  },
+);
+
+applicationsRoutes.get(
+  "/:id/video-script",
+  requireRole("owner", "member", "viewer"),
+  zValidator("param", applicationIdParamSchema),
+  async (c) => {
+    const { userId } = c.get("auth");
+    try {
+      return c.json(
+        await applicationsService.getVideoCover(
+          userId,
+          c.req.valid("param").id,
+        ),
+        200,
+      );
+    } catch (err) {
+      if (isAppError(err)) {
+        return c.json({ error: err.message }, err.statusCode);
+      }
+      throw err;
+    }
+  },
+);
+
 applicationsRoutes.get(
   "/:id/download/:kind",
   requireRole("owner", "member", "viewer"),

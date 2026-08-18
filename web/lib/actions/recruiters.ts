@@ -16,6 +16,7 @@ export type RecruiterContact = {
   company: string | null;
   email: string | null;
   role: string | null;
+  kind: "recruiter" | "referral";
 };
 
 async function authHeaders(): Promise<HeadersInit | null> {
@@ -47,6 +48,7 @@ export async function createRecruiterAction(form: {
   company?: string;
   email?: string;
   role?: string;
+  kind?: "recruiter" | "referral";
 }): Promise<ActionResult> {
   const headers = await authHeaders();
   if (!headers) return { ok: false, error: "Unauthorized" };
