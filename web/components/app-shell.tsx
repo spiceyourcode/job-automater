@@ -2,18 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  BarChart3,
-  Briefcase,
-  FileText,
-  LayoutDashboard,
-  LogOut,
-  Settings,
-  PanelLeftClose,
-  PanelLeft,
-  Keyboard,
-  Users,
-} from "lucide-react";
+import { LogOut, PanelLeftClose, PanelLeft, Keyboard } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -23,15 +12,7 @@ import { RealtimeListener } from "@/components/realtime-listener";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
 import { MobileNav } from "@/components/mobile-nav";
-
-const NAV = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard#matches", label: "Jobs", icon: Briefcase },
-  { href: "/dashboard#pipeline", label: "Applications", icon: FileText },
-  { href: "/analytics", label: "Analytics", icon: BarChart3 },
-  { href: "/crm", label: "CRM", icon: Users },
-  { href: "/settings/profile", label: "Settings", icon: Settings },
-] as const;
+import { APP_NAV, isNavActive } from "@/lib/nav";
 
 const SETTINGS_LINKS = [
   { href: "/settings/profile", label: "Profile" },
@@ -65,8 +46,8 @@ export function AppShell({
       <RealtimeListener />
       <KeyboardShortcuts />
       <header className="sticky top-0 z-40 h-14 border-b bg-background/80 backdrop-blur-sm">
-        <div className="flex h-full items-center gap-3 px-4">
-          <MobileNav items={NAV} />
+        <div className="flex h-full min-w-0 items-center gap-3 px-4">
+          <MobileNav />
           <Button
             type="button"
             variant="ghost"
@@ -84,30 +65,16 @@ export function AppShell({
           </Button>
           <Link
             href="/dashboard"
-            className="text-sm font-semibold tracking-tight"
+            className="shrink-0 text-sm font-semibold tracking-tight"
           >
             JobAutomater
           </Link>
           {title ? (
-            <span className="text-sm text-muted-foreground">/ {title}</span>
+            <span className="min-w-0 truncate text-sm text-muted-foreground">
+              / {title}
+            </span>
           ) : null}
-          <div className="ml-auto flex items-center gap-1">
-            <nav
-              className="hidden items-center gap-1 md:flex"
-              aria-label="Primary"
-            >
-              {NAV.map((item) => (
-                <Button
-                  key={item.href}
-                  asChild
-                  variant="ghost"
-                  size="sm"
-                  className="cursor-pointer"
-                >
-                  <Link href={item.href}>{item.label}</Link>
-                </Button>
-              ))}
-            </nav>
+          <div className="ml-auto flex shrink-0 items-center gap-1">
             <ThemeToggle />
             <NotificationBell />
             <Button
@@ -147,12 +114,9 @@ export function AppShell({
           aria-label="Sidebar"
         >
           <nav className="flex flex-col gap-1 p-2" aria-label="Sidebar">
-            {NAV.map((item) => {
+            {APP_NAV.map((item) => {
               const Icon = item.icon;
-              const active =
-                item.href === "/dashboard"
-                  ? pathname === "/dashboard"
-                  : pathname.startsWith(item.href.split("#")[0]!);
+              const active = isNavActive(item.href, pathname);
               return (
                 <Link
                   key={item.href}
@@ -160,7 +124,7 @@ export function AppShell({
                   aria-label={item.label}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "flex min-h-11 items-center gap-2 rounded-md px-2 py-2 text-sm hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring",
+                    "flex min-h-11 cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring",
                     active && "bg-accent font-medium",
                     collapsed && "justify-center",
                   )}

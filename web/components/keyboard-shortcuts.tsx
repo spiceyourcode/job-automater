@@ -12,8 +12,8 @@ import {
 
 const SHORTCUTS: Array<{ keys: string; action: string; href?: string }> = [
   { keys: "g then d", action: "Go to Dashboard", href: "/dashboard" },
-  { keys: "g then j", action: "Go to Jobs", href: "/dashboard#matches" },
-  { keys: "g then p", action: "Go to Pipeline", href: "/dashboard#pipeline" },
+  { keys: "g then j", action: "Go to Jobs", href: "/jobs" },
+  { keys: "g then p", action: "Go to Applications", href: "/applications" },
   { keys: "g then a", action: "Go to Analytics", href: "/analytics" },
   { keys: "g then s", action: "Go to Settings", href: "/settings/profile" },
   { keys: "?", action: "Show keyboard shortcuts" },
@@ -80,10 +80,10 @@ export function KeyboardShortcuts() {
       const map: Record<string, string> = {
         d: "/dashboard",
         D: "/dashboard",
-        j: "/dashboard#matches",
-        J: "/dashboard#matches",
-        p: "/dashboard#pipeline",
-        P: "/dashboard#pipeline",
+        j: "/jobs",
+        J: "/jobs",
+        p: "/applications",
+        P: "/applications",
         a: "/analytics",
         A: "/analytics",
         s: "/settings/profile",
