@@ -378,18 +378,43 @@ export function PipelineBoard({ initial }: Props) {
                     </form>
                   ) : null}
                   {app.status === "draft" ? null : (
-                    <Button
-                      asChild
-                      variant="link"
-                      size="sm"
-                      className="mt-1 h-auto px-0 text-xs"
+                    <nav
+                      className="mt-1 flex flex-wrap items-center gap-x-1 text-xs"
+                      aria-label="Application documents"
                     >
-                      <a href={`/applications/${app.id}/review`}>Documents</a>
-                      {" · "}
-                      <a href={`/applications/${app.id}/prep`}>Prep</a>
-                      {" · "}
-                      <a href={`/applications/${app.id}/video-script`}>Video</a>
-                    </Button>
+                      <Button
+                        asChild
+                        variant="link"
+                        size="sm"
+                        className="h-auto px-0 text-xs"
+                      >
+                        <a href={`/applications/${app.id}/review`}>Documents</a>
+                      </Button>
+                      <span className="text-muted-foreground" aria-hidden>
+                        ·
+                      </span>
+                      <Button
+                        asChild
+                        variant="link"
+                        size="sm"
+                        className="h-auto px-0 text-xs"
+                      >
+                        <a href={`/applications/${app.id}/prep`}>Prep</a>
+                      </Button>
+                      <span className="text-muted-foreground" aria-hidden>
+                        ·
+                      </span>
+                      <Button
+                        asChild
+                        variant="link"
+                        size="sm"
+                        className="h-auto px-0 text-xs"
+                      >
+                        <a href={`/applications/${app.id}/video-script`}>
+                          Video
+                        </a>
+                      </Button>
+                    </nav>
                   )}
                 </li>
               ))}
