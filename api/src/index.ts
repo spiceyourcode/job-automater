@@ -6,6 +6,7 @@ import {
   startDailyCollectWorker,
   stopDailyCollectWorker,
 } from "./lib/daily-collect.js";
+import { publicErrorFields } from "./lib/logger.js";
 import { captureUnhandled, flushSentry, initSentry } from "./lib/sentry.js";
 import { attachWebSocket, stopWebSocket } from "./lib/ws-server.js";
 
@@ -47,7 +48,7 @@ void startDailyCollectWorker()
     console.error(
       JSON.stringify({
         event: "daily_collect_worker_start_failed",
-        error: err instanceof Error ? err.message : "unknown",
+        ...publicErrorFields(err),
       }),
     );
   });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { scrubForLog } from "./logger.js";
+import { publicErrorFields, scrubForLog } from "./logger.js";
 
 describe("scrubForLog", () => {
   it("redacts email body and CV fields (P12.2 FAILURE)", () => {
@@ -15,6 +15,14 @@ describe("scrubForLog", () => {
     expect(scrubbed.cover_letter).toBe("[redacted]");
     expect(scrubbed.path).toBe("/api/v1/jobs");
     expect(JSON.stringify(scrubbed)).not.toContain("SECRET");
+  });
+
+  it("prefers driver cause over Failed query wrapper", () => {
+    const err = new Error("Failed query: select * from users\nparams: secret@example.com");
+    err.cause = new Error('password authentication failed for user "jobautomater"');
+    const fields = publicErrorFields(err);
+    expect(fields.message).toBe('password authentication failed for user "jobautomater"');
+    expect(JSON.stringify(fields)).not.toContain("secret@example.com");
   });
 
   it("redacts password and tokens", () => {

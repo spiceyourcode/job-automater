@@ -3,7 +3,7 @@ import { HTTPException } from "hono/http-exception";
 import { apiRateLimit } from "./middleware/api-rate-limit.js";
 import { requestLog } from "./middleware/request-log.js";
 import { buildOpenApiDocument } from "./lib/openapi.js";
-import { log } from "./lib/logger.js";
+import { log, publicErrorFields } from "./lib/logger.js";
 import { captureUnhandled } from "./lib/sentry.js";
 import { registerRoutes as registerHealthRoutes } from "./modules/health/index.js";
 import { registerRoutes as registerAuthRoutes } from "./modules/auth/index.js";
@@ -29,7 +29,7 @@ export const createApp = (): Hono => {
     log.error("unhandled_error", {
       path: c.req.path,
       method: c.req.method,
-      name: err instanceof Error ? err.name : "Error",
+      ...publicErrorFields(err),
     });
     captureUnhandled(err);
     return c.json({ error: "internal_error" }, 500);

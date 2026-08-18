@@ -56,6 +56,30 @@ export function scrubForLog(value: unknown, depth = 0): unknown {
 
 export type LogFields = Record<string, unknown>;
 
+function errorCode(value: unknown): string | undefined {
+  if (typeof value !== "object" || value == null || !("code" in value)) {
+    return undefined;
+  }
+  return typeof value.code === "string" ? value.code : undefined;
+}
+
+/**
+ * Safe fields for unhandled errors. Prefer the driver/cause text over
+ * Drizzle's "Failed query: … params: …" wrapper (SQL may include bound values).
+ */
+export function publicErrorFields(err: unknown): LogFields {
+  const e = err instanceof Error ? err : new Error("unknown");
+  const cause = e.cause instanceof Error ? e.cause : undefined;
+  const code = errorCode(e) ?? errorCode(cause);
+  const looksLikeQuery = e.message.startsWith("Failed query");
+  const message = looksLikeQuery && cause ? cause.message : e.message;
+  return {
+    name: e.name,
+    message: message.slice(0, 200),
+    ...(code ? { code } : {}),
+  };
+}
+
 function emit(
   level: "info" | "warn" | "error",
   event: string,
