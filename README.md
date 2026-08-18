@@ -30,7 +30,7 @@ cp .env.example .env
 docker compose up -d
 ```
 
-Postgres is `postgresql://jobautomater:jobautomater@127.0.0.1:5432/jobautomater`. Prefer `127.0.0.1` over `localhost` on Windows. If a local Postgres already owns port 5432, stop it first.
+Postgres is `postgresql://jobautomater:jobautomater@127.0.0.1:5432/jobautomater`. Prefer `127.0.0.1` over `localhost` on Windows. If a local Postgres already owns port 5432, set `POSTGRES_PORT` in `.env` (used by `docker-compose.yml`) and point `DATABASE_URL` at the same host port. On Windows, Hyper-V often reserves 5433–5532 — use `15432` instead.
 
 **API** (default `http://localhost:3001`):
 
