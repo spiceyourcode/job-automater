@@ -82,6 +82,9 @@ async function redisConsume(
   kind: RateLimitKind,
 ): Promise<RateLimitResult> {
   const client = createClient({ url: env.redisUrl }) as RedisClientType;
+  // node-redis emits 'error' on refused connect; without a listener Node throws
+  // (unhandled error event) and login 500s even though we catch connect().
+  client.on("error", () => {});
   try {
     await client.connect();
     const bucket = minuteBucket();

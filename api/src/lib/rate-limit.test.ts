@@ -36,6 +36,16 @@ describe("consumeApiRateLimit", () => {
     expect(RATE_LIMITS.anonymous).toBe(20);
     expect(RATE_LIMITS.authenticated).toBeGreaterThan(RATE_LIMITS.anonymous);
   });
+
+  it("falls back to memory when Redis is down (does not throw)", async () => {
+    useMemoryRateLimit(false);
+    const r = await consumeApiRateLimit({
+      anonKey: `dead-redis-${Date.now()}`,
+      userId: null,
+    });
+    expect(r.limit).toBe(RATE_LIMITS.anonymous);
+    expect(typeof r.allowed).toBe("boolean");
+  });
 });
 
 describe("apiRateLimit middleware", () => {
