@@ -129,6 +129,23 @@ describe("GET /api/v1/auth/gmail", () => {
   });
 });
 
+describe("GET /api/v1/auth/gmail/callback", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("redirects with why=api_forbidden on Gmail API 403", async () => {
+    mockService.completeGmailOAuth.mockRejectedValue(
+      new Error("gmail_api_forbidden"),
+    );
+    const res = await buildApp().request(
+      "/api/v1/auth/gmail/callback?code=c&state=s",
+    );
+    expect(res.status).toBe(302);
+    const loc = res.headers.get("location") ?? "";
+    expect(loc).toContain("gmail=error");
+    expect(loc).toContain("why=api_forbidden");
+  });
+});
+
 describe("GET /api/v1/emails/gmail", () => {
   afterEach(() => vi.clearAllMocks());
 

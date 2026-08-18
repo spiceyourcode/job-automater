@@ -68,7 +68,7 @@ Confirm the API with `GET http://localhost:3001/health`.
 
 Copy `.env.example` to `.env`. Required for local run: `DATABASE_URL`, `JWT_SECRET` (≥32 chars), Redis, and MinIO/S3 keys. Optional:
 
-- OAuth: `OAUTH_GOOGLE_*`, `OAUTH_GITHUB_*`, `OAUTH_LINKEDIN_*`
+- OAuth: `OAUTH_GOOGLE_*`, `OAUTH_GITHUB_*`, `OAUTH_LINKEDIN_*`. For **Connect Gmail**, enable the Gmail API on that Google Cloud project and add `{API_PUBLIC_URL}/api/v1/auth/gmail/callback` as a redirect URI.
 - LLM: `OPENAI_API_KEY`, `QROK_API_KEY`, `GOOGLE_API_KEY`, `CEREBRAS_API_KEY` (server-side only)
 - Apply: `GREENHOUSE_JOB_BOARD_API_KEY`, `LEVER_API_KEY`; keep `SUBMIT_DRY_RUN=true` until you intend live submits
 - `SENTRY_DSN` for API error reporting

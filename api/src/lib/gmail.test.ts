@@ -5,6 +5,8 @@ import {
   decodePushData,
   buildGmailAuthorizeUrl,
   isGmailOAuthConfigured,
+  fetchGmailProfile,
+  gmailConnectWhy,
 } from "./gmail.js";
 
 describe("gmail message parse", () => {
@@ -61,5 +63,17 @@ describe("gmail OAuth URL", () => {
     expect(url).toContain("access_type=offline");
     expect(url).toContain("prompt=consent");
     expect(url).not.toContain("include_granted_scopes");
+  });
+});
+
+describe("fetchGmailProfile", () => {
+  it("maps 403 to gmail_api_forbidden without a body", async () => {
+    await expect(
+      fetchGmailProfile("token", async () => new Response("nope", { status: 403 })),
+    ).rejects.toThrow("gmail_api_forbidden");
+  });
+
+  it("classifies Gmail API 403 as api_forbidden", () => {
+    expect(gmailConnectWhy(new Error("gmail_api_forbidden"))).toBe("api_forbidden");
   });
 });

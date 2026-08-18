@@ -19,6 +19,7 @@ import {
   decodePushData,
   exchangeGmailCode,
   fetchGmailProfile,
+  gmailConnectWhy,
   getGmailMessage,
   isGmailOAuthConfigured,
   listHistoryMessageIds,
@@ -319,7 +320,15 @@ export async function completeGmailOAuth(params: {
       400,
     );
   }
-  const profile = await fetchGmailProfile(tokens.accessToken);
+  const profile = await fetchGmailProfile(tokens.accessToken).catch((err: unknown) => {
+    if (gmailConnectWhy(err) === "api_forbidden") {
+      throw new EmailsError(
+        "Gmail API is disabled or mailbox access was denied. Enable Gmail API in Google Cloud Console, then connect again.",
+        400,
+      );
+    }
+    throw err;
+  });
   const expires = new Date(Date.now() + tokens.expiresIn * 1000);
 
   let watchExpiration: Date | null = null;

@@ -129,13 +129,35 @@ export async function fetchGmailProfile(
     "https://gmail.googleapis.com/gmail/v1/users/me/profile",
     { headers: { authorization: `Bearer ${accessToken}` } },
   );
-  if (!res.ok) throw new Error("gmail_profile_failed");
+  if (!res.ok) {
+    throw new Error(
+      res.status === 403 ? "gmail_api_forbidden" : `gmail_profile_failed:${res.status}`,
+    );
+  }
   const json = (await res.json()) as {
     emailAddress?: string;
     historyId?: string;
   };
   if (!json.emailAddress) throw new Error("gmail_profile_incomplete");
   return { email: json.emailAddress.toLowerCase(), historyId: json.historyId };
+}
+
+/** Safe callback reason — never include tokens or mailbox addresses (HG-8). */
+export function gmailConnectWhy(err: unknown): string {
+  const message =
+    err instanceof Error ? err.message : typeof err === "string" ? err : "";
+  if (message.includes("refresh token")) return "no_refresh";
+  if (message.includes("Invalid Gmail OAuth state")) return "state";
+  if (
+    message.includes("gmail_api_forbidden") ||
+    message.includes(":403") ||
+    message.includes("Gmail API is disabled")
+  ) {
+    return "api_forbidden";
+  }
+  if (message.includes("gmail_token")) return "token";
+  if (message.includes("gmail_profile")) return "profile";
+  return "unknown";
 }
 
 export async function startGmailWatch(

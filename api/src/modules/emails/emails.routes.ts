@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { requireAuth } from "../../middleware/require-auth.js";
 import { env } from "../../env.js";
+import { gmailConnectWhy } from "../../lib/gmail.js";
 import { log, publicErrorFields } from "../../lib/logger.js";
 import {
   classifyEmailBodySchema,
@@ -146,6 +147,7 @@ gmailAuthRoutes.get("/callback", async (c) => {
   const dest = new URL("/settings/sources", env.appUrl);
   if (!code || !state) {
     dest.searchParams.set("gmail", "error");
+    dest.searchParams.set("why", "missing");
     return c.redirect(dest.toString(), 302);
   }
   try {
@@ -155,6 +157,7 @@ gmailAuthRoutes.get("/callback", async (c) => {
   } catch (err) {
     log.error("gmail_oauth_callback_failed", publicErrorFields(err));
     dest.searchParams.set("gmail", "error");
+    dest.searchParams.set("why", gmailConnectWhy(err));
     return c.redirect(dest.toString(), 302);
   }
 });

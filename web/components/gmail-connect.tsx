@@ -11,6 +11,19 @@ import {
 } from "@/lib/actions/emails";
 import { Button } from "@/components/ui/button";
 
+const GMAIL_WHY: Record<string, string> = {
+  api_forbidden:
+    "Google signed you in, but Gmail mailbox access failed (403). Enable the Gmail API on this OAuth project's Google Cloud Console, add yourself as a test user if the app is in Testing, then connect again.",
+  no_refresh:
+    "Google did not issue a refresh token. Click Connect Gmail again and approve offline access.",
+  state: "That sign-in expired. Click Connect Gmail again.",
+  token:
+    "Google rejected the token exchange. Confirm API_PUBLIC_URL matches the authorized redirect URI /api/v1/auth/gmail/callback.",
+  profile: "Could not read the Gmail profile. Enable the Gmail API and try again.",
+  missing: "Google did not return an authorization code. Try Connect Gmail again.",
+  unknown: "Gmail connection failed.",
+};
+
 export function GmailConnect() {
   const params = useSearchParams();
   const [pending, startTransition] = useTransition();
@@ -18,6 +31,7 @@ export function GmailConnect() {
   const [error, setError] = useState<string | null>(null);
 
   const flash = params.get("gmail");
+  const why = params.get("why") ?? "unknown";
 
   useEffect(() => {
     void gmailStatusAction().then((res) => {
@@ -39,7 +53,9 @@ export function GmailConnect() {
         </p>
       ) : null}
       {flash === "error" && !status?.connected ? (
-        <p className="text-sm text-destructive">Gmail connection failed.</p>
+        <p className="text-sm text-destructive" role="alert">
+          {GMAIL_WHY[why] ?? GMAIL_WHY.unknown}
+        </p>
       ) : null}
       {status?.connected ? (
         <p className="text-sm text-muted-foreground">
