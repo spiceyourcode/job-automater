@@ -42,21 +42,32 @@ class CollectFailed(Exception):
     """Collector/business failure already persisted to source_configs — do not retry."""
 
 
+_SECRET_MARKERS = (
+    "token",
+    "bearer",
+    "api_key",
+    "authorization",
+    "secret",
+    "username",
+    "password=",
+)
+_AUTH_MARKERS = (
+    "authenticationfailed",
+    "invalid credentials",
+    "application-specific password",
+)
+
+
 def _sanitize_error(exc: BaseException) -> str:
     """Strip likely secrets from error strings before DB/logs (HG-8)."""
+    if type(exc).__name__ == "ImapAuthError":
+        return str(exc)[:500]
     text = f"{type(exc).__name__}: {exc}"
     lowered = text.lower()
-    for token in (
-        "password",
-        "token",
-        "bearer",
-        "api_key",
-        "authorization",
-        "secret",
-        "username",
-    ):
-        if token in lowered:
-            return f"{type(exc).__name__}: [redacted]"
+    if any(token in lowered for token in _AUTH_MARKERS):
+        return f"{type(exc).__name__}: [auth_failed]"
+    if any(token in lowered for token in _SECRET_MARKERS):
+        return f"{type(exc).__name__}: [redacted]"
     return text[:500]
 
 

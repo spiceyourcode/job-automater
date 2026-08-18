@@ -327,6 +327,12 @@ export function SourcesManager({ initialSources }: Props) {
               )}
               {sourceType === "imap" && (
                 <>
+                  <p className="text-xs text-muted-foreground">
+                    For Gmail, do not use your Google account password. Create an
+                    App Password at myaccount.google.com/apppasswords (2-Step
+                    Verification required), or skip IMAP and use Connect Gmail
+                    above.
+                  </p>
                   <div className="space-y-2">
                     <Label htmlFor="imap-server">IMAP server</Label>
                     <Input
@@ -348,16 +354,20 @@ export function SourcesManager({ initialSources }: Props) {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="imap-pass">Password</Label>
+                    <Label htmlFor="imap-pass">
+                      Mailbox password or App Password
+                    </Label>
                     <Input
                       id="imap-pass"
                       type="password"
                       value={imapPassword}
                       onChange={(e) => setImapPassword(e.target.value)}
                       required={!editingId}
-                      autoComplete="current-password"
+                      autoComplete="off"
                       placeholder={
-                        editingId ? "Leave blank to keep current" : undefined
+                        editingId
+                          ? "Leave blank to keep current"
+                          : "Gmail: 16-character App Password"
                       }
                     />
                   </div>

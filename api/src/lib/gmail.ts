@@ -50,7 +50,6 @@ export function buildGmailAuthorizeUrl(params: {
     state: params.state,
     access_type: "offline",
     prompt: "consent",
-    include_granted_scopes: "true",
     code_challenge: params.codeChallenge,
     code_challenge_method: "S256",
   });

@@ -3,6 +3,8 @@ import {
   extractPlainText,
   gmailMessageToIngest,
   decodePushData,
+  buildGmailAuthorizeUrl,
+  isGmailOAuthConfigured,
 } from "./gmail.js";
 
 describe("gmail message parse", () => {
@@ -46,5 +48,18 @@ describe("gmail message parse", () => {
     ).toString("base64url");
     const decoded = decodePushData(payload);
     expect(decoded.emailAddress).toBe("me@gmail.com");
+  });
+});
+
+describe("gmail OAuth URL", () => {
+  it("requests offline consent without incremental grants", () => {
+    if (!isGmailOAuthConfigured()) return;
+    const url = buildGmailAuthorizeUrl({
+      state: "st",
+      codeChallenge: "ch",
+    });
+    expect(url).toContain("access_type=offline");
+    expect(url).toContain("prompt=consent");
+    expect(url).not.toContain("include_granted_scopes");
   });
 });

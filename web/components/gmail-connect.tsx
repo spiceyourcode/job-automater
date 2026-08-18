@@ -29,15 +29,16 @@ export function GmailConnect() {
     <section className="mb-8 space-y-3 rounded-lg border p-4">
       <h2 className="text-sm font-medium">Gmail inbox</h2>
       <p className="text-sm text-muted-foreground">
-        Connect Gmail for watch + history sync. IMAP sources below remain as a
-        fallback. Tokens stay on the server.
+        Connect Gmail with OAuth for watch + history sync. Tokens stay on the
+        server. IMAP below is a fallback for non-Gmail mailboxes — Gmail IMAP
+        will reject your normal Google password.
       </p>
       {flash === "connected" ? (
         <p className="text-sm text-green-700 dark:text-green-400">
           Gmail connected.
         </p>
       ) : null}
-      {flash === "error" ? (
+      {flash === "error" && !status?.connected ? (
         <p className="text-sm text-destructive">Gmail connection failed.</p>
       ) : null}
       {status?.connected ? (

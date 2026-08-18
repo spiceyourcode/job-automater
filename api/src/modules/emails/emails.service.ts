@@ -304,8 +304,20 @@ export async function completeGmailOAuth(params: {
     throw new EmailsError("Invalid Gmail OAuth state", 400);
   }
   const tokens = await exchangeGmailCode(params.code, saved.codeVerifier);
-  if (!tokens.refreshToken) {
-    throw new EmailsError("Gmail did not return a refresh token", 400);
+  let refreshToken = tokens.refreshToken;
+  if (!refreshToken) {
+    const [existing] = await db
+      .select({ refreshToken: gmailConnections.refreshToken })
+      .from(gmailConnections)
+      .where(eq(gmailConnections.userId, saved.userId))
+      .limit(1);
+    refreshToken = existing?.refreshToken;
+  }
+  if (!refreshToken) {
+    throw new EmailsError(
+      "Gmail did not return a refresh token. Connect again and approve access.",
+      400,
+    );
   }
   const profile = await fetchGmailProfile(tokens.accessToken);
   const expires = new Date(Date.now() + tokens.expiresIn * 1000);
@@ -333,7 +345,7 @@ export async function completeGmailOAuth(params: {
       .update(gmailConnections)
       .set({
         gmailEmail: profile.email,
-        refreshToken: tokens.refreshToken,
+        refreshToken,
         accessToken: tokens.accessToken,
         accessTokenExpiresAt: expires,
         historyId,
@@ -345,7 +357,7 @@ export async function completeGmailOAuth(params: {
     await db.insert(gmailConnections).values({
       userId: saved.userId,
       gmailEmail: profile.email,
-      refreshToken: tokens.refreshToken,
+      refreshToken,
       accessToken: tokens.accessToken,
       accessTokenExpiresAt: expires,
       historyId,

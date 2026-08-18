@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { requireAuth } from "../../middleware/require-auth.js";
 import { env } from "../../env.js";
+import { log, publicErrorFields } from "../../lib/logger.js";
 import {
   classifyEmailBodySchema,
   emailIdParamSchema,
@@ -151,7 +152,8 @@ gmailAuthRoutes.get("/callback", async (c) => {
     await emailsService.completeGmailOAuth({ code, state });
     dest.searchParams.set("gmail", "connected");
     return c.redirect(dest.toString(), 302);
-  } catch {
+  } catch (err) {
+    log.error("gmail_oauth_callback_failed", publicErrorFields(err));
     dest.searchParams.set("gmail", "error");
     return c.redirect(dest.toString(), 302);
   }

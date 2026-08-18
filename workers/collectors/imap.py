@@ -18,6 +18,31 @@ logger = logging.getLogger(__name__)
 _URL_RE = re.compile(r"https?://[^\s<>\"']+", re.I)
 
 
+class ImapAuthError(Exception):
+    """Mailbox login failed — message is safe for last_run_error (HG-8)."""
+
+
+def public_imap_login_error(exc: BaseException, server: str) -> Exception:
+    """Map IMAP login failures to a non-secret user-facing error."""
+    text = str(exc).lower()
+    authish = (
+        "authenticationfailed" in text
+        or "invalid credentials" in text
+        or "application-specific password" in text
+        or "login failed" in text
+    )
+    if not authish:
+        return exc
+    host = server.lower()
+    if "gmail" in host or "googlemail" in host:
+        return ImapAuthError(
+            "Gmail IMAP rejected this login. Use a Google App Password "
+            "(2-Step Verification on), not your account password — or use "
+            "Connect Gmail (OAuth) instead of IMAP."
+        )
+    return ImapAuthError("IMAP login failed. Check the username and mailbox secret.")
+
+
 def _decode_mime_header(value: str | None) -> str:
     if not value:
         return ""
@@ -89,7 +114,10 @@ def _fetch_sync(config: dict[str, Any]) -> list[RawJob]:
 
     client = imaplib.IMAP4_SSL(server, port)
     try:
-        client.login(username, password)
+        try:
+            client.login(username, password)
+        except Exception as exc:  # noqa: BLE001
+            raise public_imap_login_error(exc, server) from exc
         typ, _ = client.select(folder, readonly=True)
         if typ != "OK":
             raise ValueError(f"Cannot select folder {folder}")

@@ -5,7 +5,11 @@ let client: RedisClientType | null = null;
 
 async function getRedis(): Promise<RedisClientType> {
   if (client?.isOpen) return client;
-  client = createClient({ url: env.redisUrl });
+  client = createClient({
+    url: env.redisUrl,
+    socket: { connectTimeout: 2000, reconnectStrategy: false },
+  });
+  client.on("error", () => {});
   await client.connect();
   return client;
 }
