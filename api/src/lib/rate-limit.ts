@@ -25,10 +25,21 @@ export type RateLimitResult = {
 /** In-memory fallback (tests + Redis outage). Still bounds floods. */
 const memory = new Map<string, { count: number; resetAt: number }>();
 let forceMemory = false;
+let redisClientFactory: typeof createClient = createClient;
+
+/** Fail fast so a down Redis cannot stall login past the test/request budget. */
+const REDIS_CONNECT_TIMEOUT_MS = 200;
 
 /** Tests only — avoid depending on a live Redis. */
 export function useMemoryRateLimit(enabled = true): void {
   forceMemory = enabled;
+}
+
+/** Tests only — inject a client factory (e.g. always-fail connect). */
+export function setRedisClientFactory(
+  factory: typeof createClient | null,
+): void {
+  redisClientFactory = factory ?? createClient;
 }
 
 export function resetRateLimitMemory(): void {
@@ -81,7 +92,13 @@ async function redisConsume(
   limit: number,
   kind: RateLimitKind,
 ): Promise<RateLimitResult> {
-  const client = createClient({ url: env.redisUrl }) as RedisClientType;
+  const client = redisClientFactory({
+    url: env.redisUrl,
+    socket: {
+      connectTimeout: REDIS_CONNECT_TIMEOUT_MS,
+      reconnectStrategy: false,
+    },
+  }) as RedisClientType;
   // node-redis emits 'error' on refused connect; without a listener Node throws
   // (unhandled error event) and login 500s even though we catch connect().
   client.on("error", () => {});
@@ -103,7 +120,11 @@ async function redisConsume(
       kind,
     };
   } finally {
-    await client.quit().catch(() => {});
+    try {
+      client.destroy();
+    } catch {
+      await client.quit().catch(() => {});
+    }
   }
 }
 

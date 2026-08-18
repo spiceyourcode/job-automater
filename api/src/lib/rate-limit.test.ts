@@ -5,6 +5,7 @@ import {
   RATE_LIMITS,
   consumeApiRateLimit,
   resetRateLimitMemory,
+  setRedisClientFactory,
   useMemoryRateLimit,
 } from "./rate-limit.js";
 import { apiRateLimit } from "../middleware/api-rate-limit.js";
@@ -13,6 +14,7 @@ describe("consumeApiRateLimit", () => {
   afterEach(() => {
     resetRateLimitMemory();
     useMemoryRateLimit(false);
+    setRedisClientFactory(null);
   });
 
   it("allows up to anonymous limit then blocks (P12.1 FAILURE)", async () => {
@@ -39,6 +41,9 @@ describe("consumeApiRateLimit", () => {
 
   it("falls back to memory when Redis is down (does not throw)", async () => {
     useMemoryRateLimit(false);
+    setRedisClientFactory(() => {
+      throw new Error("ECONNREFUSED");
+    });
     const r = await consumeApiRateLimit({
       anonKey: `dead-redis-${Date.now()}`,
       userId: null,
@@ -52,6 +57,7 @@ describe("apiRateLimit middleware", () => {
   afterEach(() => {
     resetRateLimitMemory();
     useMemoryRateLimit(false);
+    setRedisClientFactory(null);
   });
 
   it("returns 429 for anonymous flood", async () => {
