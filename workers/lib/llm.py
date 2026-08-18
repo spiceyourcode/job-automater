@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from typing import Any, Literal
 
 import httpx
@@ -23,11 +24,12 @@ logger = logging.getLogger(__name__)
 
 Purpose = Literal["extract", "docs", "classify", "match"]
 
+# Prefer providers that typically have quota; cooldown skips 402/429 dead-ends.
 PURPOSE_ORDER: dict[Purpose, tuple[str, ...]] = {
     "extract": ("openai", "qrok", "google", "cerebras"),
     "docs": ("openai", "google", "qrok"),
-    "classify": ("cerebras", "google", "openai", "qrok"),
-    "match": ("cerebras", "google", "openai", "qrok"),
+    "classify": ("openai", "qrok", "google", "cerebras"),
+    "match": ("openai", "qrok", "google", "cerebras"),
 }
 
 # Production model IDs per current provider catalogs
@@ -49,9 +51,19 @@ _OPENAI_COMPAT = {
     "cerebras": ("https://api.cerebras.ai/v1/chat/completions", "cerebras"),
 }
 
+# provider -> unix time when cooldown ends
+_COOLDOWN_UNTIL: dict[str, float] = {}
+_COOLDOWN_BILLING_S = 3600.0  # 401/402/403 — billing or auth
+_COOLDOWN_RATE_S = 120.0  # 429 — rate limit
+
 
 class LlmError(Exception):
     """Provider call failed — callers should use heuristic fallback."""
+
+
+def clear_provider_cooldowns() -> None:
+    """Test helper — reset in-process cooldowns."""
+    _COOLDOWN_UNTIL.clear()
 
 
 def _qrok_key() -> str:
@@ -87,6 +99,43 @@ def _provider_api_key(name: str) -> str:
     if name == "cerebras":
         return settings.cerebras_api_key
     raise LlmError(f"unknown_provider:{name}")
+
+
+def _provider_cooling_down(name: str) -> bool:
+    until = _COOLDOWN_UNTIL.get(name)
+    if until is None:
+        return False
+    if time.monotonic() >= until:
+        _COOLDOWN_UNTIL.pop(name, None)
+        return False
+    return True
+
+
+def _mark_provider_cooldown(name: str, status_code: int | None) -> None:
+    if status_code is None:
+        return
+    if status_code in (401, 402, 403):
+        secs = _COOLDOWN_BILLING_S
+        reason = "billing_or_auth"
+    elif status_code == 429:
+        secs = _COOLDOWN_RATE_S
+        reason = "rate_limit"
+    else:
+        return
+    _COOLDOWN_UNTIL[name] = time.monotonic() + secs
+    logger.warning(
+        "llm_provider_cooldown provider=%s status=%s reason=%s secs=%s",
+        name,
+        status_code,
+        reason,
+        int(secs),
+    )
+
+
+def _http_status(exc: BaseException) -> int | None:
+    if isinstance(exc, httpx.HTTPStatusError):
+        return int(exc.response.status_code)
+    return None
 
 
 def _log_usage(purpose: str, provider: str, model: str, usage: dict[str, Any]) -> None:
@@ -194,6 +243,9 @@ def chat_json(
     for provider in PURPOSE_ORDER[purpose]:
         if not provider_key_present(provider):
             continue
+        if _provider_cooling_down(provider):
+            logger.info("llm_provider_skipped provider=%s reason=cooldown", provider)
+            continue
         tried += 1
         try:
             if provider == "google":
@@ -211,12 +263,20 @@ def chat_json(
             return parsed
         except Exception as exc:  # noqa: BLE001
             last = exc
+            status = _http_status(exc)
+            _mark_provider_cooldown(provider, status)
             logger.warning(
-                "llm_provider_failed purpose=%s provider=%s err=%s",
+                "llm_provider_failed purpose=%s provider=%s err=%s status=%s",
                 purpose,
                 provider,
                 type(exc).__name__,
+                status,
             )
     if tried == 0:
+        # All keys missing or cooling down — treat as no usable provider for this call.
+        if any(provider_key_present(p) for p in PURPOSE_ORDER[purpose]):
+            raise LlmError(
+                f"all_providers_failed:{type(last).__name__ if last else 'cooldown'}"
+            ) from last
         raise LlmError("no_chat_provider")
     raise LlmError(f"all_providers_failed:{type(last).__name__ if last else 'unknown'}") from last
