@@ -89,6 +89,12 @@ export {
   type NegotiationScript,
 } from "./interview-preps.js";
 export {
+  recruiterContacts,
+  recruiterInteractions,
+  type RecruiterContact,
+  type RecruiterInteraction,
+} from "./recruiter-crm.js";
+export {
   sourceRuns,
   type SourceRun,
   type NewSourceRun,

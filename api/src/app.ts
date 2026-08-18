@@ -16,6 +16,7 @@ import { registerRoutes as registerAnalyticsRoutes } from "./modules/analytics/i
 import { registerRoutes as registerTeamRoutes } from "./modules/team/index.js";
 import { registerRoutes as registerAutomationRoutes } from "./modules/automation/index.js";
 import { registerRoutes as registerRealtimeRoutes } from "./modules/realtime/index.js";
+import { registerRoutes as registerRecruitersRoutes } from "./modules/recruiters/index.js";
 
 export const createApp = (): Hono => {
   const app = new Hono();
@@ -48,6 +49,7 @@ export const createApp = (): Hono => {
   registerTeamRoutes(app);
   registerAutomationRoutes(app);
   registerRealtimeRoutes(app);
+  registerRecruitersRoutes(app);
 
   // OpenAPI from registered Hono routes (P12.2)
   app.get("/api/v1/openapi.json", (c) => c.json(buildOpenApiDocument(app)));

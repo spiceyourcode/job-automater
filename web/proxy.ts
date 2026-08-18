@@ -25,13 +25,15 @@ export function proxy(request: NextRequest) {
   const isSettings = pathname.startsWith("/settings");
   const isAnalytics = pathname.startsWith("/analytics");
   const isApplications = pathname.startsWith("/applications");
+  const isCrm = pathname.startsWith("/crm");
 
   if (
     (isDashboard ||
       isOnboarding ||
       isSettings ||
       isAnalytics ||
-      isApplications) &&
+      isApplications ||
+      isCrm) &&
     !token
   ) {
     const loginUrl = new URL("/login", request.url);
@@ -41,7 +43,7 @@ export function proxy(request: NextRequest) {
 
   // Authenticated but incomplete onboarding cannot use app surfaces
   if (
-    (isDashboard || isSettings || isAnalytics || isApplications) &&
+    (isDashboard || isSettings || isAnalytics || isApplications || isCrm) &&
     token &&
     !onboardingDone
   ) {

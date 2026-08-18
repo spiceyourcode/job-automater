@@ -12,6 +12,7 @@ import {
   PanelLeftClose,
   PanelLeft,
   Keyboard,
+  Users,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ const NAV = [
   { href: "/dashboard#matches", label: "Jobs", icon: Briefcase },
   { href: "/dashboard#pipeline", label: "Applications", icon: FileText },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/crm", label: "CRM", icon: Users },
   { href: "/settings/profile", label: "Settings", icon: Settings },
 ] as const;
 
