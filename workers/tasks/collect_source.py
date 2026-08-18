@@ -24,7 +24,7 @@ from db import (
 logger = logging.getLogger(__name__)
 
 _ALLOWED_TYPES = frozenset(
-    {"rss", "api", "imap", "playwright", "career_page", "telegram"}
+    {"rss", "api", "imap", "playwright", "career_page", "telegram", "whatsapp"}
 )
 
 

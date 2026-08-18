@@ -395,6 +395,15 @@ describe("createSourceBodySchema", () => {
     });
     expect(r.success).toBe(true);
   });
+
+  it("accepts whatsapp export config", () => {
+    const r = createSourceBodySchema.safeParse({
+      sourceType: "whatsapp",
+      name: "Jobs group",
+      config: { exportPath: "/data/whatsapp-export.txt" },
+    });
+    expect(r.success).toBe(true);
+  });
 });
 
 describe("GET /api/v1/sources/templates", () => {

@@ -9,6 +9,7 @@ export const sourceTypeSchema = z.enum([
   "playwright",
   "career_page",
   "telegram",
+  "whatsapp",
 ]);
 
 const rssConfigSchema = z
@@ -96,6 +97,14 @@ const telegramConfigSchema = z
   })
   .strict();
 
+const whatsappConfigSchema = z
+  .object({
+    exportPath: z.string().min(1).max(1000),
+    messageFilter: z.string().max(500).optional(),
+    sessionDir: z.string().max(1000).optional(),
+  })
+  .strict();
+
 export const sourceConfigByType = {
   rss: rssConfigSchema,
   api: apiConfigSchema,
@@ -103,6 +112,7 @@ export const sourceConfigByType = {
   playwright: playwrightConfigSchema,
   career_page: careerPageConfigSchema,
   telegram: telegramConfigSchema,
+  whatsapp: whatsappConfigSchema,
 } as const;
 
 export const createSourceBodySchema = z

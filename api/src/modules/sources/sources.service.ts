@@ -421,6 +421,16 @@ export async function testSource(workspaceId: string, id: string) {
         company: String(config.channelId ?? ""),
       });
     }
+  } else if (source.sourceType === "whatsapp") {
+    const parsed = sourceConfigByType.whatsapp.safeParse(config);
+    if (!parsed.success) {
+      errors.push("WhatsApp config incomplete — exportPath required");
+    } else {
+      sampleJobs.push({
+        title: "WhatsApp export path configured",
+        company: "whatsapp",
+      });
+    }
   }
 
   return {
@@ -570,6 +580,12 @@ export function listSourceTemplates() {
         name: "Telegram channel",
         description: "Bot token + channel filter",
         requiredConfig: ["botToken", "channelId"],
+      },
+      {
+        sourceType: "whatsapp",
+        name: "WhatsApp export",
+        description: "Parse a WhatsApp chat export (.txt). Optional sessionDir for later Playwright.",
+        requiredConfig: ["exportPath"],
       },
     ],
   };

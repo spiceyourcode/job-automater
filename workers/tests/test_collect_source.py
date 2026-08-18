@@ -19,6 +19,7 @@ def test_registry_has_phase2_collectors():
         "playwright",
         "rss",
         "telegram",
+        "whatsapp",
     ]
     assert get_collector("rss").source_type == "rss"
 
