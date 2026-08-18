@@ -118,3 +118,15 @@ export async function getSkillGapsAction(range?: {
     `/api/v1/analytics/skills${q ? `?${q}` : ""}`,
   );
 }
+
+export type CvAbVariant = {
+  cvVersion: number;
+  applications: number;
+  submitted: number;
+  responses: number;
+  responseRatePct: number;
+};
+
+export async function getCvAbAction() {
+  return getJson<{ variants: CvAbVariant[] }>("/api/v1/analytics/cv-ab");
+}

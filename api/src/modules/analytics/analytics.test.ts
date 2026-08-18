@@ -14,6 +14,7 @@ vi.mock("./analytics.service.js", async (importOriginal) => {
     getSourcePerformance: vi.fn(),
     getSkillGaps: vi.fn(),
     buildAnalyticsExport: vi.fn(),
+    getCvAbReport: vi.fn(),
   };
 });
 
@@ -156,5 +157,33 @@ describe("GET /api/v1/analytics/export", () => {
     const uid = mockService.buildAnalyticsExport.mock.calls[0]?.[0];
     expect(uid).toBe("user-a");
     expect(uid).not.toBe("user-b");
+  });
+});
+
+describe("GET /api/v1/analytics/cv-ab", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("401 without auth", async () => {
+    const res = await buildApp().request("/api/v1/analytics/cv-ab");
+    expect(res.status).toBe(401);
+  });
+
+  it("200 returns caller-only variants", async () => {
+    mockService.getCvAbReport.mockResolvedValue({
+      variants: [
+        {
+          cvVersion: 1,
+          applications: 4,
+          submitted: 2,
+          responses: 1,
+          responseRatePct: 50,
+        },
+      ],
+    });
+    const res = await buildApp().request("/api/v1/analytics/cv-ab", {
+      headers: { Authorization: await authHeader("user-a") },
+    });
+    expect(res.status).toBe(200);
+    expect(mockService.getCvAbReport).toHaveBeenCalledWith("user-a");
   });
 });

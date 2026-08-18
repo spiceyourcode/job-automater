@@ -26,6 +26,11 @@ analyticsRoutes.get(
   },
 );
 
+analyticsRoutes.get("/cv-ab", async (c) => {
+  const { userId } = c.get("auth");
+  return c.json(await analyticsService.getCvAbReport(userId), 200);
+});
+
 analyticsRoutes.get("/pipeline", async (c) => {
   const { userId } = c.get("auth");
   return c.json(await analyticsService.getPipelineFunnel(userId), 200);

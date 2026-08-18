@@ -485,3 +485,53 @@ export async function buildAnalyticsExport(
     body: Buffer.from(toCsv(headers, rows), "utf8"),
   };
 }
+
+const RESPONSE_STATUSES = new Set([
+  "screening",
+  "interviewing",
+  "offered",
+  "acknowledged",
+]);
+
+/** Response rates by CV version used on the caller's applications (P13.3). */
+export async function getCvAbReport(userId: string) {
+  const rows = await db
+    .select({
+      userId: applications.userId,
+      cvVersion: applications.cvVersion,
+      status: applications.status,
+      submittedAt: applications.submittedAt,
+    })
+    .from(applications)
+    .where(eq(applications.userId, userId));
+
+  assertOwnerOnly(userId, rows);
+
+  const by = new Map<
+    number,
+    { used: number; submitted: number; responses: number }
+  >();
+  for (const row of rows) {
+    const v = row.cvVersion;
+    const cur = by.get(v) ?? { used: 0, submitted: 0, responses: 0 };
+    cur.used += 1;
+    if (row.submittedAt) cur.submitted += 1;
+    if (RESPONSE_STATUSES.has(row.status)) cur.responses += 1;
+    by.set(v, cur);
+  }
+
+  const variants = [...by.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([cvVersion, s]) => ({
+      cvVersion,
+      applications: s.used,
+      submitted: s.submitted,
+      responses: s.responses,
+      responseRatePct:
+        s.submitted === 0
+          ? 0
+          : Math.round((s.responses / s.submitted) * 1000) / 10,
+    }));
+
+  return { variants };
+}
