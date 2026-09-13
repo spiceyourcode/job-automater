@@ -22,6 +22,7 @@ import {
   gmailConnectWhy,
   getGmailMessage,
   isGmailOAuthConfigured,
+  gmailSyncShouldBackfill,
   listHistoryMessageIds,
   listRecentMessageIds,
   refreshGmailAccessToken,
@@ -445,24 +446,29 @@ async function ingestMessageIds(
   return messages.length;
 }
 
-export async function syncGmailHistory(userId: string) {
+export async function syncGmailHistory(
+  userId: string,
+  options: { backfillIfEmpty?: boolean } = {},
+) {
   const creds = await accessTokenFor(userId);
   let ids: string[] = [];
   let latest = creds.historyId;
-  if (creds.historyId) {
-    const hist = await listHistoryMessageIds(creds.accessToken, creds.historyId);
-    if (hist.expired) {
-      const recent = await listRecentMessageIds(creds.accessToken);
-      ids = recent.ids;
-      latest = recent.historyId ?? latest;
-    } else {
-      ids = hist.ids;
-      latest = hist.latestHistoryId ?? latest;
-    }
-  } else {
+  const hist = creds.historyId
+    ? await listHistoryMessageIds(creds.accessToken, creds.historyId)
+    : null;
+  const useBackfill = gmailSyncShouldBackfill({
+    storedHistoryId: creds.historyId,
+    historyExpired: hist?.expired ?? false,
+    historyIdCount: hist?.ids.length ?? 0,
+    backfillIfEmpty: options.backfillIfEmpty === true,
+  });
+  if (useBackfill) {
     const recent = await listRecentMessageIds(creds.accessToken);
     ids = recent.ids;
     latest = recent.historyId ?? latest;
+  } else {
+    ids = hist?.ids ?? [];
+    latest = hist?.latestHistoryId ?? latest;
   }
   const count = await ingestMessageIds(userId, creds.accessToken, ids);
   if (latest) {

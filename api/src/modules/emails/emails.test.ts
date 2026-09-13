@@ -146,6 +146,25 @@ describe("GET /api/v1/auth/gmail/callback", () => {
   });
 });
 
+describe("POST /api/v1/emails/gmail/sync", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("202 queues history sync with inbox backfill", async () => {
+    mockService.syncGmailHistory.mockResolvedValue({
+      status: "queued",
+      count: 4,
+    });
+    const res = await buildApp().request("/api/v1/emails/gmail/sync", {
+      method: "POST",
+      headers: { Authorization: await authHeader() },
+    });
+    expect(res.status).toBe(202);
+    expect(mockService.syncGmailHistory).toHaveBeenCalledWith("user-a", {
+      backfillIfEmpty: true,
+    });
+  });
+});
+
 describe("GET /api/v1/emails/gmail", () => {
   afterEach(() => vi.clearAllMocks());
 

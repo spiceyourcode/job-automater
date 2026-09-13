@@ -78,7 +78,10 @@ emailsRoutes.get("/gmail", async (c) => {
 emailsRoutes.post("/gmail/sync", async (c) => {
   const { userId } = c.get("auth");
   try {
-    return c.json(await emailsService.syncGmailHistory(userId), 202);
+    return c.json(
+      await emailsService.syncGmailHistory(userId, { backfillIfEmpty: true }),
+      202,
+    );
   } catch (err) {
     if (isErr(err)) return c.json({ error: err.message }, err.statusCode);
     throw err;

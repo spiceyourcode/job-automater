@@ -7,6 +7,7 @@ import {
   isGmailOAuthConfigured,
   fetchGmailProfile,
   gmailConnectWhy,
+  gmailSyncShouldBackfill,
 } from "./gmail.js";
 
 describe("gmail message parse", () => {
@@ -63,6 +64,41 @@ describe("gmail OAuth URL", () => {
     expect(url).toContain("access_type=offline");
     expect(url).toContain("prompt=consent");
     expect(url).not.toContain("include_granted_scopes");
+  });
+});
+
+describe("gmailSyncShouldBackfill", () => {
+  it("backfills the first user sync when history is empty after connect", () => {
+    expect(
+      gmailSyncShouldBackfill({
+        storedHistoryId: "99",
+        historyExpired: false,
+        historyIdCount: 0,
+        backfillIfEmpty: true,
+      }),
+    ).toBe(true);
+  });
+
+  it("does not backfill empty history on push", () => {
+    expect(
+      gmailSyncShouldBackfill({
+        storedHistoryId: "99",
+        historyExpired: false,
+        historyIdCount: 0,
+        backfillIfEmpty: false,
+      }),
+    ).toBe(false);
+  });
+
+  it("uses incremental ids when history has new messages", () => {
+    expect(
+      gmailSyncShouldBackfill({
+        storedHistoryId: "99",
+        historyExpired: false,
+        historyIdCount: 3,
+        backfillIfEmpty: true,
+      }),
+    ).toBe(false);
   });
 });
 

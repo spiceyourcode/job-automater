@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import {
   disconnectGmailAction,
   gmailStatusAction,
@@ -29,6 +32,7 @@ export function GmailConnect() {
   const [pending, startTransition] = useTransition();
   const [status, setStatus] = useState<GmailStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [syncNote, setSyncNote] = useState<string | null>(null);
 
   const flash = params.get("gmail");
   const why = params.get("why") ?? "unknown";
@@ -64,9 +68,27 @@ export function GmailConnect() {
       ) : (
         <p className="text-sm text-muted-foreground">Not connected.</p>
       )}
+      {status?.connected ? (
+        <p className="text-sm text-muted-foreground">
+          Sync history pulls recent inbox mail, classifies it in the background,
+          then shows interview/offer/rejection items in the bell and on{" "}
+          <Link
+            href="/settings/email-review"
+            className="underline underline-offset-4"
+          >
+            Email review
+          </Link>
+          . This page does not list messages.
+        </p>
+      ) : null}
       {error ? (
         <p className="text-sm text-destructive" role="alert">
           {error}
+        </p>
+      ) : null}
+      {syncNote ? (
+        <p className="text-sm" role="status" aria-live="polite">
+          {syncNote}
         </p>
       ) : null}
       <div className="flex flex-wrap gap-2">
@@ -98,13 +120,33 @@ export function GmailConnect() {
               disabled={pending}
               onClick={() => {
                 setError(null);
+                setSyncNote(null);
                 startTransition(async () => {
                   const res = await syncGmailAction();
-                  if (!res.ok) setError(res.error);
+                  if (!res.ok) {
+                    setError(res.error);
+                    toast.error(res.error);
+                    return;
+                  }
+                  const count = res.data?.count ?? 0;
+                  const note =
+                    count > 0
+                      ? `Queued ${count} message${count === 1 ? "" : "s"} for classification.`
+                      : "No inbox messages to queue (empty inbox or already processed).";
+                  setSyncNote(note);
+                  if (count > 0) toast.success(note);
+                  else toast.message(note);
                 });
               }}
             >
-              Sync history
+              {pending ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Syncing…
+                </>
+              ) : (
+                "Sync history"
+              )}
             </Button>
             <Button
               type="button"
@@ -113,6 +155,7 @@ export function GmailConnect() {
               disabled={pending}
               onClick={() => {
                 setError(null);
+                setSyncNote(null);
                 startTransition(async () => {
                   const res = await disconnectGmailAction();
                   if (!res.ok) setError(res.error);

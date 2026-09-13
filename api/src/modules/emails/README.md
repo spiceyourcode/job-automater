@@ -9,7 +9,7 @@ Owns `emails`, `notifications`, and `gmail_connections` tables.
 | GET | `/api/v1/auth/gmail` | Start mailbox OAuth (refresh token never returned) |
 | GET | `/api/v1/auth/gmail/callback` | Store tokens server-side, optional watch |
 | GET | `/api/v1/emails/gmail` | Connection status (no tokens) |
-| POST | `/api/v1/emails/gmail/sync` | History / 90-day backfill → classifier |
+| POST | `/api/v1/emails/gmail/sync` | Incremental history, or 90-day inbox backfill when empty → classifier |
 | POST | `/api/v1/emails/gmail/watch` | Renew `users.watch` |
 | POST | `/api/v1/emails/gmail/push` | Pub/Sub push (optional `?token=`) |
 | DELETE | `/api/v1/emails/gmail` | Disconnect |

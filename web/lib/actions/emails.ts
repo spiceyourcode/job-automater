@@ -75,6 +75,7 @@ export async function syncGmailAction(): Promise<ActionResult<{ count: number }>
     }
     const data = (await res.json()) as { count: number };
     revalidatePath("/settings/sources");
+    revalidatePath("/settings/email-review");
     return { ok: true, data };
   } catch {
     return { ok: false, error: "Network error" };

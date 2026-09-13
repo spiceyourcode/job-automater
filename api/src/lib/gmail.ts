@@ -255,6 +255,18 @@ export function gmailMessageToIngest(raw: {
   };
 }
 
+/** User Sync history backfills when connect already stored a current historyId. Push must not. */
+export function gmailSyncShouldBackfill(params: {
+  storedHistoryId: string | null;
+  historyExpired: boolean;
+  historyIdCount: number;
+  backfillIfEmpty: boolean;
+}): boolean {
+  if (!params.storedHistoryId) return true;
+  if (params.historyExpired) return true;
+  return params.backfillIfEmpty && params.historyIdCount === 0;
+}
+
 export async function listHistoryMessageIds(
   accessToken: string,
   startHistoryId: string,
