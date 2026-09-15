@@ -8,7 +8,7 @@ import threading
 from typing import Any
 
 import redis
-from celery.signals import worker_ready, worker_shutdown
+from celery.signals import worker_init, worker_ready, worker_shutdown
 
 from config import settings
 
@@ -149,14 +149,21 @@ def _loop() -> None:
     logger.info("queue_bridge_stopped")
 
 
-@worker_ready.connect
-def _on_ready(**_kwargs: Any) -> None:
+def start_queue_bridge() -> None:
+    """Start the Redis list consumer. Safe to call from multiple Celery signals."""
     global _thread
     if _thread and _thread.is_alive():
         return
     _stop.clear()
     _thread = threading.Thread(target=_loop, name="queue-bridge", daemon=True)
     _thread.start()
+
+
+@worker_init.connect
+@worker_ready.connect
+def _on_worker_up(**_kwargs: Any) -> None:
+    # Windows --pool=solo sometimes skips worker_ready; worker_init still runs.
+    start_queue_bridge()
 
 
 @worker_shutdown.connect
