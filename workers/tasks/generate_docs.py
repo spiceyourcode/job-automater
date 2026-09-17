@@ -16,6 +16,7 @@ from db import (
     load_cv_chunks_for_user,
     load_job_for_user,
     load_profile_for_user,
+    load_user_contact,
     mark_application_generation_failed,
     save_application_documents,
 )
@@ -89,12 +90,15 @@ def process_generate_docs(payload: dict[str, Any]) -> dict[str, Any]:
             return _fail(conn, job=job, error="no_cv_chunks", started=started)
 
         profile = load_profile_for_user(conn, job.user_id)
+        # Email/name only for CV contact line — never log (HG-8)
+        contact = load_user_contact(conn, job.user_id)
         cv_template = str(app_row.get("cv_template") or "modern")
         cl_template = str(app_row.get("cl_template") or "modern")
         validated = run_generate_docs(
             chunks=chunks,
             job=job_row,
             profile=profile,
+            contact=contact,
             cv_template=cv_template,
             cl_template=cl_template,
             accepted_traces=job.accepted_traces,

@@ -48,7 +48,7 @@ def test_templates_differ_in_layout():
         name="Ada",
         job_title="Engineer",
         company="Nimbus",
-        experience_bullets=["Relevant to Engineer: Built REST APIs"],
+        experience_bullets=["Built REST APIs"],
         skills=["Python"],
     )
     classic = render_cv(
@@ -56,7 +56,7 @@ def test_templates_differ_in_layout():
         name="Ada",
         job_title="Engineer",
         company="Nimbus",
-        experience_bullets=["Relevant to Engineer: Built REST APIs"],
+        experience_bullets=["Built REST APIs"],
         skills=["Python"],
     )
     minimal = render_cv(
@@ -64,17 +64,33 @@ def test_templates_differ_in_layout():
         name="Ada",
         job_title="Engineer",
         company="Nimbus",
-        experience_bullets=["Relevant to Engineer: Built REST APIs"],
+        experience_bullets=["Built REST APIs"],
         skills=["Python"],
     )
-    assert "## Experience highlights" in modern
-    assert "EXPERIENCE" in classic
-    assert "• Relevant to Engineer: Built REST APIs" in minimal
+    assert "## Work Experience" in modern
+    assert "WORK EXPERIENCE" in classic
+    assert "• Built REST APIs" in minimal
     assert modern != classic != minimal
 
 
+def test_empty_education_omitted():
+    cv = render_cv(
+        template="modern",
+        name="Ada",
+        job_title="Engineer",
+        company="Nimbus",
+        sections={
+            "experience": ["Built REST APIs with FastAPI"],
+            "skills": ["Python"],
+            "education": [],
+        },
+    )
+    assert "## Education" not in cv
+    assert "## Work Experience" in cv
+
+
 def test_cover_letter_templates_preserve_bullets():
-    lead = "Relevant to Engineer: Built REST APIs with FastAPI"
+    lead = "Built REST APIs with FastAPI"
     support = "Skills include Python, Docker, AWS"
     for tmpl in ("modern", "classic", "minimal"):
         cl = render_cover_letter(

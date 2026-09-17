@@ -6,6 +6,8 @@ import logging
 import re
 from typing import Any
 
+from agents.generate_docs.sections import classify_cv_section
+
 logger = logging.getLogger(__name__)
 
 
@@ -66,6 +68,7 @@ def reindex_document(conn: Any, user_id: str, cv_document_id: str) -> dict[str, 
 
         embedded = 0
         for idx, content in enumerate(paragraphs):
+            section_type = classify_cv_section(content)
             vec = vectors[idx] if idx < len(vectors) else None
             if vec is not None:
                 from lib.embeddings import vector_literal
@@ -86,7 +89,7 @@ def reindex_document(conn: Any, user_id: str, cv_document_id: str) -> dict[str, 
                         idx,
                         content,
                         max(1, len(content.split())),
-                        "body",
+                        section_type,
                         lit,
                     ),
                 )
@@ -106,7 +109,7 @@ def reindex_document(conn: Any, user_id: str, cv_document_id: str) -> dict[str, 
                         idx,
                         content,
                         max(1, len(content.split())),
-                        "body",
+                        section_type,
                     ),
                 )
 

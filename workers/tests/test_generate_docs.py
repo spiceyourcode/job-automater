@@ -87,6 +87,7 @@ def test_process_never_saves_on_grounding_failure():
             return_value=[CHUNK_A, CHUNK_B],
         ),
         patch("tasks.generate_docs.load_profile_for_user", return_value={}),
+        patch("tasks.generate_docs.load_user_contact", return_value=None),
         patch("tasks.generate_docs.run_generate_docs", return_value=None),
         patch("tasks.generate_docs.save_application_documents") as save,
         patch("tasks.generate_docs.mark_application_generation_failed") as mark_fail,
@@ -166,6 +167,7 @@ def test_process_saves_draft_when_grounded():
             return_value=[CHUNK_A, CHUNK_B],
         ),
         patch("tasks.generate_docs.load_profile_for_user", return_value={}),
+        patch("tasks.generate_docs.load_user_contact", return_value=None),
         patch("tasks.generate_docs.run_generate_docs", return_value=docs),
         patch("tasks.generate_docs.save_application_documents") as save,
     ):
@@ -179,3 +181,93 @@ def test_process_saves_draft_when_grounded():
 
     assert result["status"] == "ok"
     save.assert_called_once()
+
+
+def test_verbose_body_chunks_produce_sectioned_cv():
+    """Many body-tagged chunks → Education/Skills headings + more than 6 bullets."""
+    chunks = [
+        {
+            "id": "11111111-1111-1111-1111-111111111101",
+            "content": (
+                "Professional Summary\n"
+                "Backend engineer with seven years building APIs at scale."
+            ),
+            "section_type": "body",
+            "chunk_index": 0,
+        },
+        {
+            "id": "11111111-1111-1111-1111-111111111102",
+            "content": (
+                "Work Experience\n"
+                "Built REST APIs with FastAPI and PostgreSQL at Acme Corp from 2020 to 2023.\n"
+                "Led migration from monolith to microservices cutting deploy time to under four minutes.\n"
+                "Mentored four junior engineers on code review and on-call practices.\n"
+                "Shipped billing webhooks used by two thousand merchants."
+            ),
+            "section_type": "body",
+            "chunk_index": 1,
+        },
+        {
+            "id": "11111111-1111-1111-1111-111111111103",
+            "content": (
+                "Education\n"
+                "Bachelor of Science in Computer Science, University of Nairobi, 2016–2019."
+            ),
+            "section_type": "body",
+            "chunk_index": 2,
+        },
+        {
+            "id": "11111111-1111-1111-1111-111111111104",
+            "content": "Skills\nPython, Docker, AWS, Kubernetes, PostgreSQL, Redis",
+            "section_type": "body",
+            "chunk_index": 3,
+        },
+        {
+            "id": "11111111-1111-1111-1111-111111111105",
+            "content": (
+                "Projects\n"
+                "JobAutomater — Celery collectors and Hono API for job search automation."
+            ),
+            "section_type": "body",
+            "chunk_index": 4,
+        },
+        {
+            "id": "11111111-1111-1111-1111-111111111106",
+            "content": (
+                "Developed four customer-facing React features reducing support tickets.\n"
+                "Automated weekly digest emails for pipeline analytics.\n"
+                "Owned Redis bridge from API lists to Celery tasks."
+            ),
+            "section_type": "body",
+            "chunk_index": 5,
+        },
+    ]
+    docs = run_generate_docs(
+        chunks=chunks,
+        job=JOB,
+        profile={"headline": "Backend Engineer"},
+        contact={"name": "Ada Lovelace", "email": "ada@example.com"},
+    )
+    assert docs is not None
+    validated = validate_generated(docs)
+    assert_grounded_in_chunks(validated, chunks)
+    assert "## Education" in validated.tailored_cv
+    assert "## Skills" in validated.tailored_cv
+    assert "## Work Experience" in validated.tailored_cv
+    assert "## Projects" in validated.tailored_cv
+    assert "TotallyFakeCorpXYZ" not in validated.tailored_cv
+    assert "Relevant to " not in validated.tailored_cv
+    assert len(validated.bullet_traces) > 6
+    assert "ada@example.com" in validated.tailored_cv
+    assert any(t.text in validated.cover_letter for t in validated.bullet_traces)
+
+
+def test_empty_education_section_omitted_when_absent():
+    docs = run_generate_docs(
+        chunks=[CHUNK_A, CHUNK_B],
+        job=JOB,
+        profile={"headline": "Backend Engineer"},
+    )
+    assert docs is not None
+    assert "## Education" not in docs["tailored_cv"]
+    assert "FastAPI" in docs["tailored_cv"]

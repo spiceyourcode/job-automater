@@ -21,6 +21,7 @@ class DocsState(TypedDict, total=False):
     chunks: list[dict[str, Any]]
     job: dict[str, Any]
     profile: dict[str, Any] | None
+    contact: dict[str, Any] | None
     cv_template: str
     cl_template: str
     accepted_traces: list[dict[str, Any]]
@@ -35,6 +36,7 @@ def _generate_node(state: DocsState) -> dict[str, Any]:
         chunks=state["chunks"],
         job=state["job"],
         profile=state.get("profile"),
+        contact=state.get("contact"),
         cv_template=state.get("cv_template") or "modern",
         cl_template=state.get("cl_template") or "modern",
         accepted_traces=state.get("accepted_traces") or [],
@@ -47,6 +49,7 @@ def _generate_node(state: DocsState) -> dict[str, Any]:
             chunks=state["chunks"],
             job=state["job"],
             profile=state.get("profile"),
+            contact=state.get("contact"),
             cv_template=state.get("cv_template") or "modern",
             cl_template=state.get("cl_template") or "modern",
         )
@@ -105,6 +108,7 @@ def run_generate_docs(
     chunks: list[dict[str, Any]],
     job: dict[str, Any],
     profile: dict[str, Any] | None = None,
+    contact: dict[str, Any] | None = None,
     cv_template: str = "modern",
     cl_template: str = "modern",
     accepted_traces: list[dict[str, Any]] | None = None,
@@ -116,6 +120,7 @@ def run_generate_docs(
             "chunks": chunks,
             "job": job,
             "profile": profile,
+            "contact": contact,
             "cv_template": cv_template,
             "cl_template": cl_template,
             "accepted_traces": accepted_traces or [],
