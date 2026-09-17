@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { Inbox, Plus, Search, Sparkles } from "lucide-react";
+import { Inbox, Plus, Sparkles } from "lucide-react";
 import type { JobPublic } from "@/lib/jobs";
 import {
   getJobStatsAction,
@@ -26,16 +26,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { AnimatedList } from "@/components/ui/animated-list";
+import { GooeyInput } from "@/components/ui/gooey-input";
 
 type Props = {
   initialJobs: JobPublic[];
+  initialQ?: string;
 };
 
-export function JobsBoard({ initialJobs }: Props) {
+export function JobsBoard({ initialJobs, initialQ = "" }: Props) {
   const [jobs, setJobs] = useState(initialJobs);
   const [sort, setSort] = useState<"score" | "date">("score");
   const [minScore, setMinScore] = useState<string>("0");
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(initialQ);
   const [remoteOnly, setRemoteOnly] = useState(false);
   const [source, setSource] = useState<string>("all");
   const [location, setLocation] = useState("");
@@ -232,21 +235,24 @@ export function JobsBoard({ initialJobs }: Props) {
         }}
         aria-label="Filter job matches"
       >
-        <div className="min-w-[12rem] flex-1 space-y-1.5">
+        <div className="min-w-48 flex-1 space-y-1.5">
           <Label htmlFor="jobs-q">Search</Label>
-          <div className="relative">
-            <Search
-              className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground"
-              aria-hidden
-            />
-            <Input
-              id="jobs-q"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Title or company"
-              className="pl-8"
-            />
-          </div>
+          <GooeyInput
+            id="jobs-q"
+            value={q}
+            onValueChange={setQ}
+            placeholder="Title or company"
+            aria-label="Search jobs by title or company"
+            collapsedWidth={160}
+            expandedWidth={280}
+            expandedOffset={44}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                refresh({ q });
+              }
+            }}
+          />
         </div>
         <div className="w-full space-y-1.5 sm:w-36">
           <Label htmlFor="jobs-sort">Sort</Label>
@@ -448,17 +454,16 @@ export function JobsBoard({ initialJobs }: Props) {
           description="Try lowering the minimum score or clearing search."
         />
       ) : (
-        <ul className="space-y-2" aria-label="Job matches">
+        <AnimatedList aria-label="Job matches">
           {jobs.map((job) => (
-            <li key={job.id}>
-              <JobCard
-                job={job}
-                selected={selected?.id === job.id}
-                onSelect={openJob}
-              />
-            </li>
+            <JobCard
+              key={job.id}
+              job={job}
+              selected={selected?.id === job.id}
+              onSelect={openJob}
+            />
           ))}
-        </ul>
+        </AnimatedList>
       )}
 
       <JobDetailDialog

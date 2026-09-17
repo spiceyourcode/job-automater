@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { GooeyInput } from "@/components/ui/gooey-input";
 import {
   Sheet,
   SheetContent,
@@ -23,7 +24,9 @@ type Props = {
 /** Mobile navigation — Sheet portals to body so header blur cannot trap it. */
 export function MobileNav({ items = APP_NAV }: Props) {
   const pathname = usePathname();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -42,6 +45,25 @@ export function MobileNav({ items = APP_NAV }: Props) {
         <SheetHeader className="border-b">
           <SheetTitle>JobAutomater</SheetTitle>
         </SheetHeader>
+        <div className="border-b p-3">
+          <GooeyInput
+            placeholder="Search jobs..."
+            value={q}
+            onValueChange={setQ}
+            aria-label="Search jobs"
+            collapsedWidth={160}
+            expandedWidth={220}
+            expandedOffset={44}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                const next = q.trim();
+                setOpen(false);
+                router.push(next ? `/jobs?q=${encodeURIComponent(next)}` : "/jobs");
+              }
+            }}
+          />
+        </div>
         <nav className="flex flex-1 flex-col gap-1 p-3" aria-label="Mobile">
           {items.map((item) => {
             const Icon = item.icon;

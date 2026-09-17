@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { LogOut, PanelLeftClose, PanelLeft, Keyboard } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { GooeyInput } from "@/components/ui/gooey-input";
 import { cn } from "@/lib/utils";
 import { logoutAction } from "@/lib/actions/auth";
 import { NotificationBell } from "@/components/notification-bell";
@@ -32,8 +33,15 @@ export function AppShell({
   title?: string;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
+  const [headerQ, setHeaderQ] = useState("");
   const settingsOpen = pathname.startsWith("/settings");
+
+  const goToJobSearch = () => {
+    const next = headerQ.trim();
+    router.push(next ? `/jobs?q=${encodeURIComponent(next)}` : "/jobs");
+  };
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -74,7 +82,24 @@ export function AppShell({
               / {title}
             </span>
           ) : null}
-          <div className="ml-auto flex shrink-0 items-center gap-1">
+          <div className="ml-auto hidden min-w-0 sm:block">
+            <GooeyInput
+              placeholder="Search jobs..."
+              value={headerQ}
+              onValueChange={setHeaderQ}
+              aria-label="Search jobs"
+              collapsedWidth={132}
+              expandedWidth={240}
+              expandedOffset={44}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  goToJobSearch();
+                }
+              }}
+            />
+          </div>
+          <div className="ml-auto flex shrink-0 items-center gap-1 sm:ml-0">
             <ThemeToggle />
             <NotificationBell />
             <Button

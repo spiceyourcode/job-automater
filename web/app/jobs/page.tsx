@@ -1,8 +1,17 @@
 import { JobsBoard } from "@/components/jobs-board";
 import { listJobsAction } from "@/lib/actions/jobs";
 
-export default async function JobsPage() {
-  const jobsResult = await listJobsAction({ sort: "score" });
+type Props = {
+  searchParams: Promise<{ q?: string }>;
+};
+
+export default async function JobsPage({ searchParams }: Props) {
+  const { q: qParam } = await searchParams;
+  const initialQ = qParam?.trim() ?? "";
+  const jobsResult = await listJobsAction({
+    sort: "score",
+    q: initialQ || undefined,
+  });
   const jobs = jobsResult.ok ? (jobsResult.data?.jobs ?? []) : [];
 
   return (
@@ -17,13 +26,12 @@ export default async function JobsPage() {
         <p className="text-sm text-destructive" role="alert">
           {jobsResult.error}
         </p>
-      ) : jobs.length > 0 ? (
-        <JobsBoard initialJobs={jobs} />
       ) : (
-        <p className="text-sm text-muted-foreground">
-          No scored jobs yet. Add sources and run collection to see matches
-          here.
-        </p>
+        <JobsBoard
+          key={initialQ}
+          initialJobs={jobs}
+          initialQ={initialQ}
+        />
       )}
     </div>
   );
