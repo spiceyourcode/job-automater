@@ -16,6 +16,7 @@ import { JobCard } from "@/components/job-card";
 import { JobDetailDialog } from "@/components/job-detail-dialog";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
+import { StatefulButton } from "@/components/ui/stateful-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -57,7 +58,7 @@ export function JobsBoard({ initialJobs, initialQ = "" }: Props) {
   const [bulkMsg, setBulkMsg] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const refresh = (next?: {
+  const refresh = async (next?: {
     sort?: "score" | "date";
     minScore?: string;
     q?: string;
@@ -77,37 +78,35 @@ export function JobsBoard({ initialJobs, initialQ = "" }: Props) {
     const salK = next?.salaryMinK ?? salaryMinK;
     const st = next?.status ?? status;
     const saved = next?.savedOnly ?? savedOnly;
-    startTransition(async () => {
-      const min = Number(ms);
-      const salMin = Number(salK);
-      const result = await listJobsAction({
-        sort: s,
-        minScore: Number.isFinite(min) && min > 0 ? min : undefined,
-        q: query.trim() || undefined,
-        remoteOnly: remote || undefined,
-        source: src !== "all" ? src : undefined,
-        location: loc.trim() || undefined,
-        salaryMin:
-          Number.isFinite(salMin) && salMin > 0
-            ? Math.round(salMin * 1000 * 100)
-            : undefined,
-        status: st !== "all" ? st : undefined,
-        savedOnly: saved || undefined,
-      });
-      if (!result.ok) {
-        setError(result.error);
-        return;
-      }
-      setError(null);
-      setJobs(result.data?.jobs ?? []);
-      const stats = await getJobStatsAction();
-      if (stats.ok && stats.data) {
-        setStatsLine(
-          `${stats.data.total} jobs · ${stats.data.scored} scored · ${stats.data.saved} saved`,
-        );
-        setSourceOptions(stats.data.bySource.map((x) => x.source));
-      }
+    const min = Number(ms);
+    const salMin = Number(salK);
+    const result = await listJobsAction({
+      sort: s,
+      minScore: Number.isFinite(min) && min > 0 ? min : undefined,
+      q: query.trim() || undefined,
+      remoteOnly: remote || undefined,
+      source: src !== "all" ? src : undefined,
+      location: loc.trim() || undefined,
+      salaryMin:
+        Number.isFinite(salMin) && salMin > 0
+          ? Math.round(salMin * 1000 * 100)
+          : undefined,
+      status: st !== "all" ? st : undefined,
+      savedOnly: saved || undefined,
     });
+    if (!result.ok) {
+      setError(result.error);
+      throw new Error("list_failed");
+    }
+    setError(null);
+    setJobs(result.data?.jobs ?? []);
+    const stats = await getJobStatsAction();
+    if (stats.ok && stats.data) {
+      setStatsLine(
+        `${stats.data.total} jobs · ${stats.data.scored} scored · ${stats.data.saved} saved`,
+      );
+      setSourceOptions(stats.data.bySource.map((x) => x.source));
+    }
   };
 
   const openJob = (job: JobPublic) => {
@@ -143,6 +142,29 @@ export function JobsBoard({ initialJobs, initialQ = "" }: Props) {
     return `${jobs.length} match${jobs.length === 1 ? "" : "es"}`;
   }, [jobs.length]);
 
+  const importJob = async () => {
+    const url = importUrl.trim();
+    if (!url) throw new Error("empty_url");
+    setImportMsg(null);
+    const res = await importJobAction(url);
+    if (!res.ok) {
+      setError(res.error);
+      throw new Error("import_failed");
+    }
+    setError(null);
+    setImportUrl("");
+    setImportMsg(
+      res.data?.deduped
+        ? "That URL was already imported."
+        : "Job imported — scoring in progress.",
+    );
+    if (res.data?.job) {
+      setJobs((prev) => [res.data!.job, ...prev]);
+      openJob(res.data.job);
+    }
+    return res;
+  };
+
   if (
     initialJobs.length === 0 &&
     jobs.length === 0 &&
@@ -158,29 +180,7 @@ export function JobsBoard({ initialJobs, initialQ = "" }: Props) {
           setImportUrl={setImportUrl}
           pending={pending}
           importMsg={importMsg}
-          onImport={() => {
-            const url = importUrl.trim();
-            if (!url) return;
-            startTransition(async () => {
-              setImportMsg(null);
-              const res = await importJobAction(url);
-              if (!res.ok) {
-                setError(res.error);
-                return;
-              }
-              setError(null);
-              setImportUrl("");
-              setImportMsg(
-                res.data?.deduped
-                  ? "That URL was already imported."
-                  : "Job imported — scoring in progress.",
-              );
-              if (res.data?.job) {
-                setJobs((prev) => [res.data!.job, ...prev]);
-                openJob(res.data.job);
-              }
-            });
-          }}
+          onImport={importJob}
         />
         <EmptyState
           icon={<Inbox className="h-8 w-8" aria-hidden />}
@@ -198,34 +198,17 @@ export function JobsBoard({ initialJobs, initialQ = "" }: Props) {
 
   return (
     <div className="space-y-4">
-      <ImportBar
-        importUrl={importUrl}
-        setImportUrl={setImportUrl}
-        pending={pending}
-        importMsg={importMsg}
-        onImport={() => {
-          const url = importUrl.trim();
-          if (!url) return;
-          startTransition(async () => {
-            setImportMsg(null);
-            const res = await importJobAction(url);
-            if (!res.ok) {
-              setError(res.error);
-              return;
-            }
-            setError(null);
-            setImportUrl("");
-            setImportMsg(
-              res.data?.deduped
-                ? "That URL was already imported."
-                : "Job imported — scoring in progress.",
-            );
-            refresh({ sort: "date" });
+        <ImportBar
+          importUrl={importUrl}
+          setImportUrl={setImportUrl}
+          pending={pending}
+          importMsg={importMsg}
+          onImport={async () => {
+            await importJob();
             setSort("date");
-            if (res.data?.job) openJob(res.data.job);
-          });
-        }}
-      />
+            await refresh({ sort: "date" });
+          }}
+        />
 
       <form
         className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end"
@@ -316,9 +299,14 @@ export function JobsBoard({ initialJobs, initialQ = "" }: Props) {
         >
           {moreFilters ? "Fewer filters" : "More filters"}
         </Button>
-        <Button type="submit" size="sm" className="cursor-pointer" disabled={pending}>
-          {pending ? "Updating…" : "Apply"}
-        </Button>
+        <StatefulButton
+          size="sm"
+          variant="default"
+          disabled={pending}
+          onClick={() => refresh()}
+        >
+          Apply
+        </StatefulButton>
       </form>
 
       {moreFilters && (
@@ -412,34 +400,30 @@ export function JobsBoard({ initialJobs, initialQ = "" }: Props) {
       </p>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Button
-          type="button"
+        <StatefulButton
           size="sm"
           variant="outline"
-          className="cursor-pointer"
           disabled={pending}
-          onClick={() => {
-            startTransition(async () => {
-              setBulkMsg(null);
-              const min = Number(minScore);
-              const res = await bulkGenerateAction(
-                10,
-                Number.isFinite(min) && min > 0 ? min : undefined,
-              );
-              if (!res.ok) {
-                setError(res.error);
-                return;
-              }
-              setError(null);
-              setBulkMsg(
-                `Queued ${res.data?.count ?? 0} draft document packs (no submit).`,
-              );
-            });
+          onClick={async () => {
+            setBulkMsg(null);
+            const min = Number(minScore);
+            const res = await bulkGenerateAction(
+              10,
+              Number.isFinite(min) && min > 0 ? min : undefined,
+            );
+            if (!res.ok) {
+              setError(res.error);
+              throw new Error("bulk_failed");
+            }
+            setError(null);
+            setBulkMsg(
+              `Queued ${res.data?.count ?? 0} draft document packs (no submit).`,
+            );
           }}
         >
-          <Sparkles className="mr-1 h-3.5 w-3.5" aria-hidden />
+          <Sparkles className="h-3.5 w-3.5" aria-hidden />
           Generate top 10 drafts
-        </Button>
+        </StatefulButton>
         {bulkMsg && (
           <p className="text-sm text-muted-foreground" role="status">
             {bulkMsg}
@@ -495,7 +479,7 @@ function ImportBar({
   setImportUrl: (v: string) => void;
   pending: boolean;
   importMsg: string | null;
-  onImport: () => void;
+  onImport: () => void | Promise<void>;
 }) {
   return (
     <div className="space-y-2 rounded-lg border p-3">
@@ -503,7 +487,6 @@ function ImportBar({
         className="flex flex-col gap-2 sm:flex-row sm:items-end"
         onSubmit={(e) => {
           e.preventDefault();
-          onImport();
         }}
         aria-label="Import job from URL"
       >
@@ -517,9 +500,14 @@ function ImportBar({
             placeholder="https://company.com/careers/role"
           />
         </div>
-        <Button type="submit" size="sm" className="cursor-pointer" disabled={pending || !importUrl.trim()}>
-          {pending ? "Importing…" : "Import"}
-        </Button>
+        <StatefulButton
+          size="sm"
+          variant="default"
+          disabled={pending || !importUrl.trim()}
+          onClick={() => onImport()}
+        >
+          Import
+        </StatefulButton>
       </form>
       {importMsg && (
         <p className="text-sm text-muted-foreground" role="status">
