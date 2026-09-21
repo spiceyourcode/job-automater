@@ -12,7 +12,7 @@ import {
   syncGmailAction,
   type GmailStatus,
 } from "@/lib/actions/emails";
-import { Button } from "@/components/ui/button";
+import { StatefulButton } from "@/components/ui/stateful-button";
 
 const GMAIL_WHY: Record<string, string> = {
   api_forbidden:
@@ -93,7 +93,7 @@ export function GmailConnect() {
       ) : null}
       <div className="flex flex-wrap gap-2">
         {!status?.connected ? (
-          <Button
+          <StatefulButton
             type="button"
             className="cursor-pointer"
             disabled={pending}
@@ -110,10 +110,10 @@ export function GmailConnect() {
             }}
           >
             Connect Gmail
-          </Button>
+          </StatefulButton>
         ) : (
           <>
-            <Button
+            <StatefulButton
               type="button"
               variant="outline"
               className="cursor-pointer"
@@ -147,8 +147,8 @@ export function GmailConnect() {
               ) : (
                 "Sync history"
               )}
-            </Button>
-            <Button
+            </StatefulButton>
+            <StatefulButton
               type="button"
               variant="outline"
               className="cursor-pointer"
@@ -164,7 +164,7 @@ export function GmailConnect() {
               }}
             >
               Disconnect
-            </Button>
+            </StatefulButton>
           </>
         )}
       </div>

@@ -1,6 +1,7 @@
 import { CvVersionsManager } from "@/components/cv-versions-manager";
 import { listCvVersionsAction } from "@/lib/actions/profile";
 import { getCvAbAction } from "@/lib/actions/analytics";
+import { AnimatedList } from "@/components/ui/animated-list";
 
 export default async function CvSettingsPage() {
   const listed = await listCvVersionsAction();
@@ -39,14 +40,14 @@ export default async function CvSettingsPage() {
           <p className="mt-1 text-sm text-muted-foreground">
             Response rate by CV version used on your applications.
           </p>
-          <ul className="mt-4 space-y-2 text-sm">
+          <AnimatedList aria-label="Resume A/B results" className="mt-4 space-y-2 text-sm">
             {variants.map((v) => (
               <li key={v.cvVersion}>
                 Version {v.cvVersion}: {v.submitted} submitted, {v.responses}{" "}
                 responses ({v.responseRatePct}%)
               </li>
             ))}
-          </ul>
+          </AnimatedList>
         </section>
       ) : null}
     </div>

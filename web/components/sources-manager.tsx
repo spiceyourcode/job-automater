@@ -4,7 +4,6 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
-  Loader2,
   Play,
   Plus,
   Radio,
@@ -14,7 +13,9 @@ import {
   Pencil,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { StatefulButton } from "@/components/ui/stateful-button";
 import { Input } from "@/components/ui/input";
+import { AnimatedList } from "@/components/ui/animated-list";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -502,16 +503,14 @@ export function SourcesManager({ initialSources }: Props) {
                 </>
               )}
               <div className="flex flex-wrap gap-2">
-                <Button
+                <StatefulButton
                   type="submit"
                   className="cursor-pointer"
                   disabled={isPending}
+                  onClick={onCreate}
                 >
-                  {isPending && (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
-                  )}
                   {editingId ? "Save changes" : "Save source"}
-                </Button>
+                </StatefulButton>
                 {editingId && (
                   <Button
                     type="button"
@@ -551,7 +550,7 @@ export function SourcesManager({ initialSources }: Props) {
           </Button>
         </div>
       ) : (
-        <ul className="space-y-3" aria-label="Your sources">
+        <AnimatedList aria-label="Your sources">
           {initialSources.map((s) => (
             <li key={s.id}>
               <Card>
@@ -594,7 +593,7 @@ export function SourcesManager({ initialSources }: Props) {
                       <Pencil className="mr-1 h-4 w-4" aria-hidden />
                       Edit
                     </Button>
-                    <Button
+                    <StatefulButton
                       type="button"
                       size="sm"
                       variant="outline"
@@ -604,8 +603,8 @@ export function SourcesManager({ initialSources }: Props) {
                     >
                       <FlaskConical className="mr-1 h-4 w-4" aria-hidden />
                       Test
-                    </Button>
-                    <Button
+                    </StatefulButton>
+                    <StatefulButton
                       type="button"
                       size="sm"
                       variant="outline"
@@ -625,8 +624,8 @@ export function SourcesManager({ initialSources }: Props) {
                     >
                       <History className="mr-1 h-4 w-4" aria-hidden />
                       Runs
-                    </Button>
-                    <Button
+                    </StatefulButton>
+                    <StatefulButton
                       type="button"
                       size="sm"
                       className="cursor-pointer"
@@ -635,8 +634,8 @@ export function SourcesManager({ initialSources }: Props) {
                     >
                       <Play className="mr-1 h-4 w-4" aria-hidden />
                       Run now
-                    </Button>
-                    <Button
+                    </StatefulButton>
+                    <StatefulButton
                       type="button"
                       size="sm"
                       variant="ghost"
@@ -646,7 +645,7 @@ export function SourcesManager({ initialSources }: Props) {
                       aria-label={`Delete ${s.name}`}
                     >
                       <Trash2 className="h-4 w-4" aria-hidden />
-                    </Button>
+                    </StatefulButton>
                   </div>
                 </CardContent>
               </Card>
@@ -656,7 +655,7 @@ export function SourcesManager({ initialSources }: Props) {
                   {runs.length === 0 ? (
                     <p className="text-muted-foreground">No runs yet.</p>
                   ) : (
-                    <ul className="space-y-1" aria-label={`Runs for ${s.name}`}>
+                    <AnimatedList aria-label={`Runs for ${s.name}`}>
                       {runs.map((r) => (
                         <li
                           key={r.id}
@@ -673,13 +672,13 @@ export function SourcesManager({ initialSources }: Props) {
                           )}
                         </li>
                       ))}
-                    </ul>
+                    </AnimatedList>
                   )}
                 </div>
               )}
             </li>
           ))}
-        </ul>
+        </AnimatedList>
       )}
     </div>
   );

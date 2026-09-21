@@ -3,10 +3,11 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { StatefulButton } from "@/components/ui/stateful-button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AnimatedList } from "@/components/ui/animated-list";
 import {
   createRecruiterAction,
   type RecruiterContact,
@@ -24,7 +25,7 @@ function ContactList({
   return (
     <section className="space-y-2">
       <h2 className="text-sm font-medium">{title}</h2>
-      <ul className="space-y-2 text-sm">
+      <AnimatedList aria-label={title}>
         {contacts.length === 0 ? (
           <li className="text-muted-foreground">{empty}</li>
         ) : (
@@ -37,7 +38,7 @@ function ContactList({
             </li>
           ))
         )}
-      </ul>
+      </AnimatedList>
     </section>
   );
 }
@@ -104,9 +105,9 @@ export function RecruiterCrm({
           />
           <Label htmlFor="rec-referral">Referral contact</Label>
         </div>
-        <Button type="submit" className="cursor-pointer" disabled={pending}>
+        <StatefulButton type="submit" className="cursor-pointer" disabled={pending}>
           Add contact
-        </Button>
+        </StatefulButton>
       </form>
       <ContactList
         title="Recruiters"

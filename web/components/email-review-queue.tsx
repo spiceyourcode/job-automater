@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { classifyEmailAction } from "@/lib/actions/emails";
-import { Button } from "@/components/ui/button";
+import { StatefulButton } from "@/components/ui/stateful-button";
+import { AnimatedList } from "@/components/ui/animated-list";
 
 const CATEGORIES = [
   "application_confirmation",
@@ -38,7 +39,7 @@ export function EmailReviewQueue({ initial }: { initial: ReviewEmail[] }) {
   }
 
   return (
-    <ul className="space-y-3">
+    <AnimatedList aria-label="Emails for review">
       {error ? (
         <li className="text-sm text-destructive" role="alert">
           {error}
@@ -79,17 +80,17 @@ export function EmailReviewQueue({ initial }: { initial: ReviewEmail[] }) {
                 </option>
               ))}
             </select>
-            <Button
+            <StatefulButton
               type="submit"
               size="sm"
               className="cursor-pointer"
               disabled={pending}
             >
               Confirm
-            </Button>
+            </StatefulButton>
           </form>
         </li>
       ))}
-    </ul>
+    </AnimatedList>
   );
 }

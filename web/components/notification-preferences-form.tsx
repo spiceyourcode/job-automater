@@ -6,7 +6,7 @@ import {
   patchNotificationPrefsAction,
   type ChannelPref,
 } from "@/lib/actions/notifications";
-import { Button } from "@/components/ui/button";
+import { StatefulButton } from "@/components/ui/stateful-button";
 
 const LABELS: Record<string, string> = {
   high_match: "High match jobs",
@@ -138,9 +138,9 @@ export function NotificationPreferencesForm() {
       {saved ? (
         <p className="text-sm text-muted-foreground">Preferences saved.</p>
       ) : null}
-      <Button type="submit" className="cursor-pointer" disabled={pending}>
+      <StatefulButton type="submit" className="cursor-pointer" disabled={pending}>
         Save preferences
-      </Button>
+      </StatefulButton>
     </form>
   );
 }

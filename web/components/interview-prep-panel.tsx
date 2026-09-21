@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { StatefulButton } from "@/components/ui/stateful-button";
+import { AnimatedList } from "@/components/ui/animated-list";
 import {
   Card,
   CardContent,
@@ -57,14 +58,14 @@ export function InterviewPrepPanel({
             Q&A, STAR stories, and negotiation from your CV chunks only.
           </p>
         </div>
-        <Button
+        <StatefulButton
           type="button"
           className="cursor-pointer"
           disabled={pending || generating}
           onClick={generate}
         >
           {generating ? "Generating…" : prep ? "Regenerate" : "Generate prep"}
-        </Button>
+        </StatefulButton>
       </div>
 
       {!prep && (
@@ -157,9 +158,11 @@ export function InterviewPrepPanel({
                     ) ?? "—"}
                   </p>
                   <ul className="list-disc space-y-1 pl-5">
-                    {prep.negotiation.talkingPoints.map((p) => (
-                      <li key={p}>{p}</li>
-                    ))}
+                    <AnimatedList aria-label="Talking points">
+                      {prep.negotiation.talkingPoints.map((p) => (
+                        <li key={p}>{p}</li>
+                      ))}
+                    </AnimatedList>
                   </ul>
                 </CardContent>
               </Card>

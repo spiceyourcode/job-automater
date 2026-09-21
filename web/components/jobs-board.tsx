@@ -162,7 +162,6 @@ export function JobsBoard({ initialJobs, initialQ = "" }: Props) {
       setJobs((prev) => [res.data!.job, ...prev]);
       openJob(res.data.job);
     }
-    return res;
   };
 
   if (
@@ -479,7 +478,7 @@ function ImportBar({
   setImportUrl: (v: string) => void;
   pending: boolean;
   importMsg: string | null;
-  onImport: () => void | Promise<void>;
+  onImport: () => Promise<void> | void;
 }) {
   return (
     <div className="space-y-2 rounded-lg border p-3">

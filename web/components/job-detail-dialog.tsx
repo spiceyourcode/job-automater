@@ -13,6 +13,7 @@ import { formatSalaryCents } from "@/lib/jobs";
 import { createApplicationAction } from "@/lib/actions/applications";
 import { MatchScoreBadge } from "@/components/match-score-badge";
 import { Button } from "@/components/ui/button";
+import { AnimatedList } from "@/components/ui/animated-list";
 import {
   Dialog,
   DialogContent,
@@ -112,7 +113,7 @@ export function JobDetailDialog({
               >
                 Match breakdown
               </h3>
-              <ul className="space-y-3">
+              <AnimatedList aria-label="Match breakdown">
                 {BREAKDOWN.map(({ key, label }) => {
                   const value = job.score?.[key];
                   if (typeof value !== "number") return null;
@@ -131,7 +132,7 @@ export function JobDetailDialog({
                     </li>
                   );
                 })}
-              </ul>
+              </AnimatedList>
 
               <Collapsible
                 open={reasoningOpen}
@@ -187,7 +188,7 @@ export function JobDetailDialog({
               <h3 id="similar-jobs-heading" className="mb-2 text-sm font-medium">
                 Similar jobs
               </h3>
-              <ul className="space-y-1">
+              <AnimatedList aria-label="Similar jobs">
                 {similar.map((s) => (
                   <li key={s.id}>
                     <button
@@ -203,7 +204,7 @@ export function JobDetailDialog({
                     </button>
                   </li>
                 ))}
-              </ul>
+              </AnimatedList>
             </section>
           </>
         )}

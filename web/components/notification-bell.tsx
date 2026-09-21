@@ -8,6 +8,7 @@ import {
   markNotificationReadAction,
   type NotificationItem,
 } from "@/lib/actions/notifications";
+import { AnimatedList } from "@/components/ui/animated-list";
 import { Button } from "@/components/ui/button";
 
 export function NotificationBell() {
@@ -88,7 +89,7 @@ export function NotificationBell() {
               Mark all read
             </Button>
           </div>
-          <ul className="max-h-80 space-y-1 overflow-y-auto">
+          <AnimatedList aria-label="Notifications" className="max-h-80 overflow-y-auto">
             {items.length === 0 ? (
               <li className="px-2 py-6 text-center text-xs text-muted-foreground">
                 No notifications yet.
@@ -116,7 +117,7 @@ export function NotificationBell() {
                 </li>
               ))
             )}
-          </ul>
+          </AnimatedList>
         </div>
       ) : null}
     </div>

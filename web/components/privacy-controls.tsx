@@ -10,7 +10,7 @@ import {
   automationStatusAction,
   emergencyStopAction,
 } from "@/lib/actions/automation";
-import { Button } from "@/components/ui/button";
+import { StatefulButton } from "@/components/ui/stateful-button";
 
 export function PrivacyControls() {
   const router = useRouter();
@@ -70,7 +70,7 @@ export function PrivacyControls() {
           Download a JSON copy of your profile, CV metadata, applications, and
           notifications.
         </p>
-        <Button
+        <StatefulButton
           type="button"
           variant="outline"
           className="cursor-pointer"
@@ -78,7 +78,7 @@ export function PrivacyControls() {
           onClick={onExport}
         >
           Download export
-        </Button>
+        </StatefulButton>
       </section>
 
       <section className="space-y-3 border-t pt-6">
@@ -96,7 +96,7 @@ export function PrivacyControls() {
           <p className="text-sm text-muted-foreground">{stopMsg}</p>
         ) : null}
         <div className="flex flex-wrap gap-2">
-          <Button
+          <StatefulButton
             type="button"
             variant="destructive"
             className="cursor-pointer"
@@ -118,8 +118,8 @@ export function PrivacyControls() {
             }}
           >
             Stop automation
-          </Button>
-          <Button
+          </StatefulButton>
+          <StatefulButton
             type="button"
             variant="outline"
             className="cursor-pointer"
@@ -139,7 +139,7 @@ export function PrivacyControls() {
             }}
           >
             Resume
-          </Button>
+          </StatefulButton>
         </div>
       </section>
 
@@ -154,7 +154,7 @@ export function PrivacyControls() {
             Click again to confirm permanent deletion.
           </p>
         ) : null}
-        <Button
+        <StatefulButton
           type="button"
           variant="destructive"
           className="cursor-pointer"
@@ -162,7 +162,7 @@ export function PrivacyControls() {
           onClick={onDelete}
         >
           {confirmDelete ? "Confirm delete account" : "Delete my account"}
-        </Button>
+        </StatefulButton>
       </section>
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}

@@ -5,7 +5,7 @@ import {
   inviteTeamMemberAction,
   type TeamMember,
 } from "@/lib/actions/team";
-import { Button } from "@/components/ui/button";
+import { StatefulButton } from "@/components/ui/stateful-button";
 import { Input } from "@/components/ui/input";
 
 type Props = { initialMembers: TeamMember[]; canManage: boolean };
@@ -87,9 +87,9 @@ export function TeamManager({ initialMembers, canManage }: Props) {
               <option value="viewer">Viewer</option>
             </select>
           </div>
-          <Button type="submit" disabled={pending} className="cursor-pointer">
+          <StatefulButton type="submit" disabled={pending} className="cursor-pointer">
             Invite
-          </Button>
+          </StatefulButton>
         </form>
       )}
 

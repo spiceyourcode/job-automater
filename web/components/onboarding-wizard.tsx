@@ -27,6 +27,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { StatefulButton } from "@/components/ui/stateful-button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -347,17 +348,14 @@ export function OnboardingWizard() {
                     </FormItem>
                   )}
                 />
-                <Button
+                <StatefulButton
                   type="submit"
                   className="w-full cursor-pointer"
                   disabled={isPending}
                 >
-                  {isPending && (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
-                  )}
                   Continue
                   <ChevronRight className="ml-2 h-4 w-4" aria-hidden />
-                </Button>
+                </StatefulButton>
               </form>
             </Form>
           </CardContent>
@@ -453,17 +451,14 @@ export function OnboardingWizard() {
                 <ChevronLeft className="mr-1 h-4 w-4" aria-hidden />
                 Back
               </Button>
-              <Button
+              <StatefulButton
                 type="button"
                 className="flex-1 cursor-pointer"
                 disabled={isPending}
                 onClick={skillsForm.handleSubmit(onSkills)}
               >
-                {isPending && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
-                )}
                 Continue
-              </Button>
+              </StatefulButton>
             </div>
           </CardContent>
         </Card>
@@ -594,19 +589,13 @@ export function OnboardingWizard() {
                     <ChevronLeft className="mr-1 h-4 w-4" aria-hidden />
                     Back
                   </Button>
-                  <Button
+                  <StatefulButton
                     type="submit"
                     className="flex-1 cursor-pointer"
                     disabled={isPending}
                   >
-                    {isPending && (
-                      <Loader2
-                        className="mr-2 h-4 w-4 animate-spin"
-                        aria-hidden
-                      />
-                    )}
                     Continue
-                  </Button>
+                  </StatefulButton>
                 </div>
               </form>
             </Form>
@@ -701,17 +690,14 @@ export function OnboardingWizard() {
                 <ChevronLeft className="mr-1 h-4 w-4" aria-hidden />
                 Back
               </Button>
-              <Button
+              <StatefulButton
                 type="button"
                 className="flex-1 cursor-pointer"
                 disabled={isPending || sources.length < 1}
                 onClick={onSourcesComplete}
               >
-                {isPending && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
-                )}
                 Finish → Dashboard
-              </Button>
+              </StatefulButton>
             </div>
           </CardContent>
         </Card>

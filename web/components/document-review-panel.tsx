@@ -16,6 +16,7 @@ import {
 } from "@/lib/actions/applications";
 import { Button } from "@/components/ui/button";
 import { StatefulButton } from "@/components/ui/stateful-button";
+import { AnimatedList } from "@/components/ui/animated-list";
 import { Label } from "@/components/ui/label";
 import { MultiStepLoader } from "@/components/ui/multi-step-loader";
 import { Separator } from "@/components/ui/separator";
@@ -355,7 +356,7 @@ export function DocumentReviewPanel({ applicationId, initial }: Props) {
               Accept or reject each bullet (HG-9). Confirm review stays disabled
               until none are pending.
             </p>
-            <ul className="max-h-80 space-y-2 overflow-y-auto text-sm text-muted-foreground">
+            <AnimatedList aria-label="Bullet traces" className="max-h-80 overflow-y-auto">
               {traces.map((t, i) => {
                 const status = t.status ?? "pending";
                 return (
@@ -400,7 +401,7 @@ export function DocumentReviewPanel({ applicationId, initial }: Props) {
                   </li>
                 );
               })}
-            </ul>
+            </AnimatedList>
             {sections.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-2">
                 {sections.map((section) => (

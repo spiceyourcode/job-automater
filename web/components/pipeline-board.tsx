@@ -10,6 +10,8 @@ import {
   type PipelineStage,
 } from "@/lib/actions/applications";
 import { Button } from "@/components/ui/button";
+import { StatefulButton } from "@/components/ui/stateful-button";
+import { AnimatedList } from "@/components/ui/animated-list";
 import {
   Select,
   SelectContent,
@@ -140,7 +142,7 @@ export function PipelineBoard({ initial }: Props) {
         </p>
       )}
       <div className="flex flex-wrap items-center gap-2">
-        <Button
+        <StatefulButton
           type="button"
           variant="outline"
           size="sm"
@@ -149,8 +151,8 @@ export function PipelineBoard({ initial }: Props) {
           onClick={() => runBulk("archive")}
         >
           Archive selected
-        </Button>
-        <Button
+        </StatefulButton>
+        <StatefulButton
           type="button"
           variant="outline"
           size="sm"
@@ -159,8 +161,8 @@ export function PipelineBoard({ initial }: Props) {
           onClick={() => runBulk("withdraw")}
         >
           Withdraw selected
-        </Button>
-        <Button
+        </StatefulButton>
+        <StatefulButton
           type="button"
           variant="outline"
           size="sm"
@@ -169,7 +171,7 @@ export function PipelineBoard({ initial }: Props) {
           onClick={() => runBulk("followup")}
         >
           Follow up in 7 days
-        </Button>
+        </StatefulButton>
       </div>
       <div className="flex gap-3 overflow-x-auto pb-2">
         {COLUMNS.map((col) => (
@@ -187,7 +189,7 @@ export function PipelineBoard({ initial }: Props) {
                 {byStage[col.id].length}
               </span>
             </h3>
-            <ul className="space-y-2">
+            <AnimatedList aria-label={col.label}>
               {byStage[col.id].map((app) => (
                 <li
                   key={app.id}
@@ -267,7 +269,7 @@ export function PipelineBoard({ initial }: Props) {
                     >
                       Interview
                     </Button>
-                    <Button
+                    <StatefulButton
                       type="button"
                       variant="outline"
                       size="sm"
@@ -292,8 +294,8 @@ export function PipelineBoard({ initial }: Props) {
                       }}
                     >
                       Withdraw
-                    </Button>
-                    <Button
+                    </StatefulButton>
+                    <StatefulButton
                       type="button"
                       variant="outline"
                       size="sm"
@@ -318,7 +320,7 @@ export function PipelineBoard({ initial }: Props) {
                       }}
                     >
                       Notes
-                    </Button>
+                    </StatefulButton>
                   </div>
                   {interviewFor === app.id ? (
                     <form
@@ -357,14 +359,14 @@ export function PipelineBoard({ initial }: Props) {
                         required
                       />
                       <div className="flex gap-1">
-                        <Button
+                        <StatefulButton
                           type="submit"
                           size="sm"
                           className="h-7 cursor-pointer px-2 text-xs"
                           disabled={pending}
                         >
                           Save
-                        </Button>
+                        </StatefulButton>
                         <Button
                           type="button"
                           variant="ghost"
@@ -418,7 +420,7 @@ export function PipelineBoard({ initial }: Props) {
                   )}
                 </li>
               ))}
-            </ul>
+            </AnimatedList>
           </section>
         ))}
       </div>

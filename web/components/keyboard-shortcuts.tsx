@@ -9,6 +9,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { AnimatedList } from "@/components/ui/animated-list";
 
 const SHORTCUTS: Array<{ keys: string; action: string; href?: string }> = [
   { keys: "g then d", action: "Go to Dashboard", href: "/dashboard" },
@@ -115,7 +116,7 @@ export function KeyboardShortcuts() {
             Press ? anytime (outside text fields) to open this list.
           </DialogDescription>
         </DialogHeader>
-        <ul className="space-y-2 text-sm">
+        <AnimatedList aria-label="Keyboard shortcuts" className="space-y-2 text-sm">
           {SHORTCUTS.map((s) => (
             <li
               key={s.keys}
@@ -127,7 +128,7 @@ export function KeyboardShortcuts() {
               </kbd>
             </li>
           ))}
-        </ul>
+        </AnimatedList>
       </DialogContent>
     </Dialog>
   );

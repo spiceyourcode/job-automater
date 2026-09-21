@@ -2,8 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { StatefulButton } from "@/components/ui/stateful-button";
+import { AnimatedList } from "@/components/ui/animated-list";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -190,14 +192,13 @@ export function ProfileSettingsEditor({ profile }: { profile: ProfileRow }) {
             />
           </div>
         </div>
-        <Button onClick={saveOverview} disabled={pending} className="cursor-pointer">
-          {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />}
+        <StatefulButton onClick={saveOverview} disabled={pending} className="cursor-pointer">
           Save overview
-        </Button>
+        </StatefulButton>
       </TabsContent>
 
       <TabsContent value="skills" className="mt-4 space-y-4">
-        <ul className="space-y-2">
+        <AnimatedList aria-label="Skills">
           {skills.map((s, i) => (
             <li key={`${s.name}-${i}`} className="flex flex-wrap items-center gap-2">
               <Input
@@ -240,7 +241,7 @@ export function ProfileSettingsEditor({ profile }: { profile: ProfileRow }) {
               </Button>
             </li>
           ))}
-        </ul>
+        </AnimatedList>
         <div className="flex flex-wrap gap-2">
           <Button
             type="button"
@@ -256,10 +257,10 @@ export function ProfileSettingsEditor({ profile }: { profile: ProfileRow }) {
             <Plus className="mr-1 h-4 w-4" aria-hidden />
             Add skill
           </Button>
-          <Button onClick={saveSkills} disabled={pending} className="cursor-pointer">
+          <StatefulButton onClick={saveSkills} disabled={pending} className="cursor-pointer">
             Save skills
-          </Button>
-          <Button
+          </StatefulButton>
+          <StatefulButton
             type="button"
             variant="secondary"
             onClick={reindex}
@@ -267,7 +268,7 @@ export function ProfileSettingsEditor({ profile }: { profile: ProfileRow }) {
             className="cursor-pointer"
           >
             Re-index CV
-          </Button>
+          </StatefulButton>
         </div>
       </TabsContent>
 
@@ -372,9 +373,9 @@ export function ProfileSettingsEditor({ profile }: { profile: ProfileRow }) {
             onChange={(e) => setEmploymentTypes(e.target.value)}
           />
         </div>
-        <Button onClick={savePrefs} disabled={pending} className="cursor-pointer">
+        <StatefulButton onClick={savePrefs} disabled={pending} className="cursor-pointer">
           Save preferences
-        </Button>
+        </StatefulButton>
       </TabsContent>
     </Tabs>
   );

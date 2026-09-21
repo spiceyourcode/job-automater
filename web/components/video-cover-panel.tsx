@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { StatefulButton } from "@/components/ui/stateful-button";
 import {
   Card,
   CardContent,
@@ -56,14 +56,14 @@ export function VideoCoverPanel({
             job listing.
           </p>
         </div>
-        <Button
+        <StatefulButton
           type="button"
           className="cursor-pointer"
           disabled={pending || generating}
           onClick={generate}
         >
           {generating ? "Generating…" : pack ? "Regenerate" : "Generate script"}
-        </Button>
+        </StatefulButton>
       </div>
 
       {!pack && (
