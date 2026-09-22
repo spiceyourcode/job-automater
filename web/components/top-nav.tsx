@@ -9,36 +9,20 @@ import { NavPill } from "@/components/ui/nav-pill";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { NotificationBell } from "@/components/notification-bell";
 import { MobileNavTrigger } from "@/components/mobile-nav-trigger";
-import { Briefcase, FileText, Users, Settings, Menu } from "lucide-react";
+import { Briefcase, FileText, Users, Settings, Search, LogOut } from "lucide-react";
 import { useState } from "react";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { logoutAction } from "@/lib/actions/auth";
-import { Search, LogOut } from "lucide-react";
-
-const SETTINGS_LINKS = [
-  { href: "/settings/profile", label: "Profile" },
-  { href: "/settings/cv", label: "CV & Documents" },
-  { href: "/settings/sources", label: "Sources" },
-  { href: "/settings/team", label: "Team" },
-  { href: "/settings/notifications", label: "Notifications" },
-  { href: "/settings/email-review", label: "Email review" },
-  { href: "/settings/privacy", label: "Privacy" },
-] as const;
 
 interface TopNavProps {
   title?: string;
-  onToggleIconRail?: () => void;
-  showIconRail?: boolean;
 }
 
-export function TopNav({ title, onToggleIconRail, showIconRail = true }: TopNavProps) {
+export function TopNav({ title }: TopNavProps) {
   const pathname = usePathname();
   const reducedMotion = useReducedMotion();
-  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   const handleKeyDown = (e: React.KeyboardEvent, index: number) => {
@@ -76,25 +60,7 @@ export function TopNav({ title, onToggleIconRail, showIconRail = true }: TopNavP
     <header className="sticky top-0 z-50 h-14 border-b bg-background/80 backdrop-blur-sm">
       <div className="flex h-full items-center justify-between gap-4 px-4">
         <div className="flex items-center gap-4">
-          <MobileNavTrigger onOpenChange={setMobileMenuOpen} />
-
-          {onToggleIconRail && showIconRail && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="cursor-pointer hidden sm:inline-flex"
-              aria-label="Collapse sidebar"
-              onClick={onToggleIconRail}
-            >
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="3" width="7" height="7" rx="1" />
-                <rect x="14" y="3" width="7" height="7" rx="1" />
-                <rect x="3" y="14" width="7" height="7" rx="1" />
-                <rect x="14" y="14" width="7" height="7" rx="1" />
-              </svg>
-            </Button>
-          )}
+          <MobileNavTrigger />
 
           <Link href="/dashboard" className="shrink-0 flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
@@ -112,30 +78,32 @@ export function TopNav({ title, onToggleIconRail, showIconRail = true }: TopNavP
           )}
         </div>
 
-        <NavPill activeHref={pathname} className="hidden md:flex flex-1 max-w-2xl justify-center">
-          {APP_NAV.map((item, index) => {
-            const active = isNavActive(item.href, pathname);
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                aria-current={active ? "page" : undefined}
-                data-nav-index={index}
-                onKeyDown={(e) => handleKeyDown(e, index)}
-                className={cn(
-                  "relative flex h-10 min-w-0 cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                  active
-                    ? "text-primary"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                <Icon className="h-4 w-4 shrink-0" aria-hidden />
-                <span className="truncate">{item.label}</span>
-              </Link>
-            );
-          })}
-        </NavPill>
+        <nav className="hidden md:flex flex-1 max-w-2xl justify-center" aria-label="Main navigation">
+          <NavPill activeHref={pathname} className="flex items-center gap-1">
+            {APP_NAV.map((item, index) => {
+              const active = isNavActive(item.href, pathname);
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  aria-current={active ? "page" : undefined}
+                  data-nav-index={index}
+                  onKeyDown={(e) => handleKeyDown(e, index)}
+                  className={cn(
+                    "relative flex h-10 min-w-0 cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                    active
+                      ? "text-primary"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  <Icon className="h-4 w-4 shrink-0" aria-hidden />
+                  <span className="truncate">{item.label}</span>
+                </Link>
+              );
+            })}
+          </NavPill>
+        </nav>
 
         <div className="flex items-center gap-2">
           <div className="hidden lg:block relative">
@@ -236,175 +204,12 @@ export function TopNav({ title, onToggleIconRail, showIconRail = true }: TopNavP
               )}
             </div>
 
-            <Sheet>
-              <SheetTrigger asChild>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="cursor-pointer md:hidden"
-                  aria-label="Open menu"
-                  onClick={() => setMobileMenuOpen(true)}
-                >
-                  <Menu className="h-4 w-4" aria-hidden />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-72 p-0">
-                <div className="border-b p-3">
-                  <Input
-                    type="search"
-                    placeholder="Search jobs, companies..."
-                    className="h-9 w-full text-sm"
-                    aria-label="Search jobs"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        const query = (e.currentTarget as HTMLInputElement).value.trim();
-                        window.location.href = query ? `/jobs?q=${encodeURIComponent(query)}` : "/jobs";
-                        setMobileMenuOpen(false);
-                      }
-                    }}
-                  />
-                </div>
-                <nav className="flex flex-1 flex-col gap-1 p-3" aria-label="Mobile navigation">
-                  {APP_NAV.map((item) => {
-                    const active = isNavActive(item.href, pathname);
-                    const Icon = item.icon;
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        aria-current={active ? "page" : undefined}
-                        className={cn(
-                          "flex min-h-11 cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-sm hover:bg-accent",
-                          active && "bg-accent font-medium",
-                        )}
-                        onClick={() => setMobileMenuOpen(false)}
-                      >
-                        <Icon className="h-5 w-5 shrink-0" aria-hidden />
-                        {item.label}
-                      </Link>
-                    );
-                  })}
-                  {pathname.startsWith("/settings") && (
-                    <div className="mt-2 space-y-1 border-t pt-2">
-                      {SETTINGS_LINKS.map((s) => (
-                        <Link
-                          key={s.href}
-                          href={s.href}
-                          aria-current={pathname === s.href ? "page" : undefined}
-                          className={cn(
-                            "block min-h-9 rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground",
-                            pathname === s.href && "bg-accent text-foreground",
-                          )}
-                          onClick={() => setMobileMenuOpen(false)}
-                        >
-                          {s.label}
-                        </Link>
-                      ))}
-                    </div>
-                  )}
-                </nav>
-                <form action={logoutAction} className="border-t p-3">
-                  <Button type="submit" className="w-full cursor-pointer">
-                    <LogOut className="mr-2 h-4 w-4" aria-hidden />
-                    Sign out
-                  </Button>
-                </form>
-              </SheetContent>
-            </Sheet>
+            <div className="md:hidden">
+              <MobileNavTrigger />
+            </div>
           </div>
         </div>
       </div>
-
-      {mobileSearchOpen && (
-        <div className="lg:hidden border-t px-4 py-3">
-          <Input
-            type="search"
-            placeholder="Search jobs, companies..."
-            className="h-9 w-full text-sm"
-            aria-label="Search jobs"
-            autoFocus
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                const query = (e.currentTarget as HTMLInputElement).value.trim();
-                window.location.href = query ? `/jobs?q=${encodeURIComponent(query)}` : "/jobs";
-                setMobileSearchOpen(false);
-              }
-            }}
-          />
-        </div>
-      )}
-
-      {mobileMenuOpen && (
-        <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-          <SheetContent side="right" className="w-72 p-0">
-            <div className="border-b p-3">
-              <Input
-                type="search"
-                placeholder="Search jobs, companies..."
-                className="h-9 w-full text-sm"
-                aria-label="Search jobs"
-                autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    const query = (e.currentTarget as HTMLInputElement).value.trim();
-                    window.location.href = query ? `/jobs?q=${encodeURIComponent(query)}` : "/jobs";
-                    setMobileMenuOpen(false);
-                  }
-                }}
-              />
-            </div>
-            <nav className="flex flex-1 flex-col gap-1 p-3" aria-label="Mobile navigation">
-              {APP_NAV.map((item) => {
-                const active = isNavActive(item.href, pathname);
-                const Icon = item.icon;
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    aria-current={active ? "page" : undefined}
-                    className={cn(
-                      "flex min-h-11 cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-sm hover:bg-accent",
-                      active && "bg-accent font-medium",
-                    )}
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    <Icon className="h-5 w-5 shrink-0" aria-hidden />
-                    {item.label}
-                  </Link>
-                );
-              })}
-              {pathname.startsWith("/settings") && (
-                <div className="mt-2 space-y-1 border-t pt-2">
-                  {SETTINGS_LINKS.map((s) => (
-                    <Link
-                      key={s.href}
-                      href={s.href}
-                      aria-current={pathname === s.href ? "page" : undefined}
-                      className={cn(
-                        "block min-h-9 rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground",
-                        pathname === s.href && "bg-accent text-foreground",
-                      )}
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      {s.label}
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </nav>
-            <form action={logoutAction} className="border-t p-3">
-              <Button type="submit" className="w-full cursor-pointer">
-                <LogOut className="mr-2 h-4 w-4" aria-hidden />
-                Sign out
-              </Button>
-            </form>
-          </SheetContent>
-        </Sheet>
-      )}
     </header>
   );
 }

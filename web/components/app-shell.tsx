@@ -1,10 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import { RealtimeListener } from "@/components/realtime-listener";
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts";
 import { TopNav } from "@/components/top-nav";
-import { IconRail } from "@/components/icon-rail";
 
 export function AppShell({
   children,
@@ -13,8 +11,6 @@ export function AppShell({
   children: React.ReactNode;
   title?: string;
 }) {
-  const [showIconRail, setShowIconRail] = useState(true);
-
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <a
@@ -26,19 +22,11 @@ export function AppShell({
       <RealtimeListener />
       <KeyboardShortcuts />
 
-      <TopNav
-        title={title}
-        onToggleIconRail={() => setShowIconRail((v) => !v)}
-        showIconRail={showIconRail}
-      />
+      <TopNav title={title} />
 
-      <div className="flex flex-1 overflow-hidden">
-        {showIconRail && <IconRail />}
-
-        <main className="flex-1 overflow-y-auto" id="main-content" tabIndex={-1}>
-          {children}
-        </main>
-      </div>
+      <main className="flex-1 overflow-y-auto" id="main-content" tabIndex={-1}>
+        {children}
+      </main>
     </div>
   );
 }
