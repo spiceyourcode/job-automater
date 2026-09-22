@@ -11,16 +11,18 @@ import {
 export type AppNavItem = {
   href: string;
   label: string;
+  shortLabel?: string;
+  badge?: string;
   icon: LucideIcon;
 };
 
 export const APP_NAV: readonly AppNavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/jobs", label: "Jobs", icon: Briefcase },
-  { href: "/applications", label: "Applications", icon: FileText },
-  { href: "/analytics", label: "Analytics", icon: BarChart3 },
-  { href: "/crm", label: "CRM", icon: Users },
-  { href: "/settings/profile", label: "Settings", icon: Settings },
+  { href: "/dashboard", label: "Dashboard", shortLabel: "Dash", icon: LayoutDashboard },
+  { href: "/jobs", label: "Jobs", shortLabel: "Jobs", icon: Briefcase },
+  { href: "/applications", label: "Applications", shortLabel: "Apps", icon: FileText },
+  { href: "/analytics", label: "Analytics", shortLabel: "Charts", icon: BarChart3 },
+  { href: "/crm", label: "CRM", shortLabel: "CRM", icon: Users },
+  { href: "/settings/profile", label: "Settings", shortLabel: "Set.", icon: Settings },
 ] as const;
 
 export function isNavActive(href: string, pathname: string): boolean {
