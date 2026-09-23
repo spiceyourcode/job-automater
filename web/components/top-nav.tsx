@@ -9,10 +9,10 @@ import { NavPill } from "@/components/ui/nav-pill";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { NotificationBell } from "@/components/notification-bell";
 import { MobileNavTrigger } from "@/components/mobile-nav-trigger";
-import { Briefcase, FileText, Users, Settings, Search, LogOut } from "lucide-react";
+import { Briefcase, FileText, Users, Settings, LogOut } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { GooeyInput } from "@/components/ui/gooey-input";
 import { Separator } from "@/components/ui/separator";
 import { logoutAction } from "@/lib/actions/auth";
 
@@ -60,8 +60,6 @@ export function TopNav({ title }: TopNavProps) {
     <header className="sticky top-0 z-50 h-14 border-b bg-background/80 backdrop-blur-sm">
       <div className="flex h-full items-center justify-between gap-4 px-4">
         <div className="flex items-center gap-4">
-          <MobileNavTrigger />
-
           <Link href="/dashboard" className="shrink-0 flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
               <Briefcase className="h-5 w-5" aria-hidden />
@@ -106,13 +104,12 @@ export function TopNav({ title }: TopNavProps) {
         </nav>
 
         <div className="flex items-center gap-2">
-          <div className="hidden lg:block relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
-            <Input
-              type="search"
+          <div className="hidden lg:block">
+            <GooeyInput
               placeholder="Search jobs, companies..."
-              className="h-9 w-64 pl-10 pr-4 text-sm bg-background"
-              aria-label="Search jobs"
+              collapsedWidth={132}
+              expandedWidth={280}
+              expandedOffset={44}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
@@ -120,6 +117,7 @@ export function TopNav({ title }: TopNavProps) {
                   window.location.href = query ? `/jobs?q=${encodeURIComponent(query)}` : "/jobs";
                 }
               }}
+              aria-label="Search jobs"
             />
           </div>
 

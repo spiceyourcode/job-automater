@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { X, LogOut, Settings, FileText, Users, Briefcase } from "lucide-react";
+import { X, LogOut, Settings, FileText, Users, Briefcase, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { GooeyInput } from "@/components/ui/gooey-input";
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
+  SheetTrigger,
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { logoutAction } from "@/lib/actions/auth";
@@ -41,6 +43,17 @@ export function MobileNav({ items = APP_NAV }: Props) {
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="cursor-pointer"
+          aria-label="Open menu"
+        >
+          <Menu className="h-5 w-5" aria-hidden />
+        </Button>
+      </SheetTrigger>
       <SheetContent
         side="left"
         className="w-72 max-w-[85vw] p-0"
@@ -52,17 +65,34 @@ export function MobileNav({ items = APP_NAV }: Props) {
           transition={reducedMotion ? { duration: 0 } : { duration: 0.2 }}
           className="h-full flex flex-col"
         >
-          <SheetHeader className="border-b px-4 py-3 flex items-center justify-between">
-            <SheetTitle className="text-lg font-semibold">JobAutomater</SheetTitle>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="cursor-pointer"
-              onClick={handleClose}
-              aria-label="Close menu"
-            >
-              <X className="h-5 w-5" aria-hidden />
-            </Button>
+          <SheetHeader className="border-b px-4 py-3 flex flex-col gap-3">
+            <div className="flex items-center justify-between w-full">
+              <SheetTitle className="text-lg font-semibold">JobAutomater</SheetTitle>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="cursor-pointer"
+                onClick={handleClose}
+                aria-label="Close menu"
+              >
+                <X className="h-5 w-5" aria-hidden />
+              </Button>
+            </div>
+            <GooeyInput
+              placeholder="Search jobs, companies..."
+              collapsedWidth={160}
+              expandedWidth={220}
+              expandedOffset={44}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  const query = (e.currentTarget as HTMLInputElement).value.trim();
+                  window.location.href = query ? `/jobs?q=${encodeURIComponent(query)}` : "/jobs";
+                  handleClose();
+                }
+              }}
+              aria-label="Search jobs"
+            />
           </SheetHeader>
 
           <nav className="flex-1 overflow-y-auto p-3 space-y-1" aria-label="Mobile navigation">
