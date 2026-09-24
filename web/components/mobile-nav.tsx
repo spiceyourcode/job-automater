@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { X, LogOut, Settings, FileText, Users, Briefcase, Menu } from "lucide-react";
+import { X, LogOut, Menu, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GooeyInput } from "@/components/ui/gooey-input";
 import {
@@ -14,32 +14,23 @@ import {
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { logoutAction } from "@/lib/actions/auth";
-import { APP_NAV, isNavActive, type AppNavItem } from "@/lib/nav";
+import { APP_NAV, isNavActive, SETTINGS_LINKS, type AppNavItem } from "@/lib/nav";
 import { useState } from "react";
-import { motion } from "motion/react";
-import { useReducedMotion } from "motion/react";
-
-const SETTINGS_LINKS = [
-  { href: "/settings/profile", label: "Profile", icon: Settings },
-  { href: "/settings/cv", label: "CV & Documents", icon: FileText },
-  { href: "/settings/sources", label: "Sources", icon: Briefcase },
-  { href: "/settings/team", label: "Team", icon: Users },
-  { href: "/settings/notifications", label: "Notifications", icon: Settings },
-  { href: "/settings/email-review", label: "Email review", icon: Briefcase },
-  { href: "/settings/privacy", label: "Privacy", icon: Settings },
-] as const;
+import { motion, useReducedMotion } from "motion/react";
 
 type Props = {
   items?: readonly AppNavItem[];
 };
 
-/** Mobile navigation — Sheet portals to body as overlay. */
+/** Mobile navigation — Sheet portals to body as overlay with expandable sections. */
 export function MobileNav({ items = APP_NAV }: Props) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const reducedMotion = useReducedMotion();
+  const [settingsExpanded, setSettingsExpanded] = useState(false);
 
   const handleClose = () => setOpen(false);
+  const toggleSettings = () => setSettingsExpanded((prev) => !prev);
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -99,6 +90,63 @@ export function MobileNav({ items = APP_NAV }: Props) {
             {items.map((item) => {
               const active = isNavActive(item.href, pathname);
               const Icon = item.icon;
+              const isSettings = item.href.startsWith("/settings");
+
+              if (isSettings) {
+                return (
+                  <div key={item.href}>
+                    <button
+                      type="button"
+                      className={cn(
+                        "flex w-full min-h-11 cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-sm hover:bg-accent",
+                        active && "bg-accent font-medium",
+                      )}
+                      onClick={toggleSettings}
+                      aria-expanded={settingsExpanded}
+                      aria-controls="settings-submenu"
+                    >
+                      <Icon className="h-5 w-5 shrink-0" aria-hidden />
+                      {item.label}
+                      <motion.span
+                        className="ml-auto shrink-0"
+                        animate={{ rotate: settingsExpanded ? 90 : 0 }}
+                        transition={reducedMotion ? { duration: 0 } : { duration: 0.2 }}
+                      >
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden />
+                      </motion.span>
+                    </button>
+                    <motion.ul
+                      id="settings-submenu"
+                      initial={false}
+                      animate={{
+                        height: settingsExpanded ? "auto" : 0,
+                        opacity: settingsExpanded ? 1 : 0,
+                        paddingTop: settingsExpanded ? 4 : 0,
+                      }}
+                      transition={reducedMotion ? { duration: 0 } : { duration: 0.2, ease: "easeInOut" }}
+                      className="overflow-hidden"
+                    >
+                      {SETTINGS_LINKS.map((s) => (
+                        <li key={s.href}>
+                          <Link
+                            href={s.href}
+                            aria-current={pathname === s.href ? "page" : undefined}
+                            className={cn(
+                              "flex min-h-10 cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-sm hover:bg-accent pl-6",
+                              pathname === s.href && "bg-accent font-medium",
+                            )}
+                            onClick={handleClose}
+                          >
+                            <s.icon className="h-4 w-4 shrink-0" aria-hidden />
+                            {s.label}
+                          </Link>
+                        </li>
+                      ))}
+                    </motion.ul>
+                  </div>
+                );
+              }
+
               return (
                 <Link
                   key={item.href}
@@ -115,30 +163,6 @@ export function MobileNav({ items = APP_NAV }: Props) {
                 </Link>
               );
             })}
-
-            {pathname.startsWith("/settings") && (
-              <div className="mt-4 space-y-1 border-t pt-4">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-3">
-                  Settings
-                </p>
-                {SETTINGS_LINKS.map((s) => (
-                  <Link
-                    key={s.href}
-                    href={s.href}
-                    aria-current={pathname === s.href ? "page" : undefined}
-                    className={cn(
-                      "flex min-h-10 cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-sm hover:bg-accent",
-                      pathname === s.href && "bg-accent font-medium",
-                    )}
-                    onClick={handleClose}
-                  >
-                    <s.icon className="h-4 w-4 shrink-0" aria-hidden />
-                    {s.label}
-                  </Link>
-                ))}
-              </div>
-            )}
-
             <form action={logoutAction} className="mt-4 border-t pt-3">
               <button
                 type="submit"
