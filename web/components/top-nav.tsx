@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
 import { cn } from "@/lib/utils";
-import { APP_NAV, isNavActive } from "@/lib/nav";
+import { APP_NAV, isNavActive, SETTINGS_LINKS } from "@/lib/nav";
 import { NavPill } from "@/components/ui/nav-pill";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { NotificationBell } from "@/components/notification-bell";
@@ -24,6 +24,7 @@ export function TopNav({ title }: TopNavProps) {
   const pathname = usePathname();
   const reducedMotion = useReducedMotion();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const handleKeyDown = (e: React.KeyboardEvent, index: number) => {
     const links = APP_NAV;
@@ -81,6 +82,63 @@ export function TopNav({ title }: TopNavProps) {
             {APP_NAV.map((item, index) => {
               const active = isNavActive(item.href, pathname);
               const Icon = item.icon;
+              const isSettings = item.href.startsWith("/settings");
+
+              // Settings item gets a dropdown
+              if (isSettings) {
+                return (
+                  <div
+                    key={item.href}
+                    className="relative"
+                    onMouseEnter={() => setSettingsOpen(true)}
+                    onMouseLeave={() => setSettingsOpen(false)}
+                  >
+                    <button
+                      className={cn(
+                        "relative flex h-10 min-w-0 cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                        active
+                          ? "text-primary"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
+                      aria-expanded={settingsOpen}
+                      aria-haspopup="true"
+                      aria-label={item.label}
+                    >
+                      <Icon className="h-4 w-4 shrink-0" aria-hidden />
+                      <span className="truncate">{item.label}</span>
+                    </button>
+                    {settingsOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        transition={reducedMotion ? { duration: 0 } : { duration: 0.15 }}
+                        className="absolute top-full left-0 mt-1 w-56 origin-top-left rounded-md border bg-popover p-1 shadow-lg z-50"
+                        role="menu"
+                      >
+                        <nav className="py-1" aria-label={item.label}>
+                          {SETTINGS_LINKS.map((s) => (
+                            <Link
+                              key={s.href}
+                              href={s.href}
+                              aria-current={pathname === s.href ? "page" : undefined}
+                              className={cn(
+                                "flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent",
+                                pathname === s.href && "bg-accent font-medium",
+                              )}
+                              role="menuitem"
+                            >
+                              <s.icon className="h-4 w-4 shrink-0" aria-hidden />
+                              {s.label}
+                            </Link>
+                          ))}
+                        </nav>
+                      </motion.div>
+                    )}
+                  </div>
+                );
+              }
+
               return (
                 <Link
                   key={item.href}

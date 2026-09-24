@@ -16,6 +16,22 @@ export type AppNavItem = {
   icon: LucideIcon;
 };
 
+export type SettingsLink = {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+};
+
+export const SETTINGS_LINKS: readonly SettingsLink[] = [
+  { href: "/settings/profile", label: "Profile", icon: Settings },
+  { href: "/settings/cv", label: "CV & Documents", icon: FileText },
+  { href: "/settings/sources", label: "Sources", icon: FileText },
+  { href: "/settings/team", label: "Team", icon: Users },
+  { href: "/settings/notifications", label: "Notifications", icon: Settings },
+  { href: "/settings/email-review", label: "Email review", icon: FileText },
+  { href: "/settings/privacy", label: "Privacy", icon: Settings },
+] as const;
+
 export const APP_NAV: readonly AppNavItem[] = [
   { href: "/dashboard", label: "Dashboard", shortLabel: "Dash", icon: LayoutDashboard },
   { href: "/jobs", label: "Jobs", shortLabel: "Jobs", icon: Briefcase },
