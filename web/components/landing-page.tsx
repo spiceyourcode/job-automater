@@ -78,7 +78,7 @@ export function LandingPage() {
 
         {/* Waves background from ReactBits */}
         <WavesBackground
-          lineColor="hsl(var(--primary) / 0.3)"
+          lineColor="oklch(var(--primary) / 0.3)"
           backgroundColor="transparent"
           waveSpeedX={0.008}
           waveSpeedY={0.003}
@@ -116,6 +116,7 @@ export function LandingPage() {
             from={{ opacity: 0, y: 40 }}
             to={{ opacity: 1, y: 0 }}
             className="text-5xl font-semibold tracking-tight sm:text-6xl md:text-7xl lg:text-8xl"
+            id="landing-brand"
           />
 
           <motion.p
@@ -191,6 +192,7 @@ export function LandingPage() {
               fontSize={48}
               fontWeight={700}
               className="text-3xl font-semibold tracking-tight sm:text-4xl md:text-5xl"
+              id="features-heading"
             />
             <p className="mt-4 max-w-xl mx-auto text-muted-foreground md:text-lg">
               One pipeline. You stay in control of every submission.
@@ -241,6 +243,7 @@ export function LandingPage() {
               showCursor={true}
               cursorCharacter="|"
               cursorBlinkDuration={0.6}
+              id="pipeline-heading"
             />
             <p className="mt-4 max-w-xl mx-auto text-muted-foreground md:text-lg">
               Every step is visible. Nothing moves without you.

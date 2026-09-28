@@ -4,8 +4,7 @@ import { useEffect } from "react";
 import { getWsTicketAction } from "@/lib/actions/realtime";
 
 function wsBase(): string {
-  const http =
-    process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+  const http = process.env.NEXT_PUBLIC_API_URL ?? `http://localhost:${process.env.NEXT_PUBLIC_API_PORT ?? "4001"}`;
   return http.replace(/^http/, "ws");
 }
 

@@ -1,10 +1,12 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
+import { cors } from "hono/cors";
 import { apiRateLimit } from "./middleware/api-rate-limit.js";
 import { requestLog } from "./middleware/request-log.js";
 import { buildOpenApiDocument } from "./lib/openapi.js";
 import { log, publicErrorFields } from "./lib/logger.js";
 import { captureUnhandled } from "./lib/sentry.js";
+import { env } from "./env.js";
 import { registerRoutes as registerHealthRoutes } from "./modules/health/index.js";
 import { registerRoutes as registerAuthRoutes } from "./modules/auth/index.js";
 import { registerRoutes as registerProfileRoutes } from "./modules/profile/index.js";
@@ -21,6 +23,16 @@ import { registerRoutes as registerBillingRoutes } from "./modules/billing/index
 
 export const createApp = (): Hono => {
   const app = new Hono();
+
+  // CORS middleware - must be before other middleware
+  app.use("*", cors({
+    origin: [env.appUrl, "http://localhost:3000", "http://127.0.0.1:3000"],
+    allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+    exposeHeaders: ["Content-Length", "X-Request-Id"],
+    credentials: true,
+    maxAge: 86400,
+  }));
 
   app.onError((err, c) => {
     if (err instanceof HTTPException) {

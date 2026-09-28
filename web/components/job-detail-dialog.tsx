@@ -118,7 +118,7 @@ export function JobDetailDialog({
                   const value = job.score?.[key];
                   if (typeof value !== "number") return null;
                   return (
-                    <li key={key}>
+                    <div key={key}>
                       <div className="mb-1 flex justify-between text-sm">
                         <span>{label}</span>
                         <span className="tabular-nums text-muted-foreground">
@@ -129,7 +129,7 @@ export function JobDetailDialog({
                         value={value}
                         aria-label={`${label} ${Math.round(value)} percent`}
                       />
-                    </li>
+                    </div>
                   );
                 })}
               </AnimatedList>
@@ -190,19 +190,18 @@ export function JobDetailDialog({
               </h3>
               <AnimatedList aria-label="Similar jobs">
                 {similar.map((s) => (
-                  <li key={s.id}>
-                    <button
-                      type="button"
-                      className="w-full cursor-pointer rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted/50"
-                      onClick={() => onSelectSimilar?.(s)}
-                    >
-                      <span className="font-medium">{s.title}</span>
-                      <span className="text-muted-foreground">
-                        {" "}
-                        · {s.company}
-                      </span>
-                    </button>
-                  </li>
+                  <button
+                    key={s.id}
+                    type="button"
+                    className="w-full cursor-pointer rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted/50"
+                    onClick={() => onSelectSimilar?.(s)}
+                  >
+                    <span className="font-medium">{s.title}</span>
+                    <span className="text-muted-foreground">
+                      {" "}
+                      · {s.company}
+                    </span>
+                  </button>
                 ))}
               </AnimatedList>
             </section>

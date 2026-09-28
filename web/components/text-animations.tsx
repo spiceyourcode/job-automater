@@ -3,8 +3,20 @@
 import { motion, useReducedMotion } from "motion/react";
 import { useRef, useEffect, useState } from "react";
 
-// Framer Motion easing types - use the same as Framer Motion's internal type
-type Easing = "linear" | "easeIn" | "easeOut" | "easeInOut" | "easeInExpo" | "easeOutExpo" | "easeInOutExpo" | "circIn" | "circOut" | "circInOut" | "backIn" | "backOut" | "backInOut" | ((t: number) => number);
+type MotionEasing =
+  | "linear"
+  | "easeIn"
+  | "easeOut"
+  | "easeInOut"
+  | "circIn"
+  | "circOut"
+  | "circInOut"
+  | "backIn"
+  | "backOut"
+  | "backInOut"
+  | "anticipate"
+  | readonly [number, number, number, number]
+  | ((v: number) => number);
 
 interface SplitTextProps {
   text: string;
@@ -13,7 +25,7 @@ interface SplitTextProps {
   splitType?: "chars" | "words" | "lines";
   delay?: number;
   duration?: number;
-  ease?: Easing;
+  ease?: MotionEasing;
   from?: { opacity: number; y: number };
   to?: { opacity: number; y: number };
   threshold?: number;
@@ -88,7 +100,7 @@ export function SplitText({
           key={`${segment}-${index}`}
           initial={{ opacity: from.opacity, y: from.y }}
           animate={hasAnimated ? { opacity: to.opacity, y: to.y } : { opacity: from.opacity, y: from.y }}
-          transition={{ duration, ease, delay: index * (delay / 1000) }}
+          transition={{ duration, ease: ease as MotionEasing, delay: index * (delay / 1000) }}
           style={{ display: splitType === "chars" ? "inline-block" : "inline" }}
         >
           {segment}{splitType === "words" && index < segments.length - 1 && " "}
@@ -104,7 +116,7 @@ interface FoldTextProps {
   hinge?: "top" | "bottom" | "left" | "right";
   duration?: number;
   stagger?: number;
-  ease?: "linear" | "easeIn" | "easeOut" | "easeInOut" | "easeInExpo" | "easeOutExpo" | "easeInOutExpo" | "circIn" | "circOut" | "circInOut" | "backIn" | "backOut" | "backInOut";
+  ease?: MotionEasing;
   perspective?: number;
   creaseShading?: number;
   trigger?: "mount" | "hover" | "scroll";
@@ -224,11 +236,8 @@ export function FoldText({
           }
           transition={{
             duration,
-            ease,
+            ease: ease as MotionEasing,
             delay: index * stagger,
-            type: "spring",
-            stiffness: 200,
-            damping: 20,
           }}
         >
           <div
