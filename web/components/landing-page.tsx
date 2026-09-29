@@ -6,7 +6,8 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { motion, useReducedMotion } from "motion/react";
 import { Briefcase, Sparkles, Zap, Shield, ArrowRight, Check } from "lucide-react";
 import { WavesBackground } from "@/components/waves-background";
-import { SplitText, FoldText, TypeText } from "@/components/text-animations";
+import { SplitText, FoldText } from "@/components/text-animations";
+import { BlurText } from "@/components/ui/blur-text";
 
 /**
  * Marketing landing — HG-1: no API keys or secrets in client bundle.
@@ -233,16 +234,13 @@ export function LandingPage() {
             transition={{ duration: reduceMotion ? 0 : 0.7, ease: "easeOut" }}
             className="text-center max-w-2xl mx-auto mb-16"
           >
-            <TypeText
-              text={["One pipeline. Total control.", "Every step is visible.", "Nothing moves without you."]}
-              typingSpeed={40}
-              deletingSpeed={20}
-              pauseDuration={1500}
-              loop={true}
+<BlurText
+              text="One pipeline. Total control. Every step is visible. Nothing moves without you."
+              animateBy="words"
+              direction="top"
+              delay={100}
+              stepDuration={0.4}
               className="text-3xl font-semibold tracking-tight sm:text-4xl md:text-5xl"
-              showCursor={true}
-              cursorCharacter="|"
-              cursorBlinkDuration={0.6}
               id="pipeline-heading"
             />
             <p className="mt-4 max-w-xl mx-auto text-muted-foreground md:text-lg">

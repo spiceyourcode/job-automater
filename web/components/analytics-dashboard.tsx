@@ -15,6 +15,7 @@ import {
 } from "@/lib/actions/analytics";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { CountUp } from "@/components/ui/count-up";
 
 type Props = {
   initialSummary: DashboardSummary;
@@ -30,7 +31,9 @@ function BarRow({ label, value, max }: { label: string; value: number; max: numb
     <div className="space-y-1">
       <div className="flex justify-between text-xs">
         <span>{label}</span>
-        <span className="tabular-nums text-muted-foreground">{value}</span>
+        <span className="tabular-nums text-muted-foreground">
+          <CountUp to={value} duration={1} className="tabular-nums" />
+        </span>
       </div>
       <div className="h-2 overflow-hidden rounded bg-muted">
         <div
@@ -156,7 +159,11 @@ export function AnalyticsDashboard({
             <div key={String(label)} className="rounded-lg border p-3">
               <dt className="text-xs text-muted-foreground">{label}</dt>
               <dd className="mt-1 text-2xl font-semibold tabular-nums tracking-tight">
-                {value}
+                {typeof value === "number" ? (
+                  <CountUp to={value} duration={1.5} className="tabular-nums" />
+                ) : (
+                  value
+                )}
               </dd>
             </div>
           ))}
@@ -232,9 +239,11 @@ export function AnalyticsDashboard({
         ) : (
           <div className="space-y-3 rounded-lg border p-4">
             <p className="text-sm text-muted-foreground">
-              Coverage {skills.mySkillsCoverage.coveragePct}% ·{" "}
-              {skills.mySkillsCoverage.inDemandCovered}/
-              {skills.inDemand.length} in-demand skills on your profile
+              Coverage{" "}
+              <CountUp to={skills.mySkillsCoverage.coveragePct} duration={1} className="tabular-nums" />%
+              {" "}
+              <CountUp to={skills.mySkillsCoverage.inDemandCovered} duration={1} className="tabular-nums" />/
+              <CountUp to={skills.inDemand.length} duration={1} className="tabular-nums" /> in-demand skills on your profile
             </p>
             {skills.gaps.length === 0 ? (
               <p className="text-sm">No gaps in the current range.</p>

@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { Monitor, Moon, Sun } from "lucide-react";
-import { useTheme } from "next-themes";
+import { useTheme } from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
 
 const ORDER = ["light", "dark", "system"] as const;
 
-/** Cycles light → dark → system. Mount-gated to avoid next-themes SSR mismatch. */
+/** Cycles light → dark → system. Mount-gated to avoid SSR mismatch. */
 export function ThemeToggle() {
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);

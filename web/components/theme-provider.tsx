@@ -21,6 +21,7 @@ export function ThemeProvider({
 }: ThemeProviderProps) {
   const [theme, setTheme] = React.useState<Theme>(defaultTheme);
   const [mounted, setMounted] = React.useState(false);
+  const [resolvedTheme, setResolvedTheme] = React.useState<"light" | "dark">("light");
 
   React.useEffect(() => {
     setMounted(true);
@@ -34,23 +35,25 @@ export function ThemeProvider({
     if (!mounted) return;
 
     const root = document.documentElement;
-    let resolvedTheme: "light" | "dark" = "light";
+    let resolved: "light" | "dark" = "light";
 
     if (theme === "system") {
       if (enableSystem && window.matchMedia) {
-        resolvedTheme = window.matchMedia("(prefers-color-scheme: dark)").matches
+        resolved = window.matchMedia("(prefers-color-scheme: dark)").matches
           ? "dark"
           : "light";
       }
     } else {
-      resolvedTheme = theme;
+      resolved = theme;
     }
+
+    setResolvedTheme(resolved);
 
     if (attribute === "class") {
       root.classList.remove("light", "dark");
-      root.classList.add(resolvedTheme);
+      root.classList.add(resolved);
     } else {
-      root.setAttribute("data-theme", resolvedTheme);
+      root.setAttribute("data-theme", resolved);
     }
 
     localStorage.setItem("theme", theme);
@@ -64,12 +67,13 @@ export function ThemeProvider({
       const stored = localStorage.getItem("theme") as Theme | null;
       if (stored === "system") {
         const root = document.documentElement;
-        const resolvedTheme = mediaQuery.matches ? "dark" : "light";
+        const resolved = mediaQuery.matches ? "dark" : "light";
+        setResolvedTheme(resolved);
         if (attribute === "class") {
           root.classList.remove("light", "dark");
-          root.classList.add(resolvedTheme);
+          root.classList.add(resolved);
         } else {
-          root.setAttribute("data-theme", resolvedTheme);
+          root.setAttribute("data-theme", resolved);
         }
       }
     };
@@ -78,23 +82,14 @@ export function ThemeProvider({
     return () => mediaQuery.removeEventListener("change", handleChange);
   }, [enableSystem, attribute, mounted]);
 
-  if (!mounted) {
-    return (
-      <div
-        style={{
-          visibility: "hidden",
-          position: "fixed",
-          left: -9999,
-        }}
-        aria-hidden="true"
-      >
-        {children}
-      </div>
-    );
-  }
+  // Always provide context - use default values on server
+  const contextValue = React.useMemo(
+    () => ({ theme, setTheme, resolvedTheme }),
+    [theme, setTheme, resolvedTheme]
+  );
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme }}>
+    <ThemeContext.Provider value={contextValue}>
       {children}
     </ThemeContext.Provider>
   );
@@ -103,6 +98,7 @@ export function ThemeProvider({
 const ThemeContext = React.createContext<{
   theme: Theme;
   setTheme: (theme: Theme) => void;
+  resolvedTheme: "light" | "dark";
 } | null>(null);
 
 export function useTheme() {

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import type { DashboardSummary, FunnelStage, SourceRow } from "@/lib/actions/analytics";
+import { CountUp } from "@/components/ui/count-up";
 
 export function MetricsBar({ summary }: { summary: DashboardSummary }) {
   const items = [
@@ -14,7 +15,9 @@ export function MetricsBar({ summary }: { summary: DashboardSummary }) {
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
       {items.map((m) => (
         <div key={m.label} className="rounded-md border px-4 py-3">
-          <p className="text-2xl font-semibold tabular-nums">{m.value}</p>
+          <p className="text-2xl font-semibold tabular-nums">
+            <CountUp to={m.value} duration={1.5} className="tabular-nums" />
+          </p>
           <p className="text-xs text-muted-foreground">{m.label}</p>
         </div>
       ))}
@@ -27,7 +30,9 @@ export function PipelineSnapshot({ funnel }: { funnel: FunnelStage[] }) {
     <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
       {funnel.map((s) => (
         <li key={s.stage} className="rounded-md border px-3 py-2">
-          <p className="text-lg font-medium tabular-nums">{s.count}</p>
+          <p className="text-lg font-medium tabular-nums">
+            <CountUp to={s.count} duration={1} className="tabular-nums" />
+          </p>
           <p className="text-xs text-muted-foreground">{s.label}</p>
         </li>
       ))}
@@ -56,7 +61,7 @@ export function SourceHealth({ sources }: { sources: SourceRow[] }) {
           <div>
             <p className="font-medium">{s.name}</p>
             <p className="text-xs text-muted-foreground">
-              {s.type} · {s.jobsCollected} jobs
+              {s.type} · <CountUp to={s.jobsCollected} duration={1} className="tabular-nums" /> jobs
             </p>
           </div>
           <Badge variant={s.lastRunStatus === "success" ? "default" : "secondary"}>

@@ -297,13 +297,13 @@ export function TypeText({
   const [displayText, setDisplayText] = useState("");
   const [sentenceIndex, setSentenceIndex] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [cursorVisible, setCursorVisible] = useState(true);
   const [isVisible, setIsVisible] = useState(false);
   const reduceMotion = useReducedMotion();
   const ref = useRef<HTMLHeadingElement>(null);
 
   const sentences = Array.isArray(text) ? text : [text];
 
+  // Simple and reliable: use IntersectionObserver with low threshold
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -314,24 +314,26 @@ export function TypeText({
           }
         });
       },
-      { threshold: 0.1 }
+      { threshold: 0, rootMargin: "0px 0px -100px 0px" }
     );
     if (ref.current) observer.observe(ref.current);
     return () => observer.disconnect();
   }, []);
 
-  useEffect(() => {
-    const blinkInterval = setInterval(() => {
-      setCursorVisible((prev) => !prev);
-    }, cursorBlinkDuration * 1000);
+  // For reduced motion, show full text immediately
+  if (reduceMotion) {
+    return (
+      <h2 ref={ref} className={className} id={id} style={{ display: "inline-block" }}>
+        <span style={{ display: "inline-flex", alignItems: "baseline" }}>
+          {sentences[0]}
+        </span>
+      </h2>
+    );
+  }
 
-    return () => clearInterval(blinkInterval);
-  }, [cursorBlinkDuration]);
-
+  // Typing effect when visible
   useEffect(() => {
-    if (!isVisible) {
-      return;
-    }
+    if (!isVisible) return;
 
     const currentSentence = sentences[sentenceIndex];
     const targetLength = isDeleting ? 0 : currentSentence.length;
@@ -370,9 +372,9 @@ export function TypeText({
         setDisplayText(currentSentence.slice(0, displayText.length + 1));
       }
     }
-  }, [displayText, isDeleting, sentenceIndex, typingSpeed, deletingSpeed, pauseDuration, sentences, onSentenceComplete]);
+  }, [displayText, isDeleting, sentenceIndex, typingSpeed, deletingSpeed, pauseDuration, sentences, onSentenceComplete, isVisible]);
 
-  const cursor = (
+  const cursor = showCursor ? (
     <motion.span
       className="inline-block ml-1"
       animate={{ opacity: [1, 0, 1] }}
@@ -380,10 +382,10 @@ export function TypeText({
     >
       {cursorCharacter}
     </motion.span>
-  );
+  ) : null;
 
   return (
-    <h2 ref={ref} className={className} id={id}>
+    <h2 ref={ref} className={className} id={id} style={{ display: "inline-block" }}>
       <span style={{ display: "inline-flex", alignItems: "baseline" }}>
         {displayText}
         {cursor}
