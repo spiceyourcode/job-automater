@@ -26,7 +26,7 @@ export const createApp = (): Hono => {
 
   // CORS middleware - must be before other middleware
   app.use("*", cors({
-    origin: [env.appUrl, "http://localhost:3000", "http://127.0.0.1:3000"],
+    origin: [env.appUrl, "http://localhost:3000", "http://127.0.0.1:3000", "http://192.168.0.105:3000"],
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
     exposeHeaders: ["Content-Length", "X-Request-Id"],

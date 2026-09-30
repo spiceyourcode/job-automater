@@ -552,8 +552,8 @@ export function SourcesManager({ initialSources }: Props) {
       ) : (
         <AnimatedList aria-label="Your sources">
           {initialSources.map((s) => (
-            <li key={s.id}>
-              <Card>
+            <> 
+              <Card key={s.id}>
                 <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
@@ -655,9 +655,9 @@ export function SourcesManager({ initialSources }: Props) {
                   {runs.length === 0 ? (
                     <p className="text-muted-foreground">No runs yet.</p>
                   ) : (
-                    <AnimatedList aria-label={`Runs for ${s.name}`}>
+<AnimatedList aria-label={`Runs for ${s.name}`}>
                       {runs.map((r) => (
-                        <li
+                        <div
                           key={r.id}
                           className="flex flex-wrap gap-2 text-muted-foreground"
                         >
@@ -670,13 +670,13 @@ export function SourcesManager({ initialSources }: Props) {
                           {r.error && (
                             <span className="text-destructive">{r.error}</span>
                           )}
-                        </li>
+                        </div>
                       ))}
-                    </AnimatedList>
+</AnimatedList>
                   )}
                 </div>
               )}
-            </li>
+            </>
           ))}
         </AnimatedList>
       )}

@@ -5,11 +5,10 @@ import { fileURLToPath } from "node:url";
 const projectRoot = path.dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
-  // Parent-folder package-lock.json made Turbopack walk to C:\Users\Administrator
-  // and drop (auth) pages (/login, /register) from the route tree.
   turbopack: {
     root: projectRoot,
   },
+  allowedDevOrigins: ['192.168.0.105'],
 };
 
 export default nextConfig;
