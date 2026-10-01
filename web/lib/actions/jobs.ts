@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import type { JobPublic } from "@/lib/jobs";
 
 const API_URL =
-  process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+  process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4001";
 
 export type ActionResult<T = undefined> =
   | { ok: true; data?: T }

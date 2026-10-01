@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "platforms": ["ios", "android"],
     "extra": {
-      "apiUrl": "http://localhost:3001"
+      "apiUrl": "http://localhost:4001"
     }
   }
 }

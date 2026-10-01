@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 
 const API_URL =
-  process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+  process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4001";
 
 type ActionResult<T = undefined> =
   | { ok: true; data?: T }

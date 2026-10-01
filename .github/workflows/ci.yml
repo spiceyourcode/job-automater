@@ -31,7 +31,7 @@ jobs:
       S3_BUCKET: jobautomater
       S3_REGION: us-east-1
       APP_URL: http://localhost:3000
-      API_PUBLIC_URL: http://localhost:3001
+      API_PUBLIC_URL: http://localhost:4001
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -53,8 +53,8 @@ jobs:
       run:
         working-directory: web
     env:
-      NEXT_PUBLIC_API_URL: http://localhost:3001
-      API_URL: http://localhost:3001
+      NEXT_PUBLIC_API_URL: http://localhost:4001
+      API_URL: http://localhost:4001
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

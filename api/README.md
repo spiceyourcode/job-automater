@@ -15,10 +15,10 @@ npm run db:migrate
 npm run dev
 ```
 
-Listens on `API_PORT` (default **3001**). Prefer `127.0.0.1` in `DATABASE_URL` on Windows.
+Listens on `API_PORT` (default **4001**). Prefer `127.0.0.1` in `DATABASE_URL` on Windows.
 
 ```bash
-curl http://localhost:3001/health
+curl http://localhost:4001/health
 ```
 
 ## Scripts

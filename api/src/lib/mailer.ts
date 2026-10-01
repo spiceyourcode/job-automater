@@ -1,7 +1,8 @@
 /**
  * Transactional mailer — never logs recipient or body (HG-8).
- * Dev default: in-memory outbox (tests can assert). Production: SMTP via fetch webhook optional.
+ * Dev default: in-memory outbox (tests can assert). Production: Resend via API key.
  */
+import { Resend } from "resend";
 import { env } from "../env.js";
 
 export type MailMessage = {
@@ -34,7 +35,34 @@ export function drainMailOutbox(): MailMessage[] {
   return outbox.splice(0, outbox.length);
 }
 
+let resendClient: Resend | null = null;
+function getResendClient(): Resend | null {
+  if (resendClient) return resendClient;
+  if (!env.resendApiKey) return null;
+  resendClient = new Resend(env.resendApiKey);
+  return resendClient;
+}
+
 export async function sendMail(msg: MailMessage): Promise<void> {
+  const resend = getResendClient();
+  if (resend) {
+    try {
+      const from = env.emailFrom;
+      await resend.emails.send({
+        from,
+        to: msg.to,
+        subject: msg.subject,
+        text: msg.text,
+        html: msg.html,
+      });
+      console.info("mail_resend_ok subject_len=%s", msg.subject.length);
+      return;
+    } catch (err) {
+      console.warn("mail_resend_failed", err);
+      // fall through to outbox sink
+    }
+  }
+  // Fallback: in-memory outbox (dev) or SMTP webhook if configured
   if (env.smtpWebhookUrl) {
     try {
       await fetch(env.smtpWebhookUrl, {

@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 
 const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4001";
 
 const PROVIDERS = [
   { id: "google", label: "Continue with Google" },

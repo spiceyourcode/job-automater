@@ -15,7 +15,7 @@ const isProd = nodeEnv === "production";
 const envSchema = z
   .object({
     DATABASE_URL: z.string().min(1),
-    API_PORT: z.coerce.number().int().min(1).max(65535).default(3001),
+    API_PORT: z.coerce.number().int().min(1).max(65535).default(4001),
     NODE_ENV: z.string().default("development"),
     JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 chars"),
     JWT_ACCESS_TTL: z.string().default("15m"),
@@ -37,19 +37,20 @@ const envSchema = z
     OAUTH_GITHUB_CLIENT_SECRET: z.string().optional(),
     OAUTH_LINKEDIN_CLIENT_ID: z.string().optional(),
     OAUTH_LINKEDIN_CLIENT_SECRET: z.string().optional(),
-    API_PUBLIC_URL: z.string().url().default("http://localhost:3001"),
+    API_PUBLIC_URL: z.string().url().default("http://localhost:4001"),
     GMAIL_PUBSUB_TOPIC: z.string().optional(),
     GMAIL_PUSH_TOKEN: z.string().optional(),
     SENTRY_DSN: z.string().url().optional(),
     STRIPE_SECRET_KEY: z.string().optional(),
     STRIPE_WEBHOOK_SECRET: z.string().optional(),
     STRIPE_PRICE_ID: z.string().optional(),
+    RESEND_API_KEY: z.string().optional(),
   })
   .strict();
 
 const parsed = envSchema.safeParse({
   DATABASE_URL: process.env.DATABASE_URL,
-  API_PORT: process.env.API_PORT ?? "3001",
+  API_PORT: process.env.API_PORT ?? "4001",
   NODE_ENV: nodeEnv,
   JWT_SECRET: process.env.JWT_SECRET ?? "",
   JWT_ACCESS_TTL: process.env.JWT_ACCESS_TTL ?? "15m",
@@ -81,14 +82,15 @@ const parsed = envSchema.safeParse({
     process.env.OAUTH_LINKEDIN_CLIENT_SECRET || undefined,
   API_PUBLIC_URL:
     process.env.API_PUBLIC_URL ??
-    `http://localhost:${process.env.API_PORT ?? "3001"}`,
+    `http://localhost:${process.env.API_PORT ?? "4001"}`,
   GMAIL_PUBSUB_TOPIC: process.env.GMAIL_PUBSUB_TOPIC || undefined,
   GMAIL_PUSH_TOKEN: process.env.GMAIL_PUSH_TOKEN || undefined,
   SENTRY_DSN: process.env.SENTRY_DSN || undefined,
   STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || undefined,
   STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET || undefined,
-  STRIPE_PRICE_ID: process.env.STRIPE_PRICE_ID || undefined,
-});
+STRIPE_PRICE_ID: process.env.STRIPE_PRICE_ID || undefined,
+    RESEND_API_KEY: process.env.RESEND_API_KEY || undefined,
+  });
 
 if (!parsed.success) {
   const details = parsed.error.issues
@@ -127,5 +129,6 @@ export const env = {
   sentryDsn: parsed.data.SENTRY_DSN,
   stripeSecretKey: parsed.data.STRIPE_SECRET_KEY,
   stripeWebhookSecret: parsed.data.STRIPE_WEBHOOK_SECRET,
-  stripePriceId: parsed.data.STRIPE_PRICE_ID,
-} as const;
+stripePriceId: parsed.data.STRIPE_PRICE_ID,
+    resendApiKey: parsed.data.RESEND_API_KEY,
+  } as const;

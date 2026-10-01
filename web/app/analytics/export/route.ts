@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { type NextRequest } from "next/server";
 
 const API_URL =
-  process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+  process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4001";
 
 /** Proxies owner-scoped analytics export; auth cookie stays httpOnly (HG-1). */
 export async function GET(req: NextRequest) {

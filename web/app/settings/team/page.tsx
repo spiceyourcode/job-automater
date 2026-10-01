@@ -4,7 +4,7 @@ import { listTeamMembersAction } from "@/lib/actions/team";
 import { cookies } from "next/headers";
 
 const API_URL =
-  process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+  process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4001";
 
 async function fetchMyRole(): Promise<string | null> {
   const token = (await cookies()).get("access_token")?.value;

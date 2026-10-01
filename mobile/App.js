@@ -8,7 +8,7 @@ import {
   ScrollView,
 } from "react-native";
 
-const API = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3001";
+const API = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:4001";
 
 export default function App() {
   const [email, setEmail] = useState("");
