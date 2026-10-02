@@ -28,6 +28,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { OAuthButtons } from "@/components/auth/oauth-buttons";
 import { loginAction } from "@/lib/actions/auth";
+import { PasswordInput } from "@/components/ui/password-input";
 
 const schema = z.object({
   email: z.string().email("Enter a valid email"),
@@ -109,15 +110,14 @@ export function LoginForm() {
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Password</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="password"
-                      placeholder="••••••••"
-                      autoComplete="current-password"
-                      {...field}
-                    />
-                  </FormControl>
+                  <PasswordInput
+                    label="Password"
+                    name="password"
+                    control={form.control}
+                    placeholder="••••••••"
+                    autoComplete="current-password"
+                    showStrengthMeter={false}
+                  />
                   <FormMessage />
                 </FormItem>
               )}

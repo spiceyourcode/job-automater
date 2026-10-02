@@ -357,7 +357,7 @@ export const refresh = async (
         and(
           eq(userSessions.tokenHash, tokenHash),
           isNull(userSessions.revokedAt),
-          sql`${userSessions.expiresAt} > ${now}`,
+          sql`${userSessions.expiresAt} > ${now.toISOString()}`,
         ),
       )
       .returning({
@@ -514,7 +514,7 @@ export const listSessions = async (userId: string): Promise<SessionView[]> => {
       and(
         eq(userSessions.userId, userId),
         isNull(userSessions.revokedAt),
-        sql`${userSessions.expiresAt} > ${now}`,
+        sql`${userSessions.expiresAt} > ${now.toISOString()}`,
       ),
     );
 
@@ -568,7 +568,7 @@ export const verifyEmail = async (body: VerifyEmailBody): Promise<{ ok: true }> 
           eq(authTokens.tokenHash, tokenHash),
           eq(authTokens.type, "email_verify"),
           isNull(authTokens.usedAt),
-          sql`${authTokens.expiresAt} > ${now}`,
+          sql`${authTokens.expiresAt} > ${now.toISOString()}`,
         ),
       )
       .returning({ userId: authTokens.userId });
@@ -633,7 +633,7 @@ export const resetPassword = async (
           eq(authTokens.tokenHash, tokenHash),
           eq(authTokens.type, "password_reset"),
           isNull(authTokens.usedAt),
-          sql`${authTokens.expiresAt} > ${now}`,
+          sql`${authTokens.expiresAt} > ${now.toISOString()}`,
         ),
       )
       .returning({ userId: authTokens.userId });

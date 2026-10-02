@@ -2,7 +2,7 @@
 
 import { useTransition } from "react";
 import Link from "next/link";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
@@ -27,6 +27,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { OAuthButtons } from "@/components/auth/oauth-buttons";
 import { registerAction } from "@/lib/actions/auth";
+import { PasswordInput } from "@/components/ui/password-input";
 
 const schema = z
   .object({
@@ -48,7 +49,10 @@ export default function RegisterPage() {
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { name: "", email: "", password: "", confirm: "" },
+    mode: "onChange",
   });
+
+  const password = useWatch({ control: form.control, name: "password" });
 
   function onSubmit(values: FormValues) {
     startTransition(async () => {
@@ -121,15 +125,13 @@ export default function RegisterPage() {
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Password</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="password"
-                      placeholder="••••••••"
-                      autoComplete="new-password"
-                      {...field}
-                    />
-                  </FormControl>
+                  <PasswordInput
+                    label="Password"
+                    name="password"
+                    control={form.control}
+                    placeholder="••••••••"
+                    autoComplete="new-password"
+                  />
                   <FormMessage />
                 </FormItem>
               )}
@@ -139,15 +141,13 @@ export default function RegisterPage() {
               name="confirm"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Confirm password</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="password"
-                      placeholder="••••••••"
-                      autoComplete="new-password"
-                      {...field}
-                    />
-                  </FormControl>
+                  <PasswordInput
+                    label="Confirm password"
+                    name="confirm"
+                    control={form.control}
+                    placeholder="••••••••"
+                    autoComplete="new-password"
+                  />
                   <FormMessage />
                 </FormItem>
               )}

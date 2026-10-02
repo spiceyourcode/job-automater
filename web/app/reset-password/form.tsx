@@ -3,7 +3,7 @@
 import { useTransition } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
@@ -16,7 +16,6 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -26,6 +25,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { resetPasswordAction } from "@/lib/actions/auth";
+import { PasswordInput } from "@/components/ui/password-input";
 
 const schema = z
   .object({
@@ -47,7 +47,10 @@ export default function ResetPasswordPage() {
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { password: "", confirm: "" },
+    mode: "onChange",
   });
+
+  const password = useWatch({ control: form.control, name: "password" });
 
   return (
     <Card className="w-full max-w-md border-border/60 shadow-sm">
@@ -85,14 +88,13 @@ export default function ResetPasswordPage() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>New password</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="password"
-                        autoComplete="new-password"
-                        {...field}
-                      />
-                    </FormControl>
+                    <PasswordInput
+                      label="New password"
+                      name="password"
+                      control={form.control}
+                      placeholder="Enter new password"
+                      autoComplete="new-password"
+                    />
                     <FormMessage />
                   </FormItem>
                 )}
@@ -102,14 +104,13 @@ export default function ResetPasswordPage() {
                 name="confirm"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Confirm password</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="password"
-                        autoComplete="new-password"
-                        {...field}
-                      />
-                    </FormControl>
+                    <PasswordInput
+                      label="Confirm password"
+                      name="confirm"
+                      control={form.control}
+                      placeholder="Confirm new password"
+                      autoComplete="new-password"
+                    />
                     <FormMessage />
                   </FormItem>
                 )}
