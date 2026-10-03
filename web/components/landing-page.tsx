@@ -79,7 +79,7 @@ export function LandingPage() {
 
         {/* Waves background from ReactBits */}
         <WavesBackground
-          lineColor="oklch(var(--primary) / 0.3)"
+          lineColor="oklch(var(--primary) / 0.4)"
           backgroundColor="transparent"
           waveSpeedX={0.008}
           waveSpeedY={0.003}
@@ -90,7 +90,7 @@ export function LandingPage() {
           friction={0.93}
           tension={0.003}
           maxCursorMove={80}
-          className="opacity-50"
+          className="opacity-50 dark:opacity-80"
         />
 
         <div className="relative z-10 max-w-3xl mx-auto text-center">
@@ -357,7 +357,7 @@ function AtmosphereBackground({ reduceMotion }: { reduceMotion: boolean }) {
 }
 
 function GridOverlay() {
-  return <div className="landing-grid" style={{ opacity: 0.5 }} aria-hidden />;
+  return <div className="landing-grid" style={{ opacity: 0.6 }} aria-hidden />;
 }
 
 function FloatingShapes({ reduceMotion }: { reduceMotion: boolean }) {

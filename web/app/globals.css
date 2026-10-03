@@ -182,8 +182,8 @@
 
 .dark .landing-grid {
   background-image:
-    linear-gradient(to right, oklch(0.985 0 0 / 0.2) 1px, transparent 1px),
-    linear-gradient(to bottom, oklch(0.985 0 0 / 0.2) 1px, transparent 1px);
+    linear-gradient(to right, oklch(0.985 0 0 / 0.3) 1px, transparent 1px),
+    linear-gradient(to bottom, oklch(0.985 0 0 / 0.3) 1px, transparent 1px);
 }
 
 @media (prefers-reduced-motion: reduce) {
