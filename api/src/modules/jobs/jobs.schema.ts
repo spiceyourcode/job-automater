@@ -24,6 +24,7 @@ export const listJobsQuerySchema = z
       .enum(["true", "false"])
       .optional()
       .transform((v) => v === "true"),
+    postedAfter: z.string().datetime().optional(),
     limit: z.coerce.number().int().min(1).max(100).default(50),
   })
   .strict();

@@ -8,9 +8,16 @@ type Props = {
 export default async function JobsPage({ searchParams }: Props) {
   const { q: qParam } = await searchParams;
   const initialQ = qParam?.trim() ?? "";
+  
+  // Filter to jobs posted within the last 7 days
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const postedAfter = sevenDaysAgo.toISOString();
+  
   const jobsResult = await listJobsAction({
     sort: "score",
     q: initialQ || undefined,
+    postedAfter,
   });
   const jobs = jobsResult.ok ? (jobsResult.data?.jobs ?? []) : [];
 
@@ -19,7 +26,7 @@ export default async function JobsPage({ searchParams }: Props) {
       <div className="mb-6 space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">Jobs</h1>
         <p className="text-sm text-muted-foreground">
-          Scored matches from your sources. Filter and open a role to apply.
+          Scored matches from your sources from the last 7 days. Filter and open a role to apply.
         </p>
       </div>
       {!jobsResult.ok ? (

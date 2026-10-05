@@ -191,7 +191,7 @@ export function PipelineBoard({ initial }: Props) {
             </h3>
             <AnimatedList aria-label={col.label}>
               {byStage[col.id].map((app) => (
-                <li
+                <div
                   key={app.id}
                   className="rounded-md border bg-background p-3 shadow-sm"
                 >
@@ -418,7 +418,7 @@ export function PipelineBoard({ initial }: Props) {
                       </Button>
                     </nav>
                   )}
-                </li>
+                </div>
               ))}
             </AnimatedList>
           </section>

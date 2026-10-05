@@ -21,6 +21,7 @@ export type ListJobsParams = {
   salaryMax?: number;
   status?: string;
   savedOnly?: boolean;
+  postedAfter?: string;
 };
 
 async function authHeaders(): Promise<HeadersInit | null> {
@@ -47,6 +48,7 @@ export async function listJobsAction(
   if (params.salaryMax != null) qs.set("salaryMax", String(params.salaryMax));
   if (params.status) qs.set("status", params.status);
   if (params.savedOnly) qs.set("savedOnly", "true");
+  if (params.postedAfter) qs.set("postedAfter", params.postedAfter);
 
   try {
     const res = await fetch(`${API_URL}/api/v1/jobs?${qs}`, {

@@ -120,6 +120,14 @@ export async function listJobs(userId: string, query: ListJobsQuery) {
   if (query.experienceLevel) {
     conditions.push(eq(jobs.experienceLevel, query.experienceLevel));
   }
+  if (query.postedAfter) {
+    conditions.push(
+      or(
+        gte(jobs.postedAt, new Date(query.postedAfter)),
+        sql`${jobs.postedAt} IS NULL`,
+      )!,
+    );
+  }
 
   const rows = await db
     .select({
