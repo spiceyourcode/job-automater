@@ -360,7 +360,7 @@ export function DocumentReviewPanel({ applicationId, initial }: Props) {
               {traces.map((t, i) => {
                 const status = t.status ?? "pending";
                 return (
-                  <li
+                  <div
                     key={`${t.chunkId}-${i}`}
                     className="rounded border p-2"
                   >
@@ -398,7 +398,7 @@ export function DocumentReviewPanel({ applicationId, initial }: Props) {
                         </Button>
                       </div>
                     </div>
-                  </li>
+                  </div>
                 );
               })}
             </AnimatedList>
