@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { StatefulButton } from "@/components/ui/stateful-button";
 import { AnimatedList } from "@/components/ui/animated-list";
@@ -14,6 +14,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   generateInterviewPrepAction,
+  getInterviewPrepAction,
   type InterviewPrepPublic,
 } from "@/lib/actions/applications";
 import { formatSalaryCents } from "@/lib/jobs";
@@ -30,8 +31,28 @@ export function InterviewPrepPanel({
   const router = useRouter();
   const [pending, start] = useTransition();
   const [busy, setBusy] = useState(false);
-  const prep = initial;
-  const generating = status === "pending" || status === "generating" || busy;
+  const [prep, setPrep] = useState<InterviewPrepPublic | null>(initial);
+  const [currentStatus, setCurrentStatus] = useState(status);
+  const generating = currentStatus === "pending" || currentStatus === "generating" || busy;
+
+  // Poll for completion after generation starts
+  useEffect(() => {
+    if (currentStatus === "pending" || currentStatus === "generating") {
+      const interval = setInterval(async () => {
+        const res = await getInterviewPrepAction(applicationId);
+        if (res.ok && res.data) {
+          setPrep(res.data.prep);
+          setCurrentStatus(res.data.status);
+          if (res.data.status === "ready" && res.data.prep) {
+            toast.success("Interview prep ready");
+          } else if (res.data.status === "failed") {
+            toast.error("Interview prep failed");
+          }
+        }
+      }, 2000);
+      return () => clearInterval(interval);
+    }
+  }, [applicationId, currentStatus]);
 
   function generate() {
     setBusy(true);
@@ -43,7 +64,8 @@ export function InterviewPrepPanel({
         return;
       }
       toast.success("Interview prep queued");
-      router.refresh();
+      // Status will be picked up by polling effect
+      setCurrentStatus("generating");
     });
   }
 
@@ -157,13 +179,11 @@ export function InterviewPrepPanel({
                       prep.negotiation.currency,
                     ) ?? "—"}
                   </p>
-                  <ul className="list-disc space-y-1 pl-5">
-                    <AnimatedList aria-label="Talking points">
+                  <AnimatedList aria-label="Talking points">
                       {prep.negotiation.talkingPoints.map((p) => (
-                        <li key={p}>{p}</li>
+                        <div key={p} className="list-disc pl-5">{p}</div>
                       ))}
                     </AnimatedList>
-                  </ul>
                 </CardContent>
               </Card>
             ) : (
