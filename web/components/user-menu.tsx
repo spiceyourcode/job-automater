@@ -5,8 +5,9 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { logoutAction } from "@/lib/actions/auth";
-import { Settings, FileText, LogOut, ChevronDown } from "lucide-react";
+import { LogOut, ChevronDown } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
+import { SETTINGS_LINKS } from "@/lib/nav";
 
 interface UserMenuProps {
   className?: string;
@@ -79,24 +80,18 @@ export function UserMenu({ className }: UserMenuProps) {
             <p className="text-xs text-muted-foreground truncate">user@example.com</p>
           </div>
           <nav className="py-1" aria-label="User menu">
-            <button
-              className={cn(
-                "flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent",
-              )}
-              role="menuitem"
-            >
-              <Settings className="h-4 w-4" aria-hidden />
-              Settings
-            </button>
-            <button
-              className={cn(
-                "flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent",
-              )}
-              role="menuitem"
-            >
-              <FileText className="h-4 w-4" aria-hidden />
-              CV & Documents
-            </button>
+            {SETTINGS_LINKS.slice(0, 2).map((s) => (
+              <button
+                key={s.href}
+                className={cn(
+                  "flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent",
+                )}
+                role="menuitem"
+              >
+                <s.icon className="h-4 w-4" aria-hidden />
+                {s.label}
+              </button>
+            ))}
             <Separator className="my-1" />
             <form action={logoutAction}>
               <button

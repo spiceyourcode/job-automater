@@ -1,9 +1,14 @@
 import {
   BarChart3,
+  Bell,
   Briefcase,
   FileText,
   LayoutDashboard,
+  Lock,
+  Mail,
+  Rss,
   Settings,
+  Shield,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -25,11 +30,11 @@ export type SettingsLink = {
 export const SETTINGS_LINKS: readonly SettingsLink[] = [
   { href: "/settings/profile", label: "Profile", icon: Settings },
   { href: "/settings/cv", label: "CV & Documents", icon: FileText },
-  { href: "/settings/sources", label: "Sources", icon: FileText },
+  { href: "/settings/sources", label: "Sources", icon: Rss },
   { href: "/settings/team", label: "Team", icon: Users },
-  { href: "/settings/notifications", label: "Notifications", icon: Settings },
-  { href: "/settings/email-review", label: "Email review", icon: FileText },
-  { href: "/settings/privacy", label: "Privacy", icon: Settings },
+  { href: "/settings/notifications", label: "Notifications", icon: Bell },
+  { href: "/settings/email-review", label: "Email review", icon: Mail },
+  { href: "/settings/privacy", label: "Privacy", icon: Shield },
 ] as const;
 
 export const APP_NAV: readonly AppNavItem[] = [

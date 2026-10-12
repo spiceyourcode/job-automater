@@ -9,7 +9,7 @@ import { NavPill } from "@/components/ui/nav-pill";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { NotificationBell } from "@/components/notification-bell";
 import { MobileNavTrigger } from "@/components/mobile-nav-trigger";
-import { Briefcase, FileText, Users, Settings, LogOut } from "lucide-react";
+import { Briefcase, LogOut, Users } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { GooeyInput } from "@/components/ui/gooey-input";
@@ -219,28 +219,20 @@ export function TopNav({ title }: TopNavProps) {
                       <p className="text-xs text-muted-foreground truncate">user@example.com</p>
                     </div>
                     <nav className="py-1" aria-label="User menu">
-                      <Link
-                        href="/settings/profile"
-                        className={cn(
-                          "flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent",
-                        )}
-                        onClick={() => setUserMenuOpen(false)}
-                        role="menuitem"
-                      >
-                        <Settings className="h-4 w-4" aria-hidden />
-                        Settings
-                      </Link>
-                      <Link
-                        href="/settings/cv"
-                        className={cn(
-                          "flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent",
-                        )}
-                        onClick={() => setUserMenuOpen(false)}
-                        role="menuitem"
-                      >
-                        <FileText className="h-4 w-4" aria-hidden />
-                        CV & Documents
-                      </Link>
+                      {SETTINGS_LINKS.slice(0, 2).map((s) => (
+                        <Link
+                          key={s.href}
+                          href={s.href}
+                          className={cn(
+                            "flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent",
+                          )}
+                          onClick={() => setUserMenuOpen(false)}
+                          role="menuitem"
+                        >
+                          <s.icon className="h-4 w-4" aria-hidden />
+                          {s.label}
+                        </Link>
+                      ))}
                       <Separator className="my-1" />
                       <form action={logoutAction}>
                         <button
