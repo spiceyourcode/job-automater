@@ -11,12 +11,20 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   saveIdentityAction,
   savePreferencesAction,
   saveSkillsAction,
   reindexCvAction,
   type ProfileRow,
 } from "@/lib/actions/profile";
+import { SUPPORTED_CURRENCIES, type SupportedCurrency } from "@/lib/currency";
 
 type Skill = { name: string; level: "beginner" | "intermediate" | "advanced" | "expert"; years?: number };
 type Role = { title: string };
@@ -86,6 +94,9 @@ export function ProfileSettingsEditor({ profile }: { profile: ProfileRow }) {
   const [salaryMaxDollars, setMax] = useState(
     profile.salaryMax != null ? Math.floor(profile.salaryMax / 100) : 0,
   );
+  const [salaryCurrency, setSalaryCurrency] = useState<SupportedCurrency>(
+    (profile.salaryCurrency as SupportedCurrency) ?? "USD",
+  );
   const [employmentTypes, setEmploymentTypes] = useState(
     profile.employmentTypes?.length ? profile.employmentTypes.join(", ") : "full-time",
   );
@@ -119,6 +130,7 @@ export function ProfileSettingsEditor({ profile }: { profile: ProfileRow }) {
         preferredLocations: locations,
         salaryMinDollars,
         salaryMaxDollars,
+        salaryCurrency,
         employmentTypes: employmentTypes
           .split(",")
           .map((s) => s.trim())
@@ -341,9 +353,24 @@ export function ProfileSettingsEditor({ profile }: { profile: ProfileRow }) {
             Add location
           </Button>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-3">
           <div className="space-y-2">
-            <Label htmlFor="salMin">Salary min (USD / year)</Label>
+            <Label htmlFor="salCurrency">Currency</Label>
+            <Select value={salaryCurrency} onValueChange={(v) => setSalaryCurrency(v as SupportedCurrency)}>
+              <SelectTrigger id="salCurrency">
+                <SelectValue placeholder="Select currency" />
+              </SelectTrigger>
+              <SelectContent>
+                {SUPPORTED_CURRENCIES.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {c}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="salMin">Salary min ({salaryCurrency} / year)</Label>
             <Input
               id="salMin"
               type="number"
@@ -354,7 +381,7 @@ export function ProfileSettingsEditor({ profile }: { profile: ProfileRow }) {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="salMax">Salary max (USD / year)</Label>
+            <Label htmlFor="salMax">Salary max ({salaryCurrency} / year)</Label>
             <Input
               id="salMax"
               type="number"

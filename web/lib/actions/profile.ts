@@ -87,6 +87,7 @@ const preferencesSchema = z
       .min(1, "Add at least one location"),
     salaryMinDollars: z.number().int().nonnegative(),
     salaryMaxDollars: z.number().int().positive(),
+    salaryCurrency: z.string().length(3).optional(),
     employmentTypes: z.array(z.string()).min(1),
     visaStatus: z.string().optional(),
   })
@@ -194,7 +195,7 @@ export async function savePreferencesAction(
     })),
     salaryMin: d.salaryMinDollars * 100,
     salaryMax: d.salaryMaxDollars * 100,
-    salaryCurrency: "USD",
+    salaryCurrency: d.salaryCurrency || "USD",
     employmentTypes: d.employmentTypes,
     visaStatus: d.visaStatus || null,
   });
@@ -248,6 +249,52 @@ export async function completeOnboardingAction(
 
   await setOnboardingCompleteCookie(true);
   return { ok: true };
+}
+
+/**
+ * Get the user's preferred currency. Checks in order:
+ * 1. Explicit currency preference from profile (salaryCurrency)
+ * 2. User's locale from user table (via API)
+ * 3. Browser locale (fallback)
+ * 4. Default to USD
+ */
+export async function getUserCurrency(): Promise<ActionResult<string>> {
+  const headers = await authHeaders();
+  if (!headers) return { ok: false, error: "Unauthorized" };
+
+  try {
+    // First get the profile to check for explicit currency preference
+    const profileRes = await fetch(`${API_URL}/api/v1/profile`, {
+      headers,
+      cache: "no-store",
+    });
+    
+    if (profileRes.ok) {
+      const body = (await profileRes.json()) as { profile: ProfileRow };
+      if (body.profile?.salaryCurrency) {
+        return { ok: true, data: body.profile.salaryCurrency };
+      }
+    }
+
+    // Fall back to user's locale from auth/me
+    const userRes = await fetch(`${API_URL}/api/v1/auth/me`, {
+      headers,
+      cache: "no-store",
+    });
+    
+    if (userRes.ok) {
+      const userBody = (await userRes.json()) as { locale?: string };
+      if (userBody?.locale) {
+        // Import getCurrencyFromLocale dynamically to avoid circular deps
+        const { getCurrencyFromLocale } = await import("@/lib/currency");
+        return { ok: true, data: getCurrencyFromLocale(userBody.locale) };
+      }
+    }
+
+    return { ok: true, data: "USD" };
+  } catch {
+    return { ok: false, error: "Network error — is the API running?" };
+  }
 }
 
 /** GDPR — download structured JSON export of the caller's data. */

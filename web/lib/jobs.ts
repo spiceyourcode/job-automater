@@ -40,24 +40,6 @@ export type JobPublic = {
 };
 
 /** Format integer cents → display (HG-3). */
-export function formatSalaryCents(
-  min: number | null | undefined,
-  max: number | null | undefined,
-  currency = "USD",
-): string | null {
-  if (min == null && max == null) return null;
-  const fmt = (cents: number) => {
-    const dollars = cents / 100;
-    if (dollars >= 1000) {
-      return `$${Math.round(dollars / 1000)}k`;
-    }
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency,
-      maximumFractionDigits: 0,
-    }).format(dollars);
-  };
-  if (min != null && max != null) return `${fmt(min)}–${fmt(max)}`;
-  if (min != null) return `from ${fmt(min)}`;
-  return `up to ${fmt(max!)}`;
-}
+export { formatSalaryCents } from "./currency";
+export type { CurrencyInfo, SupportedCurrency } from "./currency";
+export { getCurrencyFromLocale, getCurrencyInfo, SUPPORTED_CURRENCIES } from "./currency";

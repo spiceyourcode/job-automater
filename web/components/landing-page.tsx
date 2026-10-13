@@ -79,7 +79,7 @@ export function LandingPage() {
 
         {/* Waves background from ReactBits */}
         <WavesBackground
-          lineColor="oklch(var(--primary) / 0.4)"
+          lineColor="currentColor"
           backgroundColor="transparent"
           waveSpeedX={0.008}
           waveSpeedY={0.003}
@@ -90,7 +90,7 @@ export function LandingPage() {
           friction={0.93}
           tension={0.003}
           maxCursorMove={80}
-          className="opacity-50 dark:opacity-80"
+          className="opacity-30 dark:opacity-60 text-foreground"
         />
 
         <div className="relative z-10 max-w-3xl mx-auto text-center">
