@@ -1,5 +1,3 @@
-"use client";
-
 /**
  * Locale to currency mapping for location-aware currency display.
  * Based on CLDR (Common Locale Data Repository) standards.

@@ -91,12 +91,12 @@ export function NotificationBell() {
           </div>
           <AnimatedList aria-label="Notifications" className="max-h-80 overflow-y-auto">
             {items.length === 0 ? (
-              <li className="px-2 py-6 text-center text-xs text-muted-foreground">
+              <div className="px-2 py-6 text-center text-xs text-muted-foreground">
                 No notifications yet.
-              </li>
+              </div>
             ) : (
               items.map((n) => (
-                <li key={n.id}>
+                <div key={n.id}>
                   <button
                     type="button"
                     className="w-full cursor-pointer rounded-md px-2 py-2 text-left hover:bg-accent"
@@ -114,7 +114,7 @@ export function NotificationBell() {
                       <span className="text-[10px] text-destructive">Unread</span>
                     ) : null}
                   </button>
-                </li>
+                </div>
               ))
             )}
           </AnimatedList>

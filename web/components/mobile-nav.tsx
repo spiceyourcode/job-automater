@@ -49,6 +49,7 @@ export function MobileNav({ items = APP_NAV }: Props) {
         side="left"
         className="w-72 max-w-[85vw] p-0"
         style={{ zIndex: 100 }}
+        showCloseButton={false}
       >
         <motion.div
           initial={false}
