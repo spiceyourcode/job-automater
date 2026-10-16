@@ -27,15 +27,15 @@ function ContactList({
       <h2 className="text-sm font-medium">{title}</h2>
       <AnimatedList aria-label={title}>
         {contacts.length === 0 ? (
-          <li className="text-muted-foreground">{empty}</li>
+          <p className="text-muted-foreground">{empty}</p>
         ) : (
           contacts.map((c) => (
-            <li key={c.id} className="rounded-md border px-3 py-2">
+            <div key={c.id} className="rounded-md border px-3 py-2">
               <span className="font-medium">{c.name}</span>
               {c.company ? (
                 <span className="text-muted-foreground"> · {c.company}</span>
               ) : null}
-            </li>
+            </div>
           ))
         )}
       </AnimatedList>

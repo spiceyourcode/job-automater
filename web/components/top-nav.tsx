@@ -5,11 +5,12 @@ import { usePathname } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { APP_NAV, isNavActive, SETTINGS_LINKS } from "@/lib/nav";
-import { NavPill } from "@/components/ui/nav-pill";
+import PillNav from "@/components/ui/pill-nav";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { useTheme } from "@/components/theme-provider";
 import { NotificationBell } from "@/components/notification-bell";
 import { MobileNavTrigger } from "@/components/mobile-nav-trigger";
-import { Briefcase, LogOut, Users } from "lucide-react";
+import { Briefcase, LogOut, Settings, Users } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { GooeyInput } from "@/components/ui/gooey-input";
@@ -23,39 +24,22 @@ interface TopNavProps {
 export function TopNav({ title }: TopNavProps) {
   const pathname = usePathname();
   const reducedMotion = useReducedMotion();
+  const { resolvedTheme } = useTheme();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsActive = isNavActive("/settings/profile", pathname);
 
-  const handleKeyDown = (e: React.KeyboardEvent, index: number) => {
-    const links = APP_NAV;
-    let newIndex = index;
+  const pillItems = APP_NAV.filter(
+    (item) => !item.href.startsWith("/settings"),
+  ).map((item) => ({
+    label: item.label,
+    href: item.href,
+    icon: <item.icon aria-hidden />,
+  }));
 
-    switch (e.key) {
-      case "ArrowRight":
-        e.preventDefault();
-        newIndex = (index + 1) % links.length;
-        break;
-      case "ArrowLeft":
-        e.preventDefault();
-        newIndex = (index - 1 + links.length) % links.length;
-        break;
-      case "Home":
-        e.preventDefault();
-        newIndex = 0;
-        break;
-      case "End":
-        e.preventDefault();
-        newIndex = links.length - 1;
-        break;
-      default:
-        return;
-    }
-
-    const nextLink = document.querySelector(
-      `[data-nav-index="${newIndex}"]`
-    ) as HTMLElement;
-    nextLink?.focus();
-  };
+  const activeHref = pillItems.find((item) =>
+    isNavActive(item.href, pathname),
+  )?.href;
 
   return (
     <header className="sticky top-0 z-50 h-14 border-b bg-background/80 backdrop-blur-sm">
@@ -78,87 +62,20 @@ export function TopNav({ title }: TopNavProps) {
         </div>
 
         <nav className="hidden md:flex flex-1 max-w-2xl justify-center" aria-label="Main navigation">
-          <NavPill activeHref={pathname} className="flex items-center gap-1">
-            {APP_NAV.map((item, index) => {
-              const active = isNavActive(item.href, pathname);
-              const Icon = item.icon;
-              const isSettings = item.href.startsWith("/settings");
-
-              // Settings item gets a dropdown
-              if (isSettings) {
-                return (
-                  <div
-                    key={item.href}
-                    className="relative"
-                    onMouseEnter={() => setSettingsOpen(true)}
-                    onMouseLeave={() => setSettingsOpen(false)}
-                  >
-                    <button
-                      className={cn(
-                        "relative flex h-10 min-w-0 cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                        active
-                          ? "text-primary"
-                          : "text-muted-foreground hover:text-foreground",
-                      )}
-                      aria-expanded={settingsOpen}
-                      aria-haspopup="true"
-                      aria-label={item.label}
-                    >
-                      <Icon className="h-4 w-4 shrink-0" aria-hidden />
-                      <span className="truncate">{item.label}</span>
-                    </button>
-                    {settingsOpen && (
-                      <motion.div
-                        initial={{ opacity: 0, y: -8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -8 }}
-                        transition={reducedMotion ? { duration: 0 } : { duration: 0.15 }}
-                        className="absolute top-full left-0 mt-1 w-56 origin-top-left rounded-md border bg-popover p-1 shadow-lg z-50"
-                        role="menu"
-                      >
-                        <nav className="py-1" aria-label={item.label}>
-                          {SETTINGS_LINKS.map((s) => (
-                            <Link
-                              key={s.href}
-                              href={s.href}
-                              aria-current={pathname === s.href ? "page" : undefined}
-                              className={cn(
-                                "flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent",
-                                pathname === s.href && "bg-accent font-medium",
-                              )}
-                              role="menuitem"
-                            >
-                              <s.icon className="h-4 w-4 shrink-0" aria-hidden />
-                              {s.label}
-                            </Link>
-                          ))}
-                        </nav>
-                      </motion.div>
-                    )}
-                  </div>
-                );
-              }
-
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  aria-current={active ? "page" : undefined}
-                  data-nav-index={index}
-                  onKeyDown={(e) => handleKeyDown(e, index)}
-                  className={cn(
-                    "relative flex h-10 min-w-0 cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                    active
-                      ? "text-primary"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  <Icon className="h-4 w-4 shrink-0" aria-hidden />
-                  <span className="truncate">{item.label}</span>
-                </Link>
-              );
-            })}
-          </NavPill>
+          <PillNav
+            items={pillItems}
+            activeHref={activeHref}
+            linkComponent={Link}
+            theme={resolvedTheme}
+            size="sm"
+            surface="none"
+            itemStyle="pill"
+            hoverEffect="fill"
+            indicator="dot"
+            collapse="auto"
+            ariaLabel="Main navigation"
+            className="w-full"
+          />
         </nav>
 
         <div className="flex items-center gap-2">
@@ -182,6 +99,67 @@ export function TopNav({ title }: TopNavProps) {
           <div className="flex items-center gap-1">
             <ThemeToggle />
             <NotificationBell />
+
+            <div
+              className="relative hidden md:block"
+              onMouseEnter={() => setSettingsOpen(true)}
+              onMouseLeave={() => setSettingsOpen(false)}
+            >
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "cursor-pointer",
+                  settingsActive && "text-primary",
+                )}
+                onClick={() => setSettingsOpen((o) => !o)}
+                aria-expanded={settingsOpen}
+                aria-haspopup="true"
+                aria-label="Settings"
+              >
+                <Settings className="h-4 w-4" aria-hidden />
+              </Button>
+
+              {settingsOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setSettingsOpen(false)}
+                    aria-hidden
+                  />
+                  <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={
+                      reducedMotion ? { duration: 0 } : { duration: 0.15 }
+                    }
+                    className="absolute right-0 mt-2 w-56 origin-top-right rounded-md border bg-popover p-1 shadow-lg z-50"
+                    role="menu"
+                  >
+                    <nav className="py-1" aria-label="Settings">
+                      {SETTINGS_LINKS.map((s) => (
+                        <Link
+                          key={s.href}
+                          href={s.href}
+                          aria-current={pathname === s.href ? "page" : undefined}
+                          className={cn(
+                            "flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent",
+                            pathname === s.href && "bg-accent font-medium",
+                          )}
+                          onClick={() => setSettingsOpen(false)}
+                          role="menuitem"
+                        >
+                          <s.icon className="h-4 w-4 shrink-0" aria-hidden />
+                          {s.label}
+                        </Link>
+                      ))}
+                    </nav>
+                  </motion.div>
+                </>
+              )}
+            </div>
 
             <div className="relative">
               <Button

@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
+import { ExternalLink } from "lucide-react";
 import {
   getAnalyticsDashboardAction,
   getMatchQualityAction,
@@ -16,6 +17,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { CountUp } from "@/components/ui/count-up";
+import { CalendarHeatmap } from "@/components/ui/calendar-heatmap";
+import { FunnelChart } from "@/components/ui/funnel-chart";
+import { RankedBars } from "@/components/ui/ranked-bars";
+import SloshGauge from "@/components/ui/slosh-gauge";
+import RubberSegment from "@/components/ui/rubber-segment";
+import { useTheme } from "@/components/theme-provider";
 
 type Props = {
   initialSummary: DashboardSummary;
@@ -24,27 +31,6 @@ type Props = {
   initialSources: SourceRow[];
   initialSkills: SkillGapReport | null;
 };
-
-function BarRow({ label, value, max }: { label: string; value: number; max: number }) {
-  const pct = max > 0 ? Math.round((value / max) * 100) : 0;
-  return (
-    <div className="space-y-1">
-      <div className="flex justify-between text-xs">
-        <span>{label}</span>
-        <span className="tabular-nums text-muted-foreground">
-          <CountUp to={value} duration={1} className="tabular-nums" />
-        </span>
-      </div>
-      <div className="h-2 overflow-hidden rounded bg-muted">
-        <div
-          className="h-full bg-foreground/80 transition-[width]"
-          style={{ width: `${pct}%` }}
-          role="presentation"
-        />
-      </div>
-    </div>
-  );
-}
 
 export function AnalyticsDashboard({
   initialSummary,
@@ -61,19 +47,8 @@ export function AnalyticsDashboard({
   const [days, setDays] = useState(30);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-
-  const funnelMax = useMemo(
-    () => Math.max(1, ...funnel.map((f) => f.count)),
-    [funnel],
-  );
-  const sourceMax = useMemo(
-    () => Math.max(1, ...sources.map((s) => s.jobsCollected)),
-    [sources],
-  );
-  const matchMax = useMemo(
-    () => Math.max(1, ...matches.map((m) => m.avgScore)),
-    [matches],
-  );
+  const { resolvedTheme } = useTheme();
+  const theme = resolvedTheme === "light" ? "light" : "dark";
 
   const refresh = (nextDays: number) => {
     setDays(nextDays);
@@ -103,21 +78,21 @@ export function AnalyticsDashboard({
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-3">
         <span className="text-sm text-muted-foreground">Date range</span>
-        {[7, 30, 90].map((d) => (
-          <Button
-            key={d}
-            type="button"
-            size="sm"
-            variant={days === d ? "default" : "outline"}
-            className="cursor-pointer"
-            disabled={pending}
-            onClick={() => refresh(d)}
-          >
-            {d}d
-          </Button>
-        ))}
+        <RubberSegment
+          theme={theme}
+          size="sm"
+          value={String(days)}
+          disabled={pending}
+          aria-label="Date range"
+          items={[
+            { value: "7", label: "7d" },
+            { value: "30", label: "30d" },
+            { value: "90", label: "90d" },
+          ]}
+          onChange={(value) => refresh(Number(value))}
+        />
         <div className="ml-auto flex flex-wrap gap-2">
           <Button asChild size="sm" variant="outline" className="cursor-pointer">
             <a
@@ -176,16 +151,13 @@ export function AnalyticsDashboard({
         <h2 id="funnel-heading" className="mb-3 text-lg font-medium">
           Pipeline funnel
         </h2>
-        <div className="space-y-3 rounded-lg border p-4">
-          {funnel.map((f) => (
-            <BarRow
-              key={f.stage}
-              label={f.label}
-              value={f.count}
-              max={funnelMax}
-            />
-          ))}
-        </div>
+        {funnel.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No pipeline data in range.</p>
+        ) : (
+          <div className="rounded-lg border p-4">
+            <FunnelChart stages={funnel} />
+          </div>
+        )}
       </section>
 
       <section aria-labelledby="match-heading">
@@ -195,15 +167,8 @@ export function AnalyticsDashboard({
         {matches.length === 0 ? (
           <p className="text-sm text-muted-foreground">No scored jobs in range.</p>
         ) : (
-          <div className="space-y-3 rounded-lg border p-4">
-            {matches.map((m) => (
-              <BarRow
-                key={m.day}
-                label={`${m.day} (${m.count})`}
-                value={m.avgScore}
-                max={matchMax}
-              />
-            ))}
+          <div className="rounded-lg border p-4">
+            <CalendarHeatmap data={matches} />
           </div>
         )}
       </section>
@@ -215,15 +180,17 @@ export function AnalyticsDashboard({
         {sources.length === 0 ? (
           <p className="text-sm text-muted-foreground">No sources configured.</p>
         ) : (
-          <div className="space-y-3 rounded-lg border p-4">
-            {sources.map((s) => (
-              <BarRow
-                key={s.id}
-                label={`${s.name} · ${s.type}`}
-                value={s.jobsCollected}
-                max={sourceMax}
-              />
-            ))}
+          <div className="rounded-lg border p-4">
+            <RankedBars
+              items={[...sources]
+                .sort((a, b) => b.jobsCollected - a.jobsCollected)
+                .map((s) => ({
+                  id: s.id,
+                  name: s.name,
+                  type: s.type,
+                  value: s.jobsCollected,
+                }))}
+            />
           </div>
         )}
       </section>
@@ -237,36 +204,55 @@ export function AnalyticsDashboard({
             No skill data yet. Collect and score jobs to see coverage.
           </p>
         ) : (
-          <div className="space-y-3 rounded-lg border p-4">
-            <p className="text-sm text-muted-foreground">
-              Coverage{" "}
-              <CountUp to={skills.mySkillsCoverage.coveragePct} duration={1} className="tabular-nums" />%
-              {" "}
-              <CountUp to={skills.mySkillsCoverage.inDemandCovered} duration={1} className="tabular-nums" />/
-              <CountUp to={skills.inDemand.length} duration={1} className="tabular-nums" /> in-demand skills on your profile
-            </p>
+          <div className="space-y-4 rounded-lg border p-4">
+            <div className="flex flex-wrap items-center gap-6">
+              <SloshGauge
+                value={skills.mySkillsCoverage.coveragePct}
+                interactive={false}
+                showValue
+                unit="%"
+                ariaLabel="In-demand skill coverage"
+                liquidColor={theme === "light" ? "#18181b" : "#fafafa"}
+                glassColor={theme === "light" ? "#e4e4e7" : "#262626"}
+                className="shrink-0"
+              />
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">
+                  In-demand skills covered
+                </p>
+                <p className="text-2xl font-semibold tabular-nums tracking-tight">
+                  <CountUp to={skills.mySkillsCoverage.inDemandCovered} duration={1.5} className="tabular-nums" />/
+                  <CountUp to={skills.inDemand.length} duration={1.5} className="tabular-nums" />
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {skills.mySkillsCoverage.coveragePct}% coverage across{" "}
+                  {skills.inDemand.length} in-demand skills in range
+                </p>
+              </div>
+            </div>
             {skills.gaps.length === 0 ? (
               <p className="text-sm">No gaps in the current range.</p>
             ) : (
-              skills.gaps.slice(0, 12).map((g) => (
-                <div key={g.skill} className="space-y-1">
-                  <BarRow
-                    label={g.skill}
-                    value={g.count}
-                    max={Math.max(1, ...skills.gaps.map((x) => x.count))}
-                  />
-                  {g.course ? (
+              <ul className="flex flex-wrap gap-2">
+                {skills.gaps.slice(0, 12).map((g) => (
+                  <li key={g.skill}>
                     <a
-                      href={g.course.url}
+                      href={g.course?.url ?? "#"}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-xs text-muted-foreground underline-offset-4 hover:underline"
+                      className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition-colors hover:bg-muted/60"
                     >
-                      {g.course.provider}: {g.course.title}
+                      <span className="font-medium">{g.skill}</span>
+                      <span className="text-xs text-muted-foreground tabular-nums">
+                        ×{g.count}
+                      </span>
+                      {g.course ? (
+                        <ExternalLink className="size-3 text-muted-foreground" />
+                      ) : null}
                     </a>
-                  ) : null}
-                </div>
-              ))
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
         )}

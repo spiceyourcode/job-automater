@@ -7,8 +7,8 @@ import {
 } from "@/lib/actions/analytics";
 import { Separator } from "@/components/ui/separator";
 import { AnalyticsDashboard } from "@/components/analytics-dashboard";
+import { SalaryBenchmark } from "@/components/ui/salary-benchmark";
 import { getSalaryBenchmarkAction } from "@/lib/actions/jobs";
-import { formatSalaryCents } from "@/lib/jobs";
 
 export default async function AnalyticsPage() {
   const [summaryRes, funnelRes, matchesRes, sourcesRes, skillsRes, salaryRes] =
@@ -40,21 +40,7 @@ export default async function AnalyticsPage() {
       <Separator className="mb-6" />
 
       {salary && salary.sampleSize > 0 ? (
-        <section className="mb-8 rounded-lg border p-4" aria-labelledby="salary-heading">
-          <h2 id="salary-heading" className="text-lg font-medium">
-            Salary benchmark
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            From {salary.sampleSize} of your collected jobs (integer cents).
-          </p>
-          <p className="mt-3 text-sm">
-            P25 {formatSalaryCents(salary.p25Cents, salary.p25Cents, salary.currency)}
-            {" · "}
-            Median {formatSalaryCents(salary.p50Cents, salary.p50Cents, salary.currency)}
-            {" · "}
-            P75 {formatSalaryCents(salary.p75Cents, salary.p75Cents, salary.currency)}
-          </p>
-        </section>
+        <SalaryBenchmark benchmark={salary} className="mb-8" />
       ) : (
         <p className="mb-8 text-sm text-muted-foreground">
           Collect jobs with salary data to see market percentiles.
