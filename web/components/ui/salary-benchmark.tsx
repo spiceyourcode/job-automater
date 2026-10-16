@@ -85,43 +85,9 @@ export function SalaryBenchmark({
       </div>
 
       {hasAxis ? (
-        <div className="px-1 pt-6" aria-hidden="true">
-          <div className="relative h-12">
-            {p25 !== null ? (
-              <motion.span
-                className="absolute -top-6 text-xs font-medium tabular-nums"
-                style={{ left: `${pct(p25)}%` }}
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2, duration: 0.4 }}
-              >
-                {formatCents(p25, currency)}
-              </motion.span>
-            ) : null}
-            {p50 !== null ? (
-              <motion.span
-                className="absolute -top-6 -translate-x-1/2 text-xs font-semibold tabular-nums"
-                style={{ left: `${pct(p50)}%` }}
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3, duration: 0.4 }}
-              >
-                {formatCents(p50, currency)}
-              </motion.span>
-            ) : null}
-            {p75 !== null ? (
-              <motion.span
-                className="absolute -top-6 -translate-x-full text-xs font-medium tabular-nums"
-                style={{ left: `${pct(p75)}%` }}
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4, duration: 0.4 }}
-              >
-                {formatCents(p75, currency)}
-              </motion.span>
-            ) : null}
-
-            <div className="absolute inset-x-0 top-4 h-2 overflow-hidden rounded-full bg-muted">
+        <div className="px-1" aria-hidden="true">
+          <div className="relative h-7">
+            <div className="absolute inset-x-0 top-0 h-2 overflow-hidden rounded-full bg-muted">
               {p25 !== null && p75 !== null ? (
                 <motion.div
                   className="h-full bg-foreground/70"
@@ -134,7 +100,7 @@ export function SalaryBenchmark({
             </div>
             {p50 !== null ? (
               <motion.div
-                className="absolute top-3 h-4 w-0.5 -translate-x-1/2 rounded bg-foreground"
+                className="absolute -top-0.5 h-3 w-0.5 -translate-x-1/2 rounded bg-foreground"
                 style={{ left: `${pct(p50)}%` }}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -142,10 +108,10 @@ export function SalaryBenchmark({
               />
             ) : null}
 
-            <span className="absolute left-0 top-6 text-[11px] text-muted-foreground tabular-nums">
+            <span className="absolute left-0 top-4 text-[11px] text-muted-foreground tabular-nums">
               {formatCents(lo!, currency)}
             </span>
-            <span className="absolute right-0 top-6 text-[11px] text-muted-foreground tabular-nums">
+            <span className="absolute right-0 top-4 text-[11px] text-muted-foreground tabular-nums">
               {formatCents(hi!, currency)}
             </span>
           </div>
