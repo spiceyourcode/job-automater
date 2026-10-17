@@ -15,7 +15,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { StatefulButton } from "@/components/ui/stateful-button";
 import { Input } from "@/components/ui/input";
-import { AnimatedList } from "@/components/ui/animated-list";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -550,10 +549,10 @@ export function SourcesManager({ initialSources }: Props) {
           </Button>
         </div>
       ) : (
-        <AnimatedList aria-label="Your sources">
+        <ul aria-label="Your sources" className="space-y-2">
           {initialSources.map((s) => (
-            <> 
-              <Card key={s.id}>
+            <li key={s.id}>
+              <Card>
                 <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
@@ -655,8 +654,8 @@ export function SourcesManager({ initialSources }: Props) {
                   {runs.length === 0 ? (
                     <p className="text-muted-foreground">No runs yet.</p>
                   ) : (
-<AnimatedList aria-label={`Runs for ${s.name}`}>
-                      {runs.map((r) => (
+ <div className="space-y-2">
+                       {runs.map((r) => (
                         <div
                           key={r.id}
                           className="flex flex-wrap gap-2 text-muted-foreground"
@@ -672,13 +671,13 @@ export function SourcesManager({ initialSources }: Props) {
                           )}
                         </div>
                       ))}
-</AnimatedList>
-                  )}
-                </div>
-              )}
-            </>
-          ))}
-        </AnimatedList>
+ </div>
+                   )}
+                 </div>
+               )}
+             </li>
+           ))}
+         </ul>
       )}
     </div>
   );
