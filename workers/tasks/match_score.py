@@ -11,6 +11,7 @@ from agents.match_score import run_match_score
 from celery_app import app
 from db import (
     connect,
+    insert_notification,
     load_jobs_for_user,
     load_profile_for_user,
     mark_job_duplicate,
@@ -97,6 +98,27 @@ def process_match_score(payload: dict[str, Any]) -> dict[str, Any]:
             except Exception:  # noqa: BLE001
                 failed += 1
                 logger.exception("match_score_persist_failed job_id=%s", jid)
+                continue
+
+            overall = score.get("overall_score")
+            threshold = profile.get("min_match_score") or 70
+            if overall is not None and float(overall) >= float(threshold):
+                try:
+                    insert_notification(
+                        conn,
+                        user_id=job.user_id,
+                        type_="high_match",
+                        title="High match found",
+                        message=(
+                            f"{row.get('title') or 'New role'} at "
+                            f"{row.get('company') or 'unknown company'} "
+                            f"scored {overall}"
+                        ),
+                        data={"job_id": jid, "overall_score": overall},
+                        priority=1,
+                    )
+                except Exception:  # noqa: BLE001
+                    logger.exception("match_score_notify_failed job_id=%s", jid)
 
     logger.info(
         "match_score_done scored=%s duped=%s failed=%s skipped=%s",

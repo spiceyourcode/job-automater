@@ -21,7 +21,9 @@ export type NotificationItem = {
   type: string;
   title: string;
   message: string | null;
+  data: Record<string, unknown> | null;
   isRead: boolean;
+  priority: number;
   createdAt: string;
 };
 

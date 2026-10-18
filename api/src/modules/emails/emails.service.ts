@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq } from "drizzle-orm";
 import { db } from "../../db/index.js";
 import {
   emails,
@@ -142,13 +142,21 @@ export async function classifyEmail(
 }
 
 export async function listNotifications(userId: string) {
-  const rows = await db
-    .select()
-    .from(notifications)
-    .where(eq(notifications.userId, userId))
-    .orderBy(desc(notifications.createdAt))
-    .limit(50);
-  const unreadCount = rows.filter((n) => !n.isRead).length;
+  const [rows, unreadRows] = await Promise.all([
+    db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, userId))
+      .orderBy(desc(notifications.priority), desc(notifications.createdAt))
+      .limit(50),
+    db
+      .select({ value: count() })
+      .from(notifications)
+      .where(
+        and(eq(notifications.userId, userId), eq(notifications.isRead, false)),
+      ),
+  ]);
+  const unreadCount = unreadRows[0]?.value ?? 0;
   return {
     unreadCount,
     notifications: rows.map((n) => ({

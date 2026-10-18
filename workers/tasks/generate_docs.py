@@ -12,6 +12,7 @@ from agents.generate_docs import run_generate_docs
 from celery_app import app
 from db import (
     connect,
+    insert_notification,
     load_application,
     load_cv_chunks_for_user,
     load_job_for_user,
@@ -127,6 +128,27 @@ def process_generate_docs(payload: dict[str, Any]) -> dict[str, Any]:
             len(validated["bullet_traces"]),
             duration_ms,
         )
+        try:
+            insert_notification(
+                conn,
+                user_id=job.user_id,
+                type_="docs_ready",
+                title="Documents ready",
+                message=(
+                    f"Tailored CV and cover letter ready for "
+                    f"{job_row.get('title') or 'your application'}"
+                ),
+                data={
+                    "application_id": job.application_id,
+                    "job_id": job.job_id,
+                },
+                priority=1,
+            )
+        except Exception:  # noqa: BLE001
+            logger.exception(
+                "generate_docs_notify_failed application_id=%s",
+                job.application_id,
+            )
         try:
             from tasks.realtime import publish_event
 

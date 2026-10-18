@@ -12,6 +12,7 @@ from agents.submit_verify import run_submit_verify
 from celery_app import app
 from db import (
     connect,
+    insert_notification,
     load_application,
     load_job_for_user,
     load_profile_for_user,
@@ -135,6 +136,28 @@ def process_submit_application(payload: dict[str, Any]) -> dict[str, Any]:
                     user_id=job.user_id,
                     error_code="screenshot_required",
                 )
+                try:
+                    insert_notification(
+                        conn,
+                        user_id=job.user_id,
+                        type_="submit_failed",
+                        title="Submission failed",
+                        message=(
+                            f"Could not confirm submission of "
+                            f"{job_row.get('title') or 'your application'}"
+                        ),
+                        data={
+                            "application_id": job.application_id,
+                            "job_id": str(app_row["job_id"]),
+                            "error": "screenshot_required",
+                        },
+                        priority=2,
+                    )
+                except Exception:  # noqa: BLE001
+                    logger.exception(
+                        "submit_notify_failed application_id=%s",
+                        job.application_id,
+                    )
                 return {"status": "error", "error": "screenshot_required"}
             mark_application_submitted(
                 conn,
@@ -163,6 +186,28 @@ def process_submit_application(payload: dict[str, Any]) -> dict[str, Any]:
             error_code=err,
             confirmation_screenshot_url=shot_key,
         )
+        try:
+            insert_notification(
+                conn,
+                user_id=job.user_id,
+                type_="submit_failed",
+                title="Submission failed",
+                message=(
+                    f"Could not submit "
+                    f"{job_row.get('title') or 'your application'}"
+                ),
+                data={
+                    "application_id": job.application_id,
+                    "job_id": str(app_row["job_id"]),
+                    "error": err,
+                },
+                priority=2,
+            )
+        except Exception:  # noqa: BLE001
+            logger.exception(
+                "submit_notify_failed application_id=%s",
+                job.application_id,
+            )
         # User-visible CAPTCHA / failure path — do not crash worker
         logger.warning(
             "submit_failed application_id=%s error=%s",

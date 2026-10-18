@@ -2,12 +2,13 @@ import { JobsBoard } from "@/components/jobs-board";
 import { listJobsAction } from "@/lib/actions/jobs";
 
 type Props = {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; job?: string }>;
 };
 
 export default async function JobsPage({ searchParams }: Props) {
-  const { q: qParam } = await searchParams;
+  const { q: qParam, job: jobParam } = await searchParams;
   const initialQ = qParam?.trim() ?? "";
+  const initialJobId = jobParam?.trim() || undefined;
   
   // Filter to jobs posted within the last 7 days
   const sevenDaysAgo = new Date();
@@ -35,9 +36,10 @@ export default async function JobsPage({ searchParams }: Props) {
         </p>
       ) : (
         <JobsBoard
-          key={initialQ}
+          key={`${initialQ}:${initialJobId ?? ""}`}
           initialJobs={jobs}
           initialQ={initialQ}
+          initialJobId={initialJobId}
         />
       )}
     </div>

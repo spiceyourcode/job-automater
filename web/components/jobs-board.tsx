@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { Inbox, Plus, Sparkles } from "lucide-react";
 import type { JobPublic } from "@/lib/jobs";
 import {
+  getJobAction,
   getJobStatsAction,
   importJobAction,
   listJobsAction,
@@ -33,9 +34,10 @@ import { GooeyInput } from "@/components/ui/gooey-input";
 type Props = {
   initialJobs: JobPublic[];
   initialQ?: string;
+  initialJobId?: string;
 };
 
-export function JobsBoard({ initialJobs, initialQ = "" }: Props) {
+export function JobsBoard({ initialJobs, initialQ = "", initialJobId }: Props) {
   const [jobs, setJobs] = useState(initialJobs);
   const [sort, setSort] = useState<"score" | "date">("score");
   const [minScore, setMinScore] = useState<string>("0");
@@ -118,6 +120,19 @@ export function JobsBoard({ initialJobs, initialQ = "" }: Props) {
       if (res.ok) setSimilar(res.data?.jobs ?? []);
     });
   };
+
+  useEffect(() => {
+    if (!initialJobId) return;
+    const local = initialJobs.find((j) => j.id === initialJobId);
+    if (local) {
+      openJob(local);
+      return;
+    }
+    startTransition(async () => {
+      const res = await getJobAction(initialJobId);
+      if (res.ok && res.data?.job) openJob(res.data.job);
+    });
+  }, [initialJobId]);
 
   const toggleSave = (job: JobPublic) => {
     startTransition(async () => {
