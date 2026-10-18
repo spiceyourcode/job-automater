@@ -25,6 +25,7 @@ app = Celery(
         "tasks.interview_prep",
         "tasks.video_cover",
         "tasks.followup_reminder",
+        "tasks.purge_old_jobs",
     ],
 )
 
@@ -46,6 +47,10 @@ _conf: dict = {
         "followup-reminder-hourly": {
             "task": "tasks.followup_reminder",
             "schedule": crontab(minute=15),
+        },
+        "purge-old-jobs-daily": {
+            "task": "tasks.purge_old_jobs",
+            "schedule": crontab(minute=30, hour=3),
         },
     },
 }

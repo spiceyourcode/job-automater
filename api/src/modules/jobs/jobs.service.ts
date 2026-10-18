@@ -7,6 +7,13 @@ import { assertPublicHttpUrl } from "../../lib/safe-url.js";
 import type { ImportJobBody, ListJobsQuery, SalaryBenchmarkQuery } from "./jobs.schema.js";
 
 
+/**
+ * Jobs are only surfaced for the last N days (by `collectedAt`). Older rows are
+ * also hard-deleted by the `purge_old_jobs` worker task; this filter keeps the
+ * listing correct even before a purge run.
+ */
+export const JOB_LISTING_MAX_AGE_DAYS = 5;
+
 export class JobError extends Error {
   constructor(
     message: string,
@@ -76,6 +83,11 @@ function toPublicJob(
  */
 export async function listJobs(userId: string, query: ListJobsQuery) {
   const conditions = [eq(jobs.userId, userId)];
+
+  const cutoff = new Date(
+    Date.now() - JOB_LISTING_MAX_AGE_DAYS * 24 * 60 * 60 * 1000,
+  );
+  conditions.push(gte(jobs.collectedAt, cutoff));
 
   if (!query.includeDuplicates) {
     conditions.push(eq(jobs.isDuplicate, false));
