@@ -42,10 +42,10 @@ export default async function CvSettingsPage() {
           </p>
           <AnimatedList aria-label="Resume A/B results" className="mt-4 space-y-2 text-sm">
             {variants.map((v) => (
-              <li key={v.cvVersion}>
+              <div key={v.cvVersion}>
                 Version {v.cvVersion}: {v.submitted} submitted, {v.responses}{" "}
                 responses ({v.responseRatePct}%)
-              </li>
+              </div>
             ))}
           </AnimatedList>
         </section>

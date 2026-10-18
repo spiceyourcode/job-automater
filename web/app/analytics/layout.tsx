@@ -29,5 +29,5 @@ export default async function AnalyticsLayout({
     redirect("/onboarding");
   }
 
-  return <AppShell title="Analytics">{children}</AppShell>;
+  return <AppShell>{children}</AppShell>;
 }

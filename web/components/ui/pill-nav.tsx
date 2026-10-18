@@ -48,6 +48,7 @@ export interface PillNavProps {
   intro?: boolean;
   collapse?: 'auto' | 'always' | 'never';
   onMenuToggle?: (open: boolean) => void;
+  onCollapseChange?: (collapsed: boolean) => void;
   ariaLabel?: string;
   className?: string;
   style?: CSSProperties;
@@ -248,6 +249,7 @@ const PillNav = ({
   intro = true,
   collapse = 'auto',
   onMenuToggle,
+  onCollapseChange,
   ariaLabel = 'Main',
   className = '',
   style
@@ -693,6 +695,10 @@ const PillNav = ({
   useEffect(() => {
     if (!collapsed && open) setOpen(false);
   }, [collapsed, open]);
+
+  useEffect(() => {
+    onCollapseChange?.(collapsed);
+  }, [collapsed, onCollapseChange]);
 
   useIsoLayoutEffect(() => {
     const panel = panelRef.current;

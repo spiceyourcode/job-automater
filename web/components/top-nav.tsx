@@ -17,16 +17,13 @@ import { GooeyInput } from "@/components/ui/gooey-input";
 import { Separator } from "@/components/ui/separator";
 import { logoutAction } from "@/lib/actions/auth";
 
-interface TopNavProps {
-  title?: string;
-}
-
-export function TopNav({ title }: TopNavProps) {
+export function TopNav() {
   const pathname = usePathname();
   const reducedMotion = useReducedMotion();
   const { resolvedTheme } = useTheme();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [navCollapsed, setNavCollapsed] = useState(false);
   const settingsActive = isNavActive("/settings/profile", pathname);
 
   const pillItems = APP_NAV.filter(
@@ -43,25 +40,34 @@ export function TopNav({ title }: TopNavProps) {
 
   return (
     <header className="sticky top-0 z-50 h-14 border-b bg-background/80 backdrop-blur-sm">
-      <div className="flex h-full items-center justify-between gap-4 px-4">
-        <div className="flex items-center gap-4">
-          <Link href="/dashboard" className="shrink-0 flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
-              <Briefcase className="h-5 w-5" aria-hidden />
-            </div>
-            <span className="hidden sm:block text-sm font-semibold tracking-tight">
-              JobAutomater
-            </span>
-          </Link>
+      <div className="mx-auto flex h-full items-center gap-2 px-4">
+        <Link
+          href="/dashboard"
+          className="flex shrink-0 items-center gap-2"
+        >
+          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
+            <Briefcase className="h-5 w-5" aria-hidden />
+          </div>
+          <span className="hidden text-sm font-semibold tracking-tight sm:block">
+            JobAutomater
+          </span>
+        </Link>
 
-          {title && (
-            <span className="hidden sm:block min-w-0 truncate text-sm text-muted-foreground">
-              / {title}
-            </span>
-          )}
+        <div
+          className={cn("hidden shrink-0", navCollapsed && "md:block")}
+        >
+          <MobileNavTrigger />
         </div>
 
-        <nav className="hidden md:flex flex-1 max-w-2xl justify-center" aria-label="Main navigation">
+        <div
+          className="hidden w-[140px] shrink-0 md:block"
+          aria-hidden
+        />
+
+        <nav
+          className="hidden min-w-0 flex-1 items-center justify-center md:flex"
+          aria-label="Main navigation"
+        >
           <PillNav
             items={pillItems}
             activeHref={activeHref}
@@ -73,18 +79,19 @@ export function TopNav({ title }: TopNavProps) {
             hoverEffect="fill"
             indicator="dot"
             collapse="auto"
+            onCollapseChange={setNavCollapsed}
+            className="data-[collapsed]:invisible"
             ariaLabel="Main navigation"
-            className="w-full"
           />
         </nav>
 
-        <div className="flex items-center gap-2">
-          <div className="hidden lg:block">
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          <div className="hidden w-[280px] justify-end md:flex">
             <GooeyInput
               placeholder="Search jobs, companies..."
               collapsedWidth={132}
               expandedWidth={280}
-              expandedOffset={44}
+              expandedOffset={0}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
@@ -135,7 +142,7 @@ export function TopNav({ title }: TopNavProps) {
                     transition={
                       reducedMotion ? { duration: 0 } : { duration: 0.15 }
                     }
-                    className="absolute right-0 mt-2 w-56 origin-top-right rounded-md border bg-popover p-1 shadow-lg z-50"
+                    className="absolute right-0 top-full z-50 mt-2 w-56 origin-top-right rounded-md border bg-popover p-1 shadow-lg"
                     role="menu"
                   >
                     <nav className="py-1" aria-label="Settings">
@@ -189,21 +196,21 @@ export function TopNav({ title }: TopNavProps) {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -8 }}
                     transition={reducedMotion ? { duration: 0 } : { duration: 0.15 }}
-                    className="absolute right-0 mt-2 w-56 origin-top-right rounded-md border bg-popover p-1 shadow-lg z-50"
+                    className="absolute right-0 top-full z-50 mt-2 w-56 origin-top-right rounded-md border bg-popover p-1 shadow-lg"
                     role="menu"
                   >
-                    <div className="px-3 py-2 border-b border-border">
-                      <p className="text-sm font-medium truncate">Signed in</p>
-                      <p className="text-xs text-muted-foreground truncate">user@example.com</p>
+                    <div className="border-b border-border px-3 py-2">
+                      <p className="truncate text-sm font-medium">Signed in</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        user@example.com
+                      </p>
                     </div>
                     <nav className="py-1" aria-label="User menu">
                       {SETTINGS_LINKS.slice(0, 2).map((s) => (
                         <Link
                           key={s.href}
                           href={s.href}
-                          className={cn(
-                            "flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent",
-                          )}
+                          className="flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent"
                           onClick={() => setUserMenuOpen(false)}
                           role="menuitem"
                         >
@@ -215,9 +222,7 @@ export function TopNav({ title }: TopNavProps) {
                       <form action={logoutAction}>
                         <button
                           type="submit"
-                          className={cn(
-                            "flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent text-destructive",
-                          )}
+                          className="flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm text-destructive hover:bg-accent"
                           role="menuitem"
                         >
                           <LogOut className="h-4 w-4" aria-hidden />

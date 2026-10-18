@@ -212,7 +212,7 @@ export function ProfileSettingsEditor({ profile }: { profile: ProfileRow }) {
       <TabsContent value="skills" className="mt-4 space-y-4">
         <AnimatedList aria-label="Skills">
           {skills.map((s, i) => (
-            <li key={`${s.name}-${i}`} className="flex flex-wrap items-center gap-2">
+            <div key={`${s.name}-${i}`} className="flex flex-wrap items-center gap-2">
               <Input
                 className="max-w-[10rem]"
                 value={s.name}
@@ -251,7 +251,7 @@ export function ProfileSettingsEditor({ profile }: { profile: ProfileRow }) {
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
-            </li>
+            </div>
           ))}
         </AnimatedList>
         <div className="flex flex-wrap gap-2">

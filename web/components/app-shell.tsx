@@ -6,10 +6,8 @@ import { TopNav } from "@/components/top-nav";
 
 export function AppShell({
   children,
-  title,
 }: {
   children: React.ReactNode;
-  title?: string;
 }) {
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -22,7 +20,7 @@ export function AppShell({
       <RealtimeListener />
       <KeyboardShortcuts />
 
-      <TopNav title={title} />
+      <TopNav />
 
       <main className="flex-1 overflow-y-auto" id="main-content" tabIndex={-1}>
         {children}

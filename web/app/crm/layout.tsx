@@ -29,5 +29,5 @@ export default async function CrmLayout({
     redirect("/onboarding");
   }
 
-  return <AppShell title="CRM">{children}</AppShell>;
+  return <AppShell>{children}</AppShell>;
 }

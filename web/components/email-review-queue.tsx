@@ -41,12 +41,12 @@ export function EmailReviewQueue({ initial }: { initial: ReviewEmail[] }) {
   return (
     <AnimatedList aria-label="Emails for review">
       {error ? (
-        <li className="text-sm text-destructive" role="alert">
+        <div className="text-sm text-destructive" role="alert">
           {error}
-        </li>
+        </div>
       ) : null}
       {items.map((email) => (
-        <li key={email.id} className="rounded-lg border p-4">
+        <div key={email.id} className="rounded-lg border p-4">
           <p className="text-sm font-medium">{email.subject ?? "(no subject)"}</p>
           <p className="text-xs text-muted-foreground">{email.fromEmail}</p>
           {email.snippet ? (
@@ -89,7 +89,7 @@ export function EmailReviewQueue({ initial }: { initial: ReviewEmail[] }) {
               Confirm
             </StatefulButton>
           </form>
-        </li>
+        </div>
       ))}
     </AnimatedList>
   );

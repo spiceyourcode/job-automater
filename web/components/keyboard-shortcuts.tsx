@@ -118,7 +118,7 @@ export function KeyboardShortcuts() {
         </DialogHeader>
         <AnimatedList aria-label="Keyboard shortcuts" className="space-y-2 text-sm">
           {SHORTCUTS.map((s) => (
-            <li
+            <div
               key={s.keys}
               className="flex items-center justify-between gap-4 border-b border-border/60 py-2 last:border-0"
             >
@@ -126,7 +126,7 @@ export function KeyboardShortcuts() {
               <kbd className="rounded border bg-muted px-2 py-0.5 font-mono text-xs">
                 {s.keys}
               </kbd>
-            </li>
+            </div>
           ))}
         </AnimatedList>
       </DialogContent>

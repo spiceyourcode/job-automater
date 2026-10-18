@@ -29,5 +29,5 @@ export default async function JobsLayout({
     redirect("/onboarding");
   }
 
-  return <AppShell title="Jobs">{children}</AppShell>;
+  return <AppShell>{children}</AppShell>;
 }

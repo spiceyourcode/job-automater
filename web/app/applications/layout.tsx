@@ -29,5 +29,5 @@ export default async function ApplicationsLayout({
     redirect("/onboarding");
   }
 
-  return <AppShell title="Applications">{children}</AppShell>;
+  return <AppShell>{children}</AppShell>;
 }

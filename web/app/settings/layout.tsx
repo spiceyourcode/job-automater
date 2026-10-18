@@ -29,5 +29,5 @@ export default async function SettingsLayout({
     redirect("/onboarding");
   }
 
-  return <AppShell title="Settings">{children}</AppShell>;
+  return <AppShell>{children}</AppShell>;
 }
