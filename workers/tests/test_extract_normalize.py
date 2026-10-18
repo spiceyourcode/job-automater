@@ -60,6 +60,41 @@ def test_invalid_llm_refine_falls_back_to_heuristic():
     assert job.title != "X"
 
 
+def test_llm_refine_preserves_source_identity_fields():
+    """Fix A: the model must never override provenance from the source row."""
+    from agents.extract_normalize.llm import llm_refine
+
+    draft = {
+        "title": "Backend Engineer",
+        "company": "Nimbus",
+        "source": "rss",
+        "source_id": "abc123",
+        "source_url": "https://example.com/jobs/abc123",
+        "field_confidence": {"title": 0.5, "company": 0.5},
+    }
+    parsed = {
+        "title": "Backend Engineer (Remote)",
+        "company": "Nimbus",
+        "source": "api",
+        "source_id": "model-invented",
+        "source_url": "https://evil.example.com",
+        "field_confidence": {"title": 0.9, "company": 0.9},
+    }
+    with (
+        patch("agents.extract_normalize.llm.has_chat_provider", return_value=True),
+        patch("agents.extract_normalize.llm.chat_json", return_value=dict(parsed)),
+    ):
+        merged = llm_refine({"format": "rss"}, draft)
+
+    # Content fields still come from the model...
+    assert merged["title"] == "Backend Engineer (Remote)"
+    assert merged["field_confidence"]["title"] == 0.9
+    # ...but provenance stays anchored to the source row.
+    assert merged["source"] == "rss"
+    assert merged["source_id"] == "abc123"
+    assert merged["source_url"] == "https://example.com/jobs/abc123"
+
+
 def test_rejects_unvalidated_llm_shaped_payload():
     """HG-9: garbage without confidence must not validate."""
     with pytest.raises(Exception):
@@ -106,6 +141,44 @@ def test_playwright_raw_keeps_snippet_as_description():
     assert "FastAPI" in draft["description"]
     assert "python" in draft["tags"]
     assert draft["location"] == "Remote"
+
+
+def test_career_page_parses_company_from_title():
+    from agents.extract_normalize.heuristic import extract_heuristic
+
+    draft = extract_heuristic(
+        {
+            "format": "career_page",
+            "title": "Project Manager at Biometrics Technology Limited",
+            "url": "https://example.com/jobs/1",
+            "location": "Remote",
+        },
+        source_type="career_page",
+        source_external_id="abc",
+        source_url="https://example.com/jobs/1",
+    )
+    assert draft["title"] == "Project Manager"
+    assert draft["company"] == "Biometrics Technology Limited"
+    assert draft["field_confidence"]["company"] >= 0.7
+
+
+def test_playwright_company_extraction_ignores_explicit_company():
+    from agents.extract_normalize.heuristic import extract_heuristic
+
+    draft = extract_heuristic(
+        {
+            "format": "playwright",
+            "title": "Backend Engineer at Wrong Corp",
+            "company": "Nimbus",
+            "url": "https://example.com/jobs/1",
+        },
+        source_type="playwright",
+        source_external_id="abc",
+        source_url="https://example.com/jobs/1",
+    )
+    assert draft["title"] == "Backend Engineer at Wrong Corp"
+    assert draft["company"] == "Nimbus"
+    assert draft["field_confidence"]["company"] == 0.35
 
 
 def test_process_normalize_never_inserts_on_validation_failure():

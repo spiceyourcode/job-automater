@@ -176,6 +176,7 @@ def test_process_success_inserts_and_marks_ok():
         ),
         patch("tasks.collect_source._run_collector", side_effect=fake_collect),
         patch("tasks.collect_source.insert_jobs_raw", return_value=["aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"]) as insert,
+        patch("tasks.collect_source.list_unprocessed_jobs_raw_ids", return_value=[]),
         patch("tasks.collect_source.mark_source_success") as mark_ok,
         patch("tasks.collect_source.mark_source_failed") as mark_failed,
         patch("tasks.normalize_jobs.normalize_jobs") as norm_task,
@@ -189,3 +190,84 @@ def test_process_success_inserts_and_marks_ok():
     mark_ok.assert_called_once()
     mark_failed.assert_not_called()
     norm_task.delay.assert_called_once()
+
+
+def _collect_payload(source_id: str, user_id: str) -> dict:
+    return {"source_id": source_id, "user_id": user_id, "source_type": "rss"}
+
+
+def _mock_conn_cm():
+    mock_conn = MagicMock()
+    mock_cm = MagicMock()
+    mock_cm.__enter__.return_value = mock_conn
+    mock_cm.__exit__.return_value = False
+    return mock_conn, mock_cm
+
+
+def _source_row(source_id: str, user_id: str) -> dict:
+    return {
+        "id": source_id,
+        "user_id": user_id,
+        "source_type": "rss",
+        "name": "Test",
+        "config": {"feedUrl": "https://jobs.example.com/feed.xml"},
+        "is_active": True,
+        "consecutive_failures": 0,
+        "total_jobs_collected": 0,
+    }
+
+
+def test_process_reenqueues_pending_raw_rows_when_nothing_inserted():
+    """Fix B: a source with no new inserts still normalizes leftover raw rows."""
+    source_id = "11111111-1111-1111-1111-111111111111"
+    user_id = "22222222-2222-2222-2222-222222222222"
+    pending = "dddddddd-dddd-dddd-dddd-dddddddddddd"
+
+    mock_conn, mock_cm = _mock_conn_cm()
+
+    async def fake_collect(_type, _config):
+        return []
+
+    with (
+        patch("tasks.collect_source.connect", return_value=mock_cm),
+        patch("tasks.collect_source.load_source", return_value=_source_row(source_id, user_id)),
+        patch("tasks.collect_source._run_collector", side_effect=fake_collect),
+        patch("tasks.collect_source.insert_jobs_raw", return_value=[]),
+        patch(
+            "tasks.collect_source.list_unprocessed_jobs_raw_ids",
+            return_value=[pending],
+        ) as pending_call,
+        patch("tasks.collect_source.mark_source_success"),
+        patch("tasks.normalize_jobs.normalize_jobs") as norm_task,
+    ):
+        result = process_collect_source(_collect_payload(source_id, user_id))
+
+    assert result["jobs_inserted"] == 0
+    pending_call.assert_called_once()
+    norm_task.delay.assert_called_once()
+    assert norm_task.delay.call_args.args[0]["job_ids"] == [pending]
+
+
+def test_process_does_not_enqueue_when_nothing_pending():
+    """Fix B: no inserts and no pending rows means no normalize call."""
+    source_id = "11111111-1111-1111-1111-111111111111"
+    user_id = "22222222-2222-2222-2222-222222222222"
+
+    mock_conn, mock_cm = _mock_conn_cm()
+
+    async def fake_collect(_type, _config):
+        return []
+
+    with (
+        patch("tasks.collect_source.connect", return_value=mock_cm),
+        patch("tasks.collect_source.load_source", return_value=_source_row(source_id, user_id)),
+        patch("tasks.collect_source._run_collector", side_effect=fake_collect),
+        patch("tasks.collect_source.insert_jobs_raw", return_value=[]),
+        patch("tasks.collect_source.list_unprocessed_jobs_raw_ids", return_value=[]),
+        patch("tasks.collect_source.mark_source_success"),
+        patch("tasks.normalize_jobs.normalize_jobs") as norm_task,
+    ):
+        result = process_collect_source(_collect_payload(source_id, user_id))
+
+    assert result["jobs_inserted"] == 0
+    norm_task.delay.assert_not_called()

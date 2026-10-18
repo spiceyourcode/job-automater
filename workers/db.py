@@ -214,6 +214,34 @@ def mark_jobs_raw_processed(
             )
 
 
+def list_unprocessed_jobs_raw_ids(
+    conn: psycopg.Connection,
+    *,
+    user_id: str,
+    source_config_id: str,
+    limit: int = 500,
+) -> list[str]:
+    """Raw job ids for a source that have not been normalized yet.
+
+    Lets collect re-enqueue normalization for rows left behind when a prior
+    normalize run failed, so a source with no *new* inserts still makes progress.
+    """
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT id
+            FROM jobs_raw
+            WHERE user_id = %s::uuid
+              AND source_config_id = %s::uuid
+              AND processed = false
+            ORDER BY id
+            LIMIT %s
+            """,
+            (user_id, source_config_id, limit),
+        )
+        return [str(row["id"]) for row in cur.fetchall()]
+
+
 def mark_source_success(
     conn: psycopg.Connection,
     *,

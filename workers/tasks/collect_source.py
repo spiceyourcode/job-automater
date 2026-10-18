@@ -16,6 +16,7 @@ from db import (
     connect,
     dedup_hash,
     insert_jobs_raw,
+    list_unprocessed_jobs_raw_ids,
     load_source,
     mark_source_failed,
     mark_source_success,
@@ -192,12 +193,21 @@ def process_collect_source(payload: dict[str, Any]) -> dict[str, Any]:
                 "job_ids": inserted_ids,
                 "duration_ms": duration_ms,
             }
-            if inserted_ids:
+            # Normalize every raw row still pending for this source, not just the
+            # rows inserted this run — recovers progress after a failed/partial
+            # normalize (e.g. jobs-table reset) even when nothing new arrived.
+            pending_ids = list_unprocessed_jobs_raw_ids(
+                conn,
+                user_id=job.user_id,
+                source_config_id=job.source_id,
+            )
+            queue_ids = list(dict.fromkeys([*inserted_ids, *pending_ids]))
+            if queue_ids:
                 # Late import avoids circular deps at module load
                 from tasks.normalize_jobs import normalize_jobs
 
                 normalize_jobs.delay(
-                    {"job_ids": inserted_ids, "user_id": job.user_id}
+                    {"job_ids": queue_ids, "user_id": job.user_id}
                 )
             return result
         except Exception as exc:

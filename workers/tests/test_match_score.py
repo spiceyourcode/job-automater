@@ -115,6 +115,37 @@ def test_fuzzy_dedup_near_titles():
     assert is_fuzzy_duplicate(a, c) is False
 
 
+def test_fuzzy_dedup_placeholder_company_requires_exact_title():
+    """Unknown company + near-but-not-equal title must NOT be a duplicate."""
+    a = {"title": "Data Analyst", "company": "Unknown", "location": None}
+    b = {"title": "Data Analyst", "company": "Unknown", "location": None}
+    c = {"title": "Data Analyst II", "company": "Unknown", "location": None}
+    assert is_fuzzy_duplicate(a, b) is True
+    assert is_fuzzy_duplicate(a, c) is False
+
+
+def test_fuzzy_dedup_same_company_distinct_roles_not_duplicate():
+    """A real company does not let two clearly different roles collapse."""
+    a = {"title": "Project Manager", "company": "Centum", "location": None}
+    b = {"title": "Networking Engineer", "company": "Centum", "location": None}
+    assert is_fuzzy_duplicate(a, b) is False
+
+
+def test_fuzzy_dedup_embedded_company_suffix_titles_not_duplicate():
+    """Different roles whose titles share an ' at <Company>' tail stay distinct."""
+    a = {
+        "title": "Marketing Manager at Acme Corporation",
+        "company": "Unknown",
+        "location": None,
+    }
+    b = {
+        "title": "Marketing Officer at Acme Corporation",
+        "company": "Unknown",
+        "location": None,
+    }
+    assert is_fuzzy_duplicate(a, b) is False
+
+
 def test_process_skips_other_users_jobs_idor():
     user_id = "22222222-2222-2222-2222-222222222222"
     other_job = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"

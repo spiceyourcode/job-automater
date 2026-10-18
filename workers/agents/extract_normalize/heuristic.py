@@ -35,6 +35,27 @@ _TECH = (
     "graphql",
 )
 
+_PLACEHOLDER_COMPANIES = frozenset(
+    {"", "unknown", "n a", "na", "none", "not specified", "not available", "tbd"}
+)
+
+
+def _split_company_from_title(title: str, company: str | None) -> tuple[str, str, bool]:
+    """Split ``'<Role> at <Company>'`` when the company is missing or a placeholder.
+
+    Returns ``(title, company, extracted)``. Company is left untouched when it
+    already holds a real value.
+    """
+    title = (title or "").strip()
+    current = (company or "").strip()
+    if current and current.lower() not in _PLACEHOLDER_COMPANIES:
+        return title, current, False
+    if " at " in title:
+        role, _, org = title.rpartition(" at ")
+        if role.strip() and org.strip():
+            return role.strip(), org.strip(), True
+    return title, current or "Unknown", False
+
 
 def _strip_html(text: str) -> str:
     return _WS_RE.sub(" ", unescape(_TAG_RE.sub(" ", text))).strip()
@@ -114,14 +135,9 @@ def extract_heuristic(
         title = str(raw_data.get("title") or "").strip()
         description = _strip_html(str(raw_data.get("description") or raw_data.get("summary") or ""))
         application_url = str(raw_data.get("link") or source_url or "") or source_url
+        title, company, extracted = _split_company_from_title(title, company)
         conf["title"] = 0.95 if title else 0.1
-        conf["company"] = 0.4
-        # Try "Role at Company" / "Company: Role"
-        if " at " in title:
-            parts = title.rsplit(" at ", 1)
-            if len(parts) == 2 and parts[1].strip():
-                title, company = parts[0].strip(), parts[1].strip()
-                conf["company"] = 0.75
+        conf["company"] = 0.75 if extracted else 0.4
         conf["description"] = 0.85 if description else 0.2
 
     elif fmt == "api" or "item" in raw_data:
@@ -182,6 +198,7 @@ def extract_heuristic(
     elif fmt in ("playwright", "career_page"):
         title = str(raw_data.get("title") or "").strip()
         company = str(raw_data.get("company") or "Unknown").strip()
+        title, company, extracted = _split_company_from_title(title, company)
         location = raw_data.get("location")
         department = raw_data.get("department")
         description = _strip_html(
@@ -201,7 +218,7 @@ def extract_heuristic(
             or source_url
         )
         conf["title"] = 0.9 if title else 0.2
-        conf["company"] = 0.35
+        conf["company"] = 0.75 if extracted else 0.35
         conf["description"] = 0.65 if description else 0.15
         blob = f"{title} {description} {location or ''} {department or ''}"
         is_remote, remote_type = _remote_flags(blob)
@@ -234,9 +251,10 @@ def extract_heuristic(
         # Generic fallback
         title = str(raw_data.get("title") or raw_data.get("subject") or "Untitled role").strip()
         company = str(raw_data.get("company") or raw_data.get("from") or "Unknown").strip()
+        title, company, extracted = _split_company_from_title(title, company)
         description = _strip_html(str(raw_data.get("description") or raw_data.get("body") or ""))
         conf["title"] = 0.5
-        conf["company"] = 0.4
+        conf["company"] = 0.75 if extracted else 0.4
         conf["description"] = 0.4 if description else 0.1
 
     blob = f"{title} {description}"

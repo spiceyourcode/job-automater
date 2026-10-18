@@ -11,6 +11,9 @@ from lib.llm import LlmError, chat_json, has_chat_provider
 
 logger = logging.getLogger(__name__)
 
+# Identity/provenance fields are derived from the source row, never the model.
+_IDENTITY_FIELDS = ("source", "source_id", "source_url")
+
 
 def llm_refine(raw_data: dict[str, Any], draft: dict[str, Any]) -> dict[str, Any]:
     """
@@ -52,6 +55,12 @@ def llm_refine(raw_data: dict[str, Any], draft: dict[str, Any]) -> dict[str, Any
         return draft
     allowed = set(NormalizedJob.model_fields)
     merged = {k: v for k, v in {**draft, **parsed}.items() if k in allowed}
+    # Provenance is authoritative from the source row — the model must never
+    # override or invent identity fields (guards the dedup unique index).
+    if any(field in draft for field in _IDENTITY_FIELDS):
+        for field in _IDENTITY_FIELDS:
+            if field in draft:
+                merged[field] = draft[field]
     if "field_confidence" in draft and isinstance(parsed.get("field_confidence"), dict):
         merged["field_confidence"] = {
             **draft["field_confidence"],
