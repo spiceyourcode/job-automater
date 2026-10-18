@@ -200,7 +200,7 @@ def process_weekly_digest(
     *,
     force_user_id: str | None = None,
 ) -> dict[str, int]:
-    from db import connect
+    from db import connect, insert_notification
 
     now = now_utc or datetime.now(timezone.utc)
     since = week_start_utc(now)
@@ -245,6 +245,22 @@ def process_weekly_digest(
                 "Your JobAutomater weekly digest",
                 text,
             )
+            try:
+                insert_notification(
+                    conn,
+                    user_id=user_id,
+                    type_="weekly_digest",
+                    title="Your weekly digest",
+                    message=(
+                        f"{stats.applications_submitted} applied · "
+                        f"{stats.responses} responses · "
+                        f"{stats.interviews} interviews"
+                    ),
+                    data={"week": week_key},
+                    priority=0,
+                )
+            except Exception:  # noqa: BLE001
+                logger.exception("digest_notify_failed user_id=%s", user_id)
             sent += 1
 
     logger.info("weekly_digest_done sent=%s skipped=%s", sent, skipped)
