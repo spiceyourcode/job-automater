@@ -63,10 +63,19 @@ def process_match_score(payload: dict[str, Any]) -> dict[str, Any]:
 
         peers = load_jobs_for_user(conn, user_id=job.user_id, job_ids=None)
 
+        # Jobs flagged as duplicates during this batch. `peers` is loaded once
+        # and never refreshed, so without this a pair processed in the same run
+        # would match each other and BOTH get archived (no canonical kept).
+        flagged_ids: set[str] = set()
+
         for row in targets:
             jid = str(row["id"])
-            # Exclude self from peer list for dedup
-            existing = [p for p in peers if str(p["id"]) != jid]
+            # Exclude self and already-flagged jobs from the peer list for dedup
+            existing = [
+                p
+                for p in peers
+                if str(p["id"]) != jid and str(p["id"]) not in flagged_ids
+            ]
             result = run_match_score(
                 user_id=job.user_id,
                 profile=profile,
@@ -81,6 +90,7 @@ def process_match_score(payload: dict[str, Any]) -> dict[str, Any]:
                     user_id=job.user_id,
                     duplicate_of=str(result["duplicate_of"]),
                 )
+                flagged_ids.add(jid)
                 duped += 1
                 continue
 

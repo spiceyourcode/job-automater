@@ -209,6 +209,53 @@ def test_process_scores_owned_job():
     dup.assert_not_called()
 
 
+def test_duplicate_pair_not_mutually_flagged():
+    """A duplicate pair in one batch must keep one job (not archive both).
+
+    Regression: `peers` was loaded once, so both members matched each other
+    and were archived with no surviving canonical copy.
+    """
+    user_id = "22222222-2222-2222-2222-222222222222"
+    id_a = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    id_b = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    mock_conn = MagicMock()
+    mock_cm = MagicMock()
+    mock_cm.__enter__.return_value = mock_conn
+    mock_cm.__exit__.return_value = False
+
+    job_a = {**STRONG_JOB, "id": id_a, "user_id": user_id, "is_duplicate": False}
+    job_b = {**STRONG_JOB, "id": id_b, "user_id": user_id, "is_duplicate": False}
+
+    def _fake_run(*, job, existing_jobs, **_kw):
+        for peer in existing_jobs:
+            if peer.get("title") == job.get("title"):
+                return {"duplicate_of": peer["id"]}
+        return {
+            "duplicate_of": None,
+            "score": compute_match_score(STRONG_PROFILE, job),
+        }
+
+    with (
+        patch("tasks.match_score.connect", return_value=mock_cm),
+        patch("tasks.match_score.load_profile_for_user", return_value=STRONG_PROFILE),
+        patch(
+            "tasks.match_score.load_jobs_for_user",
+            side_effect=[[job_a, job_b], [job_a, job_b]],
+        ),
+        patch("tasks.match_score.run_match_score", side_effect=_fake_run),
+        patch("tasks.match_score.upsert_job_score", return_value="score-1") as upsert,
+        patch("tasks.match_score.mark_job_scored") as marked,
+        patch("tasks.match_score.mark_job_duplicate") as dup,
+    ):
+        result = process_match_score({"job_ids": [id_a, id_b], "user_id": user_id})
+
+    assert result["duplicated"] == 1
+    assert result["scored"] == 1
+    dup.assert_called_once()
+    upsert.assert_called_once()
+    marked.assert_called_once()
+
+
 def test_duplicate_marked_not_scored():
     user_id = "22222222-2222-2222-2222-222222222222"
     job_id = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
