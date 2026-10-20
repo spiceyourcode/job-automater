@@ -24,7 +24,7 @@ export function ThemeToggle() {
         aria-label="Toggle theme"
         title="Toggle theme"
       >
-        <Monitor className="h-4 w-4" aria-hidden />
+        <Monitor className="h-4 w-4" aria-hidden suppressHydrationWarning />
       </Button>
     );
   }
@@ -62,7 +62,7 @@ export function ThemeToggle() {
         setTheme(ORDER[(idx + 1) % ORDER.length]!);
       }}
     >
-      <Icon className="h-4 w-4" aria-hidden />
+      <Icon className="h-4 w-4" aria-hidden suppressHydrationWarning />
     </Button>
   );
 }
