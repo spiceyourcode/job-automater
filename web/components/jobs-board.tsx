@@ -125,7 +125,7 @@ export function JobsBoard({ initialJobs, initialQ = "", initialJobId }: Props) {
     if (!initialJobId) return;
     const local = initialJobs.find((j) => j.id === initialJobId);
     if (local) {
-      openJob(local);
+      startTransition(() => openJob(local));
       return;
     }
     startTransition(async () => {

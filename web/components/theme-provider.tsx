@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useHydrated } from "@/lib/use-hydrated";
 
 type Theme = "light" | "dark" | "system";
 
@@ -20,13 +21,14 @@ export function ThemeProvider({
   disableTransitionOnChange = false,
 }: ThemeProviderProps) {
   const [theme, setTheme] = React.useState<Theme>(defaultTheme);
-  const [mounted, setMounted] = React.useState(false);
+  const mounted = useHydrated();
   const [resolvedTheme, setResolvedTheme] = React.useState<"light" | "dark">("light");
 
   React.useEffect(() => {
-    setMounted(true);
     const stored = localStorage.getItem("theme") as Theme | null;
     if (stored) {
+      // Mount-time sync from localStorage, which is unavailable during SSR.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setTheme(stored);
     }
   }, []);
@@ -47,6 +49,8 @@ export function ThemeProvider({
       resolved = theme;
     }
 
+    // Mirrors the stored/system preference into context for consumers.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setResolvedTheme(resolved);
 
     if (attribute === "class") {

@@ -80,11 +80,13 @@ export function NotificationBell() {
   }, []);
 
   useEffect(() => {
-    void load();
+    // Deferred so the initial fetch never sets state during the mount commit.
+    const initial = setTimeout(() => void load(), 0);
     const t = setInterval(() => void load(), 60_000);
     const onRealtime = () => void load();
     window.addEventListener("jobautomater:notification", onRealtime);
     return () => {
+      clearTimeout(initial);
       clearInterval(t);
       window.removeEventListener("jobautomater:notification", onRealtime);
     };

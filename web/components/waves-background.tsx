@@ -61,7 +61,7 @@ class Noise {
     seed = Math.floor(seed);
     if (seed < 256) seed |= seed << 8;
     for (let i = 0; i < 256; i++) {
-      let v = i & 1 ? this.p[i] ^ (seed & 255) : this.p[i] ^ ((seed >> 8) & 255);
+      const v = i & 1 ? this.p[i] ^ (seed & 255) : this.p[i] ^ ((seed >> 8) & 255);
       this.perm[i] = this.perm[i + 256] = v;
       this.gradP[i] = this.gradP[i + 256] = this.grad3[v % 12];
     }
@@ -124,7 +124,7 @@ export function WavesBackground({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
   const boundingRef = useRef({ width: 0, height: 0, left: 0, top: 0 });
-  const noiseRef = useRef(new Noise(Math.random()));
+  const noiseRef = useRef<Noise | null>(null);
   const linesRef = useRef<
     Array<
       Array<{
@@ -184,6 +184,7 @@ export function WavesBackground({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctxRef.current = ctx;
+    noiseRef.current ??= new Noise(Math.random());
 
     function setSize() {
       boundingRef.current = container!.getBoundingClientRect();
@@ -218,7 +219,7 @@ export function WavesBackground({
     function movePoints(time: number) {
       const lines = linesRef.current;
       const mouse = mouseRef.current;
-      const noise = noiseRef.current;
+      const noise = noiseRef.current!;
       const {
         waveSpeedX,
         waveSpeedY,

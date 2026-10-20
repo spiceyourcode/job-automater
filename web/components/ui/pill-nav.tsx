@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  startTransition,
   useEffect,
   useId,
   useLayoutEffect,
@@ -292,7 +293,9 @@ const PillNav = ({
     stretch: clamp(stretch, 0, 1)
   };
   const settingsRef = useRef(settings);
-  settingsRef.current = settings;
+  useIsoLayoutEffect(() => {
+    settingsRef.current = settings;
+  });
 
   const palette = THEMES[theme] ?? THEMES.dark;
   const vars: Record<string, string> = { ...palette, ...(SIZES[size] ?? SIZES.md) };
@@ -693,7 +696,7 @@ const PillNav = ({
   }, [collapsed, joined]);
 
   useEffect(() => {
-    if (!collapsed && open) setOpen(false);
+    if (!collapsed && open) startTransition(() => setOpen(false));
   }, [collapsed, open]);
 
   useEffect(() => {

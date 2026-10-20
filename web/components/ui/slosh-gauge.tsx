@@ -112,7 +112,10 @@ const SloshGauge: React.FC<SloshGaugeProps> = ({
   const reduce = useRef(false);
   const [held, setHeld] = useState(false);
   const live = useRef<Live>({} as Live);
-  live.current = { viscosity, tilt, splash, width, height, value, onChange, unit };
+
+  useIsoLayoutEffect(() => {
+    live.current = { viscosity, tilt, splash, width, height, value, onChange, unit };
+  });
 
   const paint = () => {
     const { x, v, L } = sim.current;

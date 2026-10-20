@@ -118,11 +118,13 @@ export function DocumentReviewPanel({ applicationId, initial }: Props) {
   // Poll until documents arrive or generation fails
   useEffect(() => {
     if (!generating) return;
-    void refreshApp();
+    // Deferred so the first poll never sets state during the mount commit.
+    const initial = setTimeout(() => void refreshApp(), 0);
     const t = setInterval(() => void refreshApp(), 2000);
     const onReady = () => void refreshApp();
     window.addEventListener("jobautomater:documents", onReady);
     return () => {
+      clearTimeout(initial);
       clearInterval(t);
       window.removeEventListener("jobautomater:documents", onReady);
     };
@@ -131,7 +133,7 @@ export function DocumentReviewPanel({ applicationId, initial }: Props) {
 
   useEffect(() => {
     if (!generating) {
-      setElapsedSec(0);
+      startTransition(() => setElapsedSec(0));
       return;
     }
     const started = Date.now();

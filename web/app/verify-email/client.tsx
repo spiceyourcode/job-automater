@@ -17,26 +17,25 @@ import { verifyEmailAction } from "@/lib/actions/auth";
 export default function VerifyEmailClient() {
   const params = useSearchParams();
   const token = params.get("token") ?? "";
-  const [status, setStatus] = useState<"idle" | "ok" | "error">("idle");
+  const [result, setResult] = useState<"idle" | "ok" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
-    if (!token) {
-      setStatus("error");
-      setError("Missing verification token");
-      return;
-    }
+    if (!token) return;
     startTransition(async () => {
-      const result = await verifyEmailAction({ token });
-      if (result?.error) {
-        setStatus("error");
-        setError(result.error);
+      const response = await verifyEmailAction({ token });
+      if (response?.error) {
+        setResult("error");
+        setError(response.error);
       } else {
-        setStatus("ok");
+        setResult("ok");
       }
     });
   }, [token]);
+
+  const status = token ? result : "error";
+  const message = error ?? (token ? null : "Missing verification token");
 
   return (
     <Card className="w-full max-w-md border-border/60 shadow-sm">
@@ -60,7 +59,7 @@ export default function VerifyEmailClient() {
         )}
         {status === "error" && (
           <p className="text-sm text-destructive" role="alert">
-            {error ?? "Verification failed"}
+            {message ?? "Verification failed"}
           </p>
         )}
         <Button asChild className="cursor-pointer">

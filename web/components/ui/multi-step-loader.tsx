@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { useEffect, useState } from "react";
+import { startTransition, useEffect, useState } from "react";
 
 const CheckIcon = ({ className }: { className?: string }) => {
   return (
@@ -120,7 +120,7 @@ export const MultiStepLoader = ({
   useEffect(() => {
     if (controlled) return;
     if (!loading) {
-      setCurrentState(0);
+      startTransition(() => setCurrentState(0));
       return;
     }
     const timeout = setTimeout(() => {

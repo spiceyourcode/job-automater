@@ -320,6 +320,49 @@ export function TypeText({
     return () => observer.disconnect();
   }, []);
 
+  // Typing effect when visible
+  useEffect(() => {
+    if (!isVisible || reduceMotion) return;
+
+    const currentSentence = sentences[sentenceIndex];
+    const targetLength = isDeleting ? 0 : currentSentence.length;
+    const currentLength = displayText.length;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    if (currentLength === targetLength) {
+      if (!isDeleting) {
+        // Finished typing
+        timer = setTimeout(() => {
+          setIsDeleting(true);
+          onSentenceComplete?.(currentSentence, sentenceIndex);
+        }, pauseDuration);
+      } else if (loop || sentenceIndex < sentences.length - 1) {
+        // Finished deleting
+        timer = setTimeout(() => {
+          setIsDeleting(false);
+          setSentenceIndex((prev) => (prev + 1) % sentences.length);
+        }, typingSpeed);
+      }
+      return () => clearTimeout(timer);
+    }
+
+    const speed = variableSpeed
+      ? Math.random() * (variableSpeed.max - variableSpeed.min) + variableSpeed.min
+      : isDeleting
+      ? deletingSpeed
+      : typingSpeed;
+
+    timer = setTimeout(() => {
+      setDisplayText(
+        isDeleting
+          ? currentSentence.slice(0, currentLength - 1)
+          : currentSentence.slice(0, currentLength + 1)
+      );
+    }, speed);
+
+    return () => clearTimeout(timer);
+  }, [displayText, isDeleting, sentenceIndex, typingSpeed, deletingSpeed, pauseDuration, sentences, onSentenceComplete, isVisible, reduceMotion]);
+
   // For reduced motion, show full text immediately
   if (reduceMotion) {
     return (
@@ -330,49 +373,6 @@ export function TypeText({
       </h2>
     );
   }
-
-  // Typing effect when visible
-  useEffect(() => {
-    if (!isVisible) return;
-
-    const currentSentence = sentences[sentenceIndex];
-    const targetLength = isDeleting ? 0 : currentSentence.length;
-    const currentLength = displayText.length;
-
-    if (currentLength === targetLength) {
-      if (!isDeleting) {
-        // Finished typing
-        setIsDeleting(true);
-        if (onSentenceComplete) onSentenceComplete(currentSentence, sentenceIndex);
-        setTimeout(() => tick(), pauseDuration);
-      } else {
-        // Finished deleting
-        setIsDeleting(false);
-        setSentenceIndex((prev) => (prev + 1) % sentences.length);
-        if (loop || sentenceIndex < sentences.length - 1) {
-          setTimeout(() => tick(), typingSpeed);
-        }
-      }
-      return;
-    }
-
-    const speed = variableSpeed
-      ? Math.random() * (variableSpeed.max - variableSpeed.min) + variableSpeed.min
-      : isDeleting
-      ? deletingSpeed
-      : typingSpeed;
-
-    setTimeout(() => tick(), speed);
-
-    function tick() {
-      const currentSentence = sentences[sentenceIndex];
-      if (isDeleting) {
-        setDisplayText(currentSentence.slice(0, displayText.length - 1));
-      } else {
-        setDisplayText(currentSentence.slice(0, displayText.length + 1));
-      }
-    }
-  }, [displayText, isDeleting, sentenceIndex, typingSpeed, deletingSpeed, pauseDuration, sentences, onSentenceComplete, isVisible]);
 
   const cursor = showCursor ? (
     <motion.span

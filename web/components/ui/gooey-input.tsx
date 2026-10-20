@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  startTransition,
   useState,
   useRef,
   useEffect,
@@ -156,7 +157,7 @@ export function GooeyInput({
 
   useEffect(() => {
     if (searchText && !isExpanded) {
-      setIsExpanded(true);
+      startTransition(() => setIsExpanded(true));
     }
   }, [searchText, isExpanded]);
 

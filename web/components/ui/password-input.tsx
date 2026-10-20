@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Eye, EyeOff, AlertCircle, CheckCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Controller, ControllerRenderProps } from "react-hook-form";
+import { Control, Controller, FieldValues, Path } from "react-hook-form";
 
 interface PasswordStrengthMeterProps {
   password: string;
@@ -66,17 +66,17 @@ export function PasswordStrengthMeter({ password, className }: PasswordStrengthM
   );
 }
 
-interface PasswordInputProps {
+interface PasswordInputProps<TFieldValues extends FieldValues = FieldValues> {
   label: string;
-  name: string;
-  control: any;
+  name: Path<TFieldValues>;
+  control: Control<TFieldValues>;
   placeholder?: string;
   autoComplete?: string;
   required?: boolean;
   showStrengthMeter?: boolean;
 }
 
-export function PasswordInput({ label, name, control, placeholder, autoComplete = "new-password", required = true, showStrengthMeter = true }: PasswordInputProps) {
+export function PasswordInput<TFieldValues extends FieldValues = FieldValues>({ label, name, control, placeholder, autoComplete = "new-password", required = true, showStrengthMeter = true }: PasswordInputProps<TFieldValues>) {
   const [showPassword, setShowPassword] = useState(false);
 
   return (
@@ -111,7 +111,11 @@ export function PasswordInput({ label, name, control, placeholder, autoComplete 
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
-          {showStrengthMeter && <PasswordStrengthMeter password={field.value} />}
+          {showStrengthMeter && (
+            <PasswordStrengthMeter
+              password={typeof field.value === "string" ? field.value : ""}
+            />
+          )}
         </div>
       )}
     />
