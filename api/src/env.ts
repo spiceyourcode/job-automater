@@ -18,7 +18,7 @@ const envSchema = z
     API_PORT: z.coerce.number().int().min(1).max(65535).default(4001),
     NODE_ENV: z.string().default("development"),
     JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 chars"),
-    JWT_ACCESS_TTL: z.string().default("15m"),
+    JWT_ACCESS_TTL: z.string().default("1h"),
     JWT_REFRESH_TTL: z.string().default("7d"),
     S3_ENDPOINT: z.string().url(),
     S3_ACCESS_KEY: z.string().min(1),
@@ -53,7 +53,7 @@ const parsed = envSchema.safeParse({
   API_PORT: process.env.API_PORT ?? "4001",
   NODE_ENV: nodeEnv,
   JWT_SECRET: process.env.JWT_SECRET ?? "",
-  JWT_ACCESS_TTL: process.env.JWT_ACCESS_TTL ?? "15m",
+  JWT_ACCESS_TTL: process.env.JWT_ACCESS_TTL ?? "1h",
   JWT_REFRESH_TTL: process.env.JWT_REFRESH_TTL ?? "7d",
   // Dev-only defaults for local MinIO; production must set explicitly (fail closed)
   S3_ENDPOINT:

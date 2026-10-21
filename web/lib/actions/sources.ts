@@ -1,6 +1,6 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { getAccessToken } from "@/lib/auth-token";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -24,8 +24,7 @@ export type SourcePublic = {
 };
 
 async function authHeaders(): Promise<HeadersInit | null> {
-  const cookieStore = await cookies();
-  const token = cookieStore.get("access_token")?.value;
+  const token = await getAccessToken();
   if (!token) return null;
   return { authorization: `Bearer ${token}` };
 }

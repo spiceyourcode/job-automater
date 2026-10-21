@@ -1,6 +1,6 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { getAccessToken } from "@/lib/auth-token";
 
 const API_URL =
   process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4001";
@@ -8,7 +8,7 @@ const API_URL =
 export async function getWsTicketAction(): Promise<
   { ok: true; ticket: string } | { ok: false; error: string }
 > {
-  const token = (await cookies()).get("access_token")?.value;
+  const token = await getAccessToken();
   if (!token) return { ok: false, error: "Unauthorized" };
   try {
     const res = await fetch(`${API_URL}/api/v1/realtime/ticket`, {

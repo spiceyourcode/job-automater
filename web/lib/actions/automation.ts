@@ -1,6 +1,6 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { getAccessToken } from "@/lib/auth-token";
 
 const API_URL = process.env.API_URL ?? "http://127.0.0.1:4001";
 
@@ -9,7 +9,7 @@ type ActionResult<T = undefined> =
   | { ok: false; error: string };
 
 async function authHeaders(): Promise<HeadersInit | null> {
-  const token = (await cookies()).get("access_token")?.value;
+  const token = await getAccessToken();
   if (!token) return null;
   return { Authorization: `Bearer ${token}`, "content-type": "application/json" };
 }

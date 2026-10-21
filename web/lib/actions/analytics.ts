@@ -1,6 +1,6 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { getAccessToken } from "@/lib/auth-token";
 
 const API_URL =
   process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4001";
@@ -10,8 +10,7 @@ export type ActionResult<T = undefined> =
   | { ok: false; error: string };
 
 async function authHeaders(): Promise<HeadersInit | null> {
-  const cookieStore = await cookies();
-  const token = cookieStore.get("access_token")?.value;
+  const token = await getAccessToken();
   if (!token) return null;
   return { authorization: `Bearer ${token}` };
 }

@@ -50,6 +50,7 @@ export function LoginForm() {
   const [isPending, startTransition] = useTransition();
   const searchParams = useSearchParams();
   const oauthError = searchParams.get("oauth_error");
+  const sessionExpired = searchParams.get("reason") === "session_expired";
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -74,6 +75,11 @@ export function LoginForm() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {sessionExpired ? (
+          <p className="text-sm text-muted-foreground" role="status">
+            Your session expired. Please sign in again.
+          </p>
+        ) : null}
         {oauthError ? (
           <p className="text-sm text-destructive" role="alert">
             {OAUTH_ERRORS[oauthError] ?? OAUTH_ERRORS.oauth_failed}

@@ -49,6 +49,7 @@ import type {
   PatchMeBody,
   SessionView,
 } from "./auth.schema.js";
+import { canReuseRevokedSession } from "./refresh-grace.js";
 
 type Tx = PgTransaction<
   PostgresJsQueryResultHKT,
@@ -368,17 +369,51 @@ export const refresh = async (
       });
 
     if (!revoked) {
-      // Could be reuse of already-revoked token — revoke all sessions for safety
       const [existingSession] = await tx
-        .select({ userId: userSessions.userId })
+        .select({
+          id: userSessions.id,
+          userId: userSessions.userId,
+          expiresAt: userSessions.expiresAt,
+          revokedAt: userSessions.revokedAt,
+        })
         .from(userSessions)
         .where(eq(userSessions.tokenHash, tokenHash))
         .limit(1);
 
-      if (existingSession) {
+      if (!existingSession) throw new AuthError();
+
+      // A concurrent tab may have rotated this token moments ago. Reissuing
+      // keeps that tab logged in; intentional revocations expire immediately,
+      // so they fail the expiry check above and never reach this branch.
+      if (canReuseRevokedSession(existingSession, now)) {
+        const [user] = await tx
+          .select({ id: users.id, email: users.email })
+          .from(users)
+          .where(
+            and(eq(users.id, existingSession.userId), isNull(users.deletedAt)),
+          )
+          .limit(1);
+
+        if (!user) throw new AuthError();
+
+        const membership = await resolveMembership(tx, user.id, user.email);
+        return issueTokens(
+          tx,
+          user.id,
+          user.email,
+          membership.role,
+          membership.workspaceId,
+          userAgent,
+          ipAddress,
+        );
+      }
+
+      // Reuse outside the grace window, or a revoked token — revoke all
+      // sessions for safety.
+      if (existingSession.revokedAt) {
         await tx
           .update(userSessions)
-          .set({ revokedAt: now })
+          .set({ revokedAt: now, expiresAt: now })
           .where(
             and(
               eq(userSessions.userId, existingSession.userId),
@@ -412,9 +447,10 @@ export const refresh = async (
 };
 
 export const logout = async (userId: string): Promise<void> => {
+  const now = new Date();
   await db
     .update(userSessions)
-    .set({ revokedAt: new Date() })
+    .set({ revokedAt: now, expiresAt: now })
     .where(
       and(eq(userSessions.userId, userId), isNull(userSessions.revokedAt)),
     );
@@ -538,7 +574,7 @@ export const revokeSession = async (
   const now = new Date();
   const [row] = await db
     .update(userSessions)
-    .set({ revokedAt: now })
+    .set({ revokedAt: now, expiresAt: now })
     .where(
       and(
         eq(userSessions.id, sessionId),
@@ -645,10 +681,10 @@ export const resetPassword = async (
       .set({ passwordHash, emailVerified: true })
       .where(eq(users.id, row.userId));
 
-    // Force re-login everywhere
+    // Force re-login everywhere. Expiry sentinel keeps these un-reusable.
     await tx
       .update(userSessions)
-      .set({ revokedAt: now })
+      .set({ revokedAt: now, expiresAt: now })
       .where(
         and(eq(userSessions.userId, row.userId), isNull(userSessions.revokedAt)),
       );

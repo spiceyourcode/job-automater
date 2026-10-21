@@ -2,7 +2,6 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { jwtVerify } from "jose";
 import { OnboardingWizard } from "@/components/onboarding-wizard";
-import { DeleteAuthCookieAndRedirect } from "@/components/delete-auth-cookie";
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET ?? "");
 
@@ -15,10 +14,9 @@ export default async function OnboardingPage() {
   }
 
   try {
-    await jwtVerify(token.value, JWT_SECRET);
+    await jwtVerify(token.value, JWT_SECRET, { algorithms: ["HS256"] });
   } catch {
-    // Token is invalid - render client component to delete cookie and redirect
-    return <DeleteAuthCookieAndRedirect />;
+    redirect("/auth/session-expired");
   }
 
   if (cookieStore.get("onboarding_complete")?.value === "1") {
