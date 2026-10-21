@@ -13,6 +13,7 @@ import {
   unsaveJobAction,
 } from "@/lib/actions/jobs";
 import { bulkGenerateAction } from "@/lib/actions/applications";
+import { pushToast } from "@/lib/toast-store";
 import { JobCard } from "@/components/job-card";
 import { JobDetailDialog } from "@/components/job-detail-dialog";
 import { EmptyState } from "@/components/empty-state";
@@ -427,12 +428,26 @@ export function JobsBoard({ initialJobs, initialQ = "", initialJobId }: Props) {
             );
             if (!res.ok) {
               setError(res.error);
+              pushToast({
+                id: "bulk-drafts-error",
+                title: "Draft generation failed",
+                description: res.error,
+                duration: 8000,
+              });
               throw new Error("bulk_failed");
             }
             setError(null);
-            setBulkMsg(
-              `Queued ${res.data?.count ?? 0} draft document packs (no submit).`,
-            );
+            const count = res.data?.count ?? 0;
+            setBulkMsg(`Queued ${count} draft document packs (no submit).`);
+            pushToast({
+              id: "bulk-drafts",
+              title: "Draft generation queued",
+              description:
+                count === 0
+                  ? "No unscored jobs matched — lower the minimum score and try again."
+                  : `${count} draft document pack${count === 1 ? "" : "s"} queued. Nothing was submitted.`,
+              duration: 8000,
+            });
           }}
         >
           <Sparkles className="h-3.5 w-3.5" aria-hidden />

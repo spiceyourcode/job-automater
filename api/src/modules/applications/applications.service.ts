@@ -309,6 +309,7 @@ export async function bulkGenerateDocuments(
         jobId: row.jobId,
         cvVersion: profile?.cvVersion ?? 1,
         status: "draft",
+        generationModel: "pending",
       })
       .returning({ id: applications.id, jobId: applications.jobId });
     if (!created) continue;

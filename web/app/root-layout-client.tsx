@@ -2,6 +2,7 @@
 
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
+import { SwipeToastHost } from "@/components/ui/swipe-toast-host";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 
@@ -35,6 +36,7 @@ export default function RootLayoutClient({
         >
           {children}
           <Toaster />
+          <SwipeToastHost />
         </ThemeProvider>
       </body>
     </html>

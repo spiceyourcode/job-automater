@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useReducedMotion } from "motion/react";
 import {
   addInterviewAction,
   bulkActionAction,
@@ -12,6 +13,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { StatefulButton } from "@/components/ui/stateful-button";
 import { AnimatedList } from "@/components/ui/animated-list";
+import { pushToast } from "@/lib/toast-store";
+import { cn } from "@/lib/utils";
 import {
   Select,
   SelectContent,
@@ -57,6 +60,33 @@ export function PipelineBoard({ initial }: Props) {
   const [interviewStage, setInterviewStage] = useState("phone_screen");
   const [interviewWhen, setInterviewWhen] = useState("");
   const [announce, setAnnounce] = useState("");
+  const [focus, setFocus] = useState<"drafts" | PipelineStage | null>(null);
+  const columnRefs = useRef(new Map<string, HTMLElement>());
+  const reduceMotion = useReducedMotion();
+
+  useEffect(() => {
+    if (!focus) return;
+    columnRefs.current.get(focus)?.scrollIntoView({
+      inline: "nearest",
+      block: "nearest",
+      behavior: reduceMotion ? "auto" : "smooth",
+    });
+  }, [focus, reduceMotion]);
+
+  const columnClass = (id: "drafts" | PipelineStage, dashed = false) =>
+    cn(
+      "min-w-[220px] flex-1 rounded-lg border p-3 transition-[flex-grow,min-width] duration-300 ease-out motion-reduce:transition-none",
+      dashed && "border-dashed",
+      "bg-muted/20",
+      focus === id
+        ? "md:min-w-[360px] md:flex-[2.2]"
+        : focus !== null
+          ? "md:min-w-[180px]"
+          : null,
+    );
+
+  const toggleFocus = (id: "drafts" | PipelineStage) =>
+    setFocus((current) => (current === id ? null : id));
 
   const selectedIds = Object.entries(selected)
     .filter(([, v]) => v)
@@ -93,6 +123,14 @@ export function PipelineBoard({ initial }: Props) {
         applyUpdate(id, res.data.application);
         const label = COLUMNS.find((c) => c.id === stage)?.label ?? stage;
         setAnnounce(`Moved application to ${label}`);
+        pushToast({
+          id: `move-${id}`,
+          title: `Moved to ${label}`,
+          description:
+            res.data.application.jobTitle ??
+            res.data.application.jobCompany ??
+            undefined,
+        });
       }
     });
   };
@@ -100,6 +138,7 @@ export function PipelineBoard({ initial }: Props) {
   const runBulk = (action: "archive" | "withdraw" | "followup") => {
     if (selectedIds.length === 0) return;
     setError(null);
+    const count = selectedIds.length;
     startTransition(async () => {
       const res = await bulkActionAction(selectedIds, action);
       if (!res.ok) {
@@ -117,16 +156,29 @@ export function PipelineBoard({ initial }: Props) {
         );
       }
       setSelected({});
+      pushToast({
+        id: `bulk-${action}`,
+        title:
+          action === "followup"
+            ? `${count} follow-up${count === 1 ? "" : "s"} scheduled`
+            : action === "archive"
+              ? `${count} application${count === 1 ? "" : "s"} archived`
+              : `${count} application${count === 1 ? "" : "s"} withdrawn`,
+      });
     });
   };
 
+  const drafts = apps.filter((a) => a.status === "draft");
   const pipelineApps = apps.filter((a) => stageOf(a) != null);
 
-  if (pipelineApps.length === 0) {
+  if (drafts.length === 0 && pipelineApps.length === 0) {
     return (
       <p className="rounded-md border bg-muted/40 p-4 text-sm text-muted-foreground">
-        No applications on the pipeline yet. Approve a reviewed draft to start
-        the apply flow.
+        No applications yet. Generate drafts from the{" "}
+        <a className="underline" href="/jobs">
+          jobs board
+        </a>{" "}
+        to get started.
       </p>
     );
   }
@@ -174,22 +226,88 @@ export function PipelineBoard({ initial }: Props) {
         </StatefulButton>
       </div>
       <div className="flex gap-3 overflow-x-auto pb-2">
+        {drafts.length > 0 && (
+          <section
+            ref={(node) => {
+              if (node) columnRefs.current.set("drafts", node);
+              else columnRefs.current.delete("drafts");
+            }}
+            aria-labelledby="col-drafts"
+            className={columnClass("drafts", true)}
+          >
+            <h3 id="col-drafts" className="mb-3 text-sm font-medium">
+              <button
+                type="button"
+                aria-expanded={focus === "drafts"}
+                aria-controls="list-drafts"
+                onClick={() => toggleFocus("drafts")}
+                className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-sm text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >
+                <span>Drafts</span>
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {drafts.length}
+                </span>
+              </button>
+            </h3>
+            <AnimatedList id="list-drafts" aria-label="Drafts">
+              {drafts.map((app) => {
+                const docs = app.documentsStatus ?? "idle";
+                return (
+                  <div
+                    key={app.id}
+                    className="rounded-md border bg-background p-3 shadow-sm"
+                  >
+                    <span className="block font-medium leading-snug">
+                      {app.jobCompany ?? "Company"}
+                    </span>
+                    <span className="block text-xs text-muted-foreground">
+                      {app.jobTitle ?? "Role"}
+                    </span>
+                    <p className="mt-1 font-mono text-[10px] text-muted-foreground">
+                      {docs}
+                      {app.generationError ? ` · ${app.generationError}` : ""}
+                    </p>
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="sm"
+                      className="mt-2 h-7 cursor-pointer px-2 text-xs"
+                    >
+                      <a href={`/applications/${app.id}/review`}>
+                        {docs === "ready" ? "Review & approve" : "Open draft"}
+                      </a>
+                    </Button>
+                  </div>
+                );
+              })}
+            </AnimatedList>
+          </section>
+        )}
         {COLUMNS.map((col) => (
           <section
             key={col.id}
+            ref={(node) => {
+              if (node) columnRefs.current.set(col.id, node);
+              else columnRefs.current.delete(col.id);
+            }}
             aria-labelledby={`col-${col.id}`}
-            className="min-w-[220px] flex-1 rounded-lg border bg-muted/20 p-3"
+            className={columnClass(col.id)}
           >
-            <h3
-              id={`col-${col.id}`}
-              className="mb-3 flex items-center justify-between text-sm font-medium"
-            >
-              <span>{col.label}</span>
-              <span className="text-xs text-muted-foreground tabular-nums">
-                {byStage[col.id].length}
-              </span>
+            <h3 id={`col-${col.id}`} className="mb-3 text-sm font-medium">
+              <button
+                type="button"
+                aria-expanded={focus === col.id}
+                aria-controls={`list-${col.id}`}
+                onClick={() => toggleFocus(col.id)}
+                className="flex w-full cursor-pointer items-center justify-between gap-2 rounded-sm text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >
+                <span>{col.label}</span>
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {byStage[col.id].length}
+                </span>
+              </button>
             </h3>
-            <AnimatedList aria-label={col.label}>
+            <AnimatedList id={`list-${col.id}`} aria-label={col.label}>
               {byStage[col.id].map((app) => (
                 <div
                   key={app.id}
@@ -289,6 +407,11 @@ export function PipelineBoard({ initial }: Props) {
                               status: "withdrawn",
                               pipelineStage: "archived",
                             });
+                            pushToast({
+                              id: `move-${app.id}`,
+                              title: "Application withdrawn",
+                              description: app.jobTitle ?? app.jobCompany,
+                            });
                           }
                         });
                       }}
@@ -315,6 +438,11 @@ export function PipelineBoard({ initial }: Props) {
                           if (!res.ok) setError(res.error);
                           else if (res.data?.application) {
                             applyUpdate(app.id, res.data.application);
+                            pushToast({
+                              id: `notes-${app.id}`,
+                              title: "Notes saved",
+                              description: app.jobTitle ?? app.jobCompany,
+                            });
                           }
                         });
                       }}
@@ -341,6 +469,11 @@ export function PipelineBoard({ initial }: Props) {
                           else if (res.data?.application) {
                             applyUpdate(app.id, res.data.application);
                             setInterviewFor(null);
+                            pushToast({
+                              id: `interview-${app.id}`,
+                              title: "Interview scheduled",
+                              description: `${interviewStage.replace(/_/g, " ")} · ${new Date(scheduledAt).toLocaleString()}`,
+                            });
                           }
                         });
                       }}

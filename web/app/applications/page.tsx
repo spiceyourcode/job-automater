@@ -8,7 +8,7 @@ export default async function ApplicationsPage() {
     : [];
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
+    <div className="w-full px-4 py-8 lg:px-6">
       <div className="mb-6 space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">Applications</h1>
         <p className="text-sm text-muted-foreground">

@@ -40,6 +40,8 @@ type AnimatedListProps = {
   className?: string;
   /** Accessible name for the list. */
   "aria-label"?: string;
+  /** Optional id so a controlling header can reference the list with aria-controls. */
+  id?: string;
 };
 
 /**
@@ -50,11 +52,16 @@ export function AnimatedList({
   children,
   className,
   "aria-label": ariaLabel,
+  id,
 }: AnimatedListProps) {
   const items = Children.toArray(children);
 
   return (
-    <ul className={cn("relative space-y-2", className)} aria-label={ariaLabel}>
+    <ul
+      id={id}
+      className={cn("relative space-y-2", className)}
+      aria-label={ariaLabel}
+    >
       {items.map((child, index) => (
         <AnimatedItem
           key={(child as { key?: string | null }).key ?? index}
