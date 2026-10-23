@@ -194,6 +194,32 @@ export async function resetPasswordAction(input: {
   }
 }
 
+export async function verifyOtpAction(input: {
+  code: string;
+}): Promise<ActionState> {
+  const parsed = z.object({ code: z.string().length(6).regex(/^\d{6}$/) }).safeParse(input);
+  if (!parsed.success) {
+    return { error: "Enter a 6-digit code" };
+  }
+  try {
+    const res = await fetch(`${API_URL}/api/v1/auth/verify-otp`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(parsed.data),
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      return {
+        error: (body?.error as string | undefined) ?? "Invalid or expired code",
+      };
+    }
+    return undefined;
+  } catch {
+    return { error: "Network error — is the API running?" };
+  }
+}
+
 export async function verifyEmailAction(input: {
   token: string;
 }): Promise<ActionState> {
