@@ -28,7 +28,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Check, RotateCcw, X } from "lucide-react";
+import { Check, ChevronDown, RotateCcw, X } from "lucide-react";
+import { BlurText } from "@/components/ui/blur-text";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 type Props = {
   applicationId: string;
@@ -90,6 +97,7 @@ export function DocumentReviewPanel({ applicationId, initial }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [elapsedSec, setElapsedSec] = useState(0);
+  const [attestCv, setAttestCv] = useState(false);
 
   const ready = Boolean(app.tailoredCvContent && app.coverLetterContent);
   const genError = app.generationError ?? null;
@@ -147,9 +155,6 @@ export function DocumentReviewPanel({ applicationId, initial }: Props) {
   const canApprove = Boolean(app.canApprove ?? app.canApply);
   const approved = Boolean(app.approvedAt) || app.status === "approved";
   const traces = app.bulletTraces ?? [];
-  const pendingCount = traces.filter(
-    (t) => !t.status || t.status === "pending",
-  ).length;
   const sections = Array.from(new Set(traces.map((t) => t.section)));
   const errorCode =
     genError ||
@@ -207,9 +212,12 @@ export function DocumentReviewPanel({ applicationId, initial }: Props) {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Review documents
-          </h1>
+          <BlurText
+            text="Review documents"
+            className="text-2xl font-semibold tracking-tight text-foreground"
+            animateBy="words"
+            delay={40}
+          />
           <p className="text-sm text-muted-foreground" aria-live="polite">
             {job
               ? `${job.title} at ${job.company}`
@@ -346,131 +354,140 @@ export function DocumentReviewPanel({ applicationId, initial }: Props) {
       ) : null}
 
       {ready ? (
-        <div className="grid gap-4 md:grid-cols-2">
-          <section
-            aria-labelledby="orig-cv-heading"
-            className="rounded-lg border p-4"
-          >
-            <h2 id="orig-cv-heading" className="mb-2 text-sm font-medium">
-              Source grounding
-            </h2>
-            <p className="mb-2 text-xs text-muted-foreground">
-              Accept or reject each bullet (HG-9). Confirm review stays disabled
-              until none are pending.
-            </p>
-            <AnimatedList aria-label="Bullet traces" className="max-h-80 overflow-y-auto">
-              {traces.map((t, i) => {
-                const status = t.status ?? "pending";
-                return (
-                  <div
-                    key={`${t.chunkId}-${i}`}
-                    className="rounded border p-2"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <span className="font-mono text-xs text-foreground/70">
-                          {t.section} · {status}
-                        </span>
-                        <p className="mt-1 text-foreground/90">{t.text}</p>
-                      </div>
-                      <div className="flex shrink-0 gap-1">
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant={status === "accepted" ? "default" : "outline"}
-                          className="h-8 w-8 cursor-pointer"
-                          disabled={pending}
-                          aria-label="Accept bullet"
-                          onClick={() => setBulletStatus(i, "accepted")}
-                        >
-                          <Check className="h-3.5 w-3.5" aria-hidden />
-                        </Button>
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant={
-                            status === "rejected" ? "destructive" : "outline"
-                          }
-                          className="h-8 w-8 cursor-pointer"
-                          disabled={pending}
-                          aria-label="Reject bullet"
-                          onClick={() => setBulletStatus(i, "rejected")}
-                        >
-                          <X className="h-3.5 w-3.5" aria-hidden />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </AnimatedList>
-            {sections.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {sections.map((section) => (
-                  <Button
-                    key={section}
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="cursor-pointer"
-                    disabled={pending}
-                    onClick={() => {
-                      markLocalPending();
-                      startTransition(async () => {
-                        const res = await regenerateSectionAction(
-                          applicationId,
-                          section,
-                        );
-                        if (!res.ok) setError(res.error);
-                        else {
-                          setApp((a) => ({
-                            ...a,
-                            ...(res.data?.application ?? {}),
-                            tailoredCvContent: null,
-                            coverLetterContent: null,
-                            documentsReviewedAt: null,
-                            canApply: false,
-                            documentsStatus: "pending",
-                            generationModel: "pending",
-                            generationError: null,
-                          }));
-                        }
-                      });
-                    }}
-                  >
-                    <RotateCcw className="mr-1 h-3.5 w-3.5" aria-hidden />
-                    Regen {section}
-                  </Button>
-                ))}
-              </div>
-            )}
-            {pendingCount > 0 && (
-              <p className="mt-2 text-xs text-muted-foreground">
-                {pendingCount} bullet{pendingCount === 1 ? "" : "s"} still
-                pending.
-              </p>
-            )}
-          </section>
-
-          <section
-            aria-labelledby="tailored-heading"
-            className="space-y-4 md:col-span-1"
-          >
-            <div className="rounded-lg border p-4">
-              <h2 id="tailored-heading" className="mb-2 text-sm font-medium">
+        <div className="space-y-6">
+          <div className="grid gap-6 lg:grid-cols-2">
+            <div className="rounded-lg border border-border/60 bg-card/80 p-4 shadow-sm backdrop-blur-sm">
+              <h2 id="tailored-heading" className="mb-3 text-sm font-medium">
                 Tailored CV ({template})
               </h2>
-              <pre className="max-h-48 overflow-y-auto whitespace-pre-wrap font-sans text-sm leading-relaxed text-muted-foreground">
+              <pre className="max-h-[min(32rem,65vh)] overflow-y-auto whitespace-pre-wrap font-sans text-sm leading-relaxed text-foreground/90">
                 {app.tailoredCvContent}
               </pre>
             </div>
-            <div className="rounded-lg border p-4">
-              <h2 className="mb-2 text-sm font-medium">Cover letter</h2>
-              <pre className="max-h-48 overflow-y-auto whitespace-pre-wrap font-sans text-sm leading-relaxed text-muted-foreground">
+            <div className="rounded-lg border border-border/60 bg-card/80 p-4 shadow-sm backdrop-blur-sm">
+              <h2 className="mb-3 text-sm font-medium">Cover letter</h2>
+              <pre className="max-h-[min(32rem,65vh)] overflow-y-auto whitespace-pre-wrap font-sans text-sm leading-relaxed text-foreground/90">
                 {app.coverLetterContent}
               </pre>
             </div>
-          </section>
+          </div>
+
+          <Collapsible>
+            <CollapsibleTrigger className="flex w-full cursor-pointer items-center justify-between rounded-lg border px-3 py-2 text-sm font-medium hover:bg-muted/50">
+              Source details (advanced)
+              <ChevronDown className="h-4 w-4 opacity-60" aria-hidden />
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-3 space-y-3 rounded-lg border border-dashed p-4">
+              <p className="text-xs text-muted-foreground">
+                Lines included in your documents, traced to indexed CV chunks
+                (HG-9). Reject a line and regenerate a section if something looks
+                wrong.
+              </p>
+              <AnimatedList
+                aria-label="Bullet traces"
+                className="max-h-64 overflow-y-auto space-y-2"
+              >
+                {traces.map((t, i) => {
+                  const status = t.status ?? "accepted";
+                  return (
+                    <div
+                      key={`${t.chunkId}-${i}`}
+                      className="rounded-md border border-border/50 bg-muted/20 p-2"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <span className="font-mono text-xs text-muted-foreground">
+                            {t.section} · {status}
+                          </span>
+                          <p className="mt-1 text-sm">{t.text}</p>
+                        </div>
+                        <div className="flex shrink-0 gap-1">
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant={
+                              status === "accepted" ? "default" : "outline"
+                            }
+                            className="h-8 w-8 cursor-pointer"
+                            disabled={pending}
+                            aria-label="Accept bullet"
+                            onClick={() => setBulletStatus(i, "accepted")}
+                          >
+                            <Check className="h-3.5 w-3.5" aria-hidden />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant={
+                              status === "rejected" ? "destructive" : "outline"
+                            }
+                            className="h-8 w-8 cursor-pointer"
+                            disabled={pending}
+                            aria-label="Reject bullet"
+                            onClick={() => setBulletStatus(i, "rejected")}
+                          >
+                            <X className="h-3.5 w-3.5" aria-hidden />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </AnimatedList>
+              {sections.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {sections.map((section) => (
+                    <Button
+                      key={section}
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="cursor-pointer"
+                      disabled={pending}
+                      onClick={() => {
+                        markLocalPending();
+                        startTransition(async () => {
+                          const res = await regenerateSectionAction(
+                            applicationId,
+                            section,
+                          );
+                          if (!res.ok) setError(res.error);
+                          else {
+                            setApp((a) => ({
+                              ...a,
+                              ...(res.data?.application ?? {}),
+                              tailoredCvContent: null,
+                              coverLetterContent: null,
+                              documentsReviewedAt: null,
+                              canApply: false,
+                              documentsStatus: "pending",
+                              generationModel: "pending",
+                              generationError: null,
+                            }));
+                          }
+                        });
+                      }}
+                    >
+                      <RotateCcw className="mr-1 h-3.5 w-3.5" aria-hidden />
+                      Regen {section}
+                    </Button>
+                  ))}
+                </div>
+              ) : null}
+            </CollapsibleContent>
+          </Collapsible>
+
+          <label className="flex cursor-pointer items-start gap-2 text-sm">
+            <Checkbox
+              checked={attestCv}
+              onCheckedChange={(v) => setAttestCv(v === true)}
+              className="mt-0.5"
+            />
+            <span>
+              These documents reflect my indexed CV only (HG-9). I have read
+              the tailored CV and cover letter above.
+            </span>
+          </label>
         </div>
       ) : null}
 
@@ -540,10 +557,10 @@ export function DocumentReviewPanel({ applicationId, initial }: Props) {
         <Button
           type="button"
           className="cursor-pointer"
-          disabled={!ready || reviewed || pending || pendingCount > 0}
+          disabled={!ready || reviewed || pending || !attestCv}
           title={
-            pendingCount > 0
-              ? "Accept or reject every bullet first"
+            !attestCv
+              ? "Confirm that documents reflect your indexed CV"
               : undefined
           }
           onClick={() => {
