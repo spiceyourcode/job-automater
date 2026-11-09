@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pydantic import ValidationError
 
-from agents.interview_prep.graph import run_interview_prep
+from agents.interview_prep.heuristic import generate_prep_heuristic
 from agents.interview_prep.schema import assert_star_grounded, validate_prep
 from tasks.interview_prep import InterviewPrepJob, process_interview_prep
 
@@ -33,7 +33,39 @@ JOB = {
 }
 
 
+def test_heuristic_avoids_title_noise_questions():
+    noisy_chunks = [
+        {
+            "id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "section_type": "body",
+            "content": (
+                "Name Person\nemail@example.com\n"
+                "Fundamentals of Generative AI - Microsoft Jun 2024\n"
+                "LifeJar Goal Saver - Finance platform\n"
+                "- RESTful routing, Eloquent ORM, migrations."
+            ),
+        },
+        {
+            "id": CHUNK_A["id"],
+            "section_type": "projects",
+            "content": CHUNK_A["content"],
+        },
+    ]
+    job = {**JOB, "title": "Software Engineer, AI Coding Tasks", "description": "We are hiring."}
+    pack = generate_prep_heuristic(chunks=noisy_chunks, job=job, profile=None)
+    assert "Connect your uploaded experience" not in pack["questions"][0]["suggested_answer"]
+    tech_qs = [q["question"] for q in pack["questions"] if q["category"] == "technical"]
+    assert not any("worked with tasks" in q.lower() for q in tech_qs)
+    assert not any(" used know " in q.lower() for q in tech_qs)
+    assert "body story" not in pack["star_stories"][0]["title"].lower()
+    star = pack["star_stories"][0]
+    assert star["action"].count("●") == 0
+    assert len(star["action"]) < 500
+
+
 def test_heuristic_prep_is_grounded():
+    from agents.interview_prep import run_interview_prep
+
     pack = run_interview_prep(chunks=[CHUNK_A], job=JOB, profile={"salary_min": 11000000})
     assert pack is not None
     model = validate_prep(pack)

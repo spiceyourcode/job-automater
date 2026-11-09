@@ -7,31 +7,110 @@ import re
 from typing import Any
 from urllib.parse import urlparse
 
+from lib.cv_chunk_filters import (
+    chunk_action_verbs,
+    chunk_contact_noise_ratio,
+    clean_cv_header,
+    cv_sentences,
+    rank_story_chunks,
+)
 
-def _sentences(text: str) -> list[str]:
-    """Split text into sentences, preserving bullet points."""
-    bullets = re.split(r"[\n\r]+", text)
-    parts = []
-    for b in bullets:
-        b = b.strip()
-        if not b:
+_REQ_STOPWORDS = frozenset(
+    {
+        "tasks",
+        "task",
+        "hiring",
+        "engineers",
+        "backend",
+        "frontend",
+        "we're",
+        "were",
+        "coding",
+        "engineer",
+        "software",
+        "developer",
+        "designer",
+        "senior",
+        "junior",
+        "remote",
+        "hybrid",
+        "full",
+        "stack",
+        "time",
+        "role",
+        "position",
+        "looking",
+        "join",
+        "team",
+        "work",
+        "working",
+        "about",
+        "your",
+        "our",
+        "this",
+        "that",
+        "with",
+        "from",
+        "have",
+        "will",
+        "would",
+        "could",
+        "should",
+        "must",
+        "need",
+        "using",
+        "based",
+        "years",
+        "experience",
+        "experienced",
+        "codebase",
+        "know",
+        "well",
+        "highly",
+        "strong",
+        "familiar",
+        "comfortable",
+        "understand",
+        "understanding",
+        "including",
+        "ability",
+        "preferred",
+        "ideally",
+        "someone",
+        "looking",
+        "opportunity",
+        "actions",
+        "deployment",
+    }
+)
+
+_STAR_FIELD_CAP = 420
+_TECH_HINT = re.compile(
+    r"\b(python|javascript|typescript|java|golang|rust|ruby|php|sql|"
+    r"postgresql|postgres|mysql|mongodb|redis|fastapi|django|flask|react|"
+    r"nextjs|node|docker|kubernetes|aws|azure|gcp|graphql|rest|api|"
+    r"github|gitlab|langchain|openai|tensorflow|pytorch)\b",
+    re.I,
+)
+
+
+def _story_title(c: dict[str, Any]) -> str:
+    content = str(c.get("content") or "").strip()
+    for line in content.split("\n"):
+        line = line.strip().lstrip("-•*")
+        if len(line) < 12:
             continue
-        sents = re.split(r"(?<=[.!?])\s+", b)
-        parts.extend([s.strip() for s in sents if s.strip()])
-    return parts or ([text.strip()] if text.strip() else [])
-
-
-def _experience_chunks(chunks: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Return chunks with substantial experience content."""
-    out: list[dict[str, Any]] = []
-    for c in chunks:
-        section = str(c.get("section_type") or "").lower()
-        content = str(c.get("content") or "").strip()
-        if not content or not c.get("id"):
+        if re.search(r"[\w.-]+@[\w.-]+\.\w+", line):
             continue
-        if section in {"experience", "work", "projects", "body", ""} and len(content) >= 150:
-            out.append(c)
-    return out[:8]
+        if re.search(r"^[A-Z][a-z]+\s+[A-Z][a-z]+$", line):
+            continue
+        if chunk_contact_noise_ratio(line) >= 1.0:
+            continue
+        return line[:200]
+    section = str(c.get("section_type") or "experience").replace("_", " ").strip()
+    if section.lower() == "body":
+        section = "experience"
+    return f"{section.title()} highlight"
 
 
 def _overlap_tokens(text: str, haystack: str) -> bool:
@@ -44,53 +123,48 @@ def _overlap_tokens(text: str, haystack: str) -> bool:
     return hits / len(tokens) >= 0.35
 
 
+def _trim_star_field(text: str) -> str:
+    text = re.sub(r"\s*●\s*", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    if len(text) <= _STAR_FIELD_CAP:
+        return text
+    cut = text[:_STAR_FIELD_CAP]
+    if " " in cut:
+        cut = cut.rsplit(" ", 1)[0]
+    return cut.rstrip(",;.") + "."
+
+
 def _ensure_grounded(field_text: str, chunk_content: str) -> str:
-    """Ensure field_text has >=35% overlap with chunk_content."""
+    """Light overlap nudge — never append the whole chunk (HG-9)."""
     if not field_text or not chunk_content:
-        return field_text
+        return _trim_star_field(field_text)
+    field_text = _trim_star_field(field_text)
     if _overlap_tokens(field_text, chunk_content):
         return field_text
-    chunk_sents = _sentences(chunk_content)
-    boosted = field_text + " " + " ".join(chunk_sents[:5])
-    return boosted
-
-
-def _clean_cv_header(text: str) -> str:
-    """Remove CV header/contact info from text."""
-    lines = text.split("\n")
-    cleaned = []
-    found_content = False
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
-        # Skip contact info / header lines
-        if re.search(r"[@+]\d|linkedin|github|nakuru|kenya|summary|skills|backend|languages|api|integration|databases|devops|quality", line, re.I):
-            # Only skip if this line doesn't contain action verbs (actual experience)
-            if not re.search(r"\b(built|designed|implemented|developed|engineered|optimized|reduced|increased|achieved|delivered|managed|led|created|architected|automated|refactored|migrated|deployed|configured|integrated|debugged|troubleshot|solved|fixed|maintained|monitored|established|defined|documented)\b", line, re.I):
-                continue
-        # Skip pure name/email/phone lines
-        if re.search(r"^[A-Z][a-z]+\s+[A-Z][a-z]+$", line):  # "Frankline Omari"
-            continue
-        if re.search(r"[\w.-]+@[\w.-]+\.\w+", line):  # email
-            continue
-        if re.search(r"[\+\d\s]{10,}", line) and not re.search(r"\d{4}", line):  # phone (not year)
-            continue
-        # Once we hit substantial content, keep everything after
-        if len(line) > 80 or found_content:
-            found_content = True
-            cleaned.append(line)
-        elif len(line) > 50:
-            found_content = True
-            cleaned.append(line)
-    return "\n".join(cleaned) if cleaned else text
+    tokens = [w for w in field_text.lower().split() if len(w) > 3]
+    if not tokens:
+        return field_text
+    extra: list[str] = []
+    for sent in cv_sentences(chunk_content):
+        low = sent.lower()
+        if any(t in low for t in tokens[:6]):
+            extra.append(sent)
+        if len(extra) >= 1:
+            break
+    if extra:
+        return _trim_star_field(f"{field_text} {extra[0]}")
+    return field_text
 
 
 def _classify_sentence(sentence: str) -> str:
     """Classify sentence as situation/task/action/result based on keywords."""
     s = sentence.lower()
     # Result keywords (metrics, outcomes)
-    if re.search(r"\b(improved|reduced|increased|optimized|achieved|delivered|saved|cut|boosted|grew|lowered|decreased|~?\d+%|approximately \d+%|\d+x|x \d+)\b", s):
+    if re.search(
+        r"\b(improved|reduced|increased|optimized|optimised|achieved|delivered|"
+        r"saved|cut|boosted|grew|lowered|decreased|~?\d+%|approximately \d+%|\d+x|x \d+)\b",
+        s,
+    ):
         return "result"
     # Action keywords (what you did)
     if re.search(r"\b(built|designed|implemented|developed|created|engineered|architected|automated|refactored|migrated|deployed|configured|integrated|optimized|debugged|troubleshot|solved|fixed|maintained|monitored|established|defined|documented)\b", s):
@@ -106,14 +180,15 @@ def _classify_sentence(sentence: str) -> str:
 
 def _parse_star_from_chunk(c: dict[str, Any]) -> dict[str, str] | None:
     """Parse a CV chunk into STAR components using sentence classification."""
-    cid = str(c["id"])
     content = str(c.get("content") or "").strip()
-    content = _clean_cv_header(content)
-    
-    if len(content) < 150:
+    content = clean_cv_header(content)
+
+    if len(content) < 120:
+        return None
+    if chunk_contact_noise_ratio(content) > 0.5 and not chunk_action_verbs(content):
         return None
 
-    sentences = _sentences(content)
+    sentences = cv_sentences(content)
     if len(sentences) < 3:
         return None
 
@@ -123,11 +198,31 @@ def _parse_star_from_chunk(c: dict[str, Any]) -> dict[str, str] | None:
         cat = _classify_sentence(sent)
         classified[cat].append(sent)
 
-    # Build each STAR field from classified sentences
-    situation = " ".join(classified["situation"][:2]) if classified["situation"] else sentences[0]
-    task = " ".join(classified["task"][:2]) if classified["task"] else (classified["situation"][0] if classified["situation"] else sentences[0])
-    action = " ".join(classified["action"][:3]) if classified["action"] else (classified["task"][0] if classified["task"] else (sentences[1] if len(sentences) > 1 else sentences[0]))
-    result = " ".join(classified["result"][:2]) if classified["result"] else (classified["action"][-1] if classified["action"] else sentences[-1])
+    # Build each STAR field — at most one clause each to avoid bullet dumps
+    situation = sentences[0]
+    for cand in sentences:
+        if _classify_sentence(cand) == "situation" and not re.search(
+            r"\d+\s*%|approximately\s+\d+",
+            cand,
+            re.I,
+        ):
+            situation = cand
+            break
+    task = (
+        classified["task"][0]
+        if classified["task"]
+        else (sentences[1] if len(sentences) > 1 else sentences[0])
+    )
+    action = (
+        classified["action"][0]
+        if classified["action"]
+        else (sentences[2] if len(sentences) > 2 else sentences[-1])
+    )
+    result = (
+        classified["result"][-1]
+        if classified["result"]
+        else sentences[-1]
+    )
 
     # Ensure each field is grounded in chunk content
     grounded = {}
@@ -142,11 +237,28 @@ def _parse_star_from_chunk(c: dict[str, Any]) -> dict[str, str] | None:
     }
 
 
+def _valid_req_phrase(word: str, *, from_tech_list: bool = False) -> bool:
+    w = word.strip(".,;:()[]{}").lower()
+    if len(w) < 4 or len(w) > 40:
+        return False
+    if "'" in w or w in _REQ_STOPWORDS:
+        return False
+    if not re.fullmatch(r"[a-z0-9][a-z0-9.+#/-]*", w):
+        return False
+    if w.isdigit():
+        return False
+    if from_tech_list:
+        return True
+    if _TECH_HINT.fullmatch(w):
+        return True
+    return len(w) >= 6 and w not in _REQ_STOPWORDS
+
+
 def _requirement_phrases(job: dict[str, Any]) -> list[str]:
     """Extract meaningful technical requirements from job description."""
     blob = " ".join(
         str(job.get(k) or "")
-        for k in ("title", "requirements", "description", "responsibilities", "tech_stack", "keywords")
+        for k in ("requirements", "description", "responsibilities", "tech_stack", "keywords")
     )
     # Filter to meaningful technical terms (3+ chars, not generic)
     generic = {"the", "and", "for", "with", "you", "your", "our", "will", "can", "are", "have", "has", "been", "from", "this", "that", "they", "will", "would", "could", "should", "must", "need", "work", "working", "experience", "years", "strong", "good", "great", "excellent", "knowledge", "skills", "ability", "abilities", "proficient", "familiar", "understanding", "deep", "solid", "expert", "senior", "junior", "mid", "level", "role", "position", "job", "company", "team", "project", "projects", "environment", "development", "software", "engineer", "developer", "engineering", "build", "building", "develop", "developing", "create", "creating", "implement", "implementing", "design", "designing", "architect", "architecting", "optimize", "optimizing", "improve", "improving", "maintain", "maintaining", "support", "supporting", "deliver", "delivering", "drive", "driving", "lead", "leading", "manage", "managing", "own", "owning", "take", "taking", "ensure", "ensuring", "collaborate", "collaborating", "communicate", "communicating", "software", "engineer", "trainer", "python", "web", "full", "stack", "code", "coding", "programming", "programmer", "technical", "technology", "tech", "system", "systems", "application", "applications", "platform", "platforms", "service", "services", "solution", "solutions", "product", "products", "feature", "features", "tool", "tools", "framework", "frameworks", "library", "libraries", "api", "apis", "database", "databases", "cloud", "aws", "azure", "gcp", "docker", "kubernetes", "k8s", "ci", "cd", "cicd", "git", "agile", "scrum", "kanban", "jira", "confluence", "test", "testing", "unit", "integration", "e2e", "qa", "quality", "assurance", "security", "performance", "scalability", "reliability", "monitoring", "logging", "observability", "devops", "sre", "infrastructure", "automation", "scripting", "bash", "shell", "linux", "windows", "macos", "unix"}
@@ -162,17 +274,67 @@ def _requirement_phrases(job: dict[str, Any]) -> list[str]:
 
     words = [w.strip(".,;:()[]{}").lower() for w in blob.split() if len(w) > 3]
     seen: list[str] = []
-    # Prioritize tech stack terms
+    blob_l = blob.lower()
+    for m in _TECH_HINT.finditer(blob_l):
+        term = m.group(0).lower()
+        if term not in seen:
+            seen.append(term)
     for w in tech_terms:
-        if w not in seen and w not in generic and not w.isdigit() and len(w) > 2:
+        if w not in seen and w not in generic and _valid_req_phrase(w, from_tech_list=True):
             seen.append(w)
-    # Then general words
     for w in words:
-        if w not in seen and w not in generic and not w.isdigit() and len(w) > 3:
+        if w not in seen and w not in generic and _valid_req_phrase(w):
             seen.append(w)
         if len(seen) >= 6:
             break
     return seen
+
+
+def _star_summary(story: dict[str, Any], *, max_len: int = 900) -> str:
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for key in ("situation", "task", "action", "result"):
+        part = _trim_star_field(str(story.get(key) or ""))
+        if not part or part in seen:
+            continue
+        seen.add(part)
+        ordered.append(part)
+    text = " ".join(ordered)
+    return text[:max_len]
+
+
+def _answer_for_company(*, company: str, title: str, story: dict[str, Any] | None) -> str:
+    if not story:
+        return (
+            f"I want to contribute as {title} at {company}, using strengths shown in my CV."
+        )
+    snippet = _star_summary(story, max_len=500)
+    return (
+        f"I am interested in {title} at {company} because it fits work I have already done. "
+        f"{snippet}"
+    )[:4000]
+
+
+def _answer_for_behavioral(story: dict[str, Any] | None) -> str:
+    if not story:
+        return "I would walk through a recent project using situation, task, action, and result."
+    return _star_summary(story, max_len=1200)
+
+
+def _answer_for_technical(*, phrase: str, stories: list[dict[str, Any]]) -> str:
+    phrase_l = phrase.lower()
+    for story in stories:
+        blob = _star_summary(story).lower()
+        if phrase_l in blob:
+            return _star_summary(story, max_len=1000)
+    if stories:
+        action = _trim_star_field(str(stories[0].get("action") or ""))
+        result = _trim_star_field(str(stories[0].get("result") or ""))
+        return (
+            f"On a recent project I applied skills relevant to {phrase}. "
+            f"{action} {result}"
+        ).strip()[:4000]
+    return f"I would answer using a CV bullet that demonstrates {phrase}."
 
 
 def generate_prep_heuristic(
@@ -214,7 +376,7 @@ def generate_prep_heuristic(
         or "this role"
     )
 
-    exp = _experience_chunks(chunks)
+    exp = rank_story_chunks(chunks)
     stories: list[dict[str, Any]] = []
 
     for c in exp[:4]:
@@ -225,7 +387,7 @@ def generate_prep_heuristic(
 
         stories.append(
             {
-                "title": (str(c.get("section_type") or "experience") + " story")[:200],
+                "title": _story_title(c),
                 "situation": star["situation"],
                 "task": star["task"],
                 "action": star["action"],
@@ -242,7 +404,7 @@ def generate_prep_heuristic(
             if star:
                 stories = [
                     {
-                        "title": "CV experience",
+                        "title": _story_title(c),
                         "situation": star["situation"],
                         "task": star["task"],
                         "action": star["action"],
@@ -267,32 +429,33 @@ def generate_prep_heuristic(
         ]
 
     req = _requirement_phrases(job)
+    lead_story = stories[0] if stories else None
     questions: list[dict[str, Any]] = [
         {
             "question": f"Why do you want to work at {company} as a {title}?",
-            "suggested_answer": (
-                f"Connect your uploaded experience to {title} at {company}. "
-                "Use only facts from your CV stories below."
+            "suggested_answer": _answer_for_company(
+                company=company, title=title, story=lead_story
             ),
             "category": "company",
             "chunk_ids": [str(s["chunk_ids"][0]) for s in stories[:2]],
         },
         {
             "question": "Walk me through a project using the STAR format.",
-            "suggested_answer": stories[0]["situation"] if stories else "Use a CV story.",
+            "suggested_answer": _answer_for_behavioral(lead_story),
             "category": "behavioral",
             "chunk_ids": stories[0]["chunk_ids"] if stories else [],
         },
     ]
-    for phrase in req[:4]:
+    hay = " ".join(str(c.get("content") or "") for c in exp).lower()
+    for phrase in req[:6]:
+        if len(questions) >= 12:
+            break
+        if phrase not in hay and not _TECH_HINT.search(phrase):
+            continue
         questions.append(
             {
-                "question": f"Tell me about a time you worked with {phrase}.",
-                "suggested_answer": (
-                    stories[0]["action"]
-                    if stories
-                    else "Answer using a CV bullet only."
-                ),
+                "question": f"Tell me about a time you used {phrase} in a project.",
+                "suggested_answer": _answer_for_technical(phrase=phrase, stories=stories),
                 "category": "technical",
                 "chunk_ids": stories[0]["chunk_ids"] if stories else [],
             }
@@ -332,7 +495,7 @@ def generate_prep_heuristic(
     if not points and stories:
         points.append(stories[0]["action"][:240])
 
-    return {
+    pack = {
         "questions": questions[:12],
         "star_stories": stories[:6],
         "negotiation": {
@@ -346,6 +509,7 @@ def generate_prep_heuristic(
         },
         "model_used": "heuristic-prep-v1",
     }
+    return pack
 
 
 # keep import used for type checkers / tests
