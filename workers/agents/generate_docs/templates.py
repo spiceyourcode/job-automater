@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
+import re
 from typing import Literal
+
+
+def _normalize_bullet(text: str) -> str:
+    text = re.sub(r"^[\s●•\-\*]+", "", text.strip())
+    return re.sub(r"\s+", " ", text)
 
 CvTemplate = Literal["modern", "classic", "minimal"]
 ClTemplate = Literal["modern", "classic", "minimal", "standard"]
@@ -142,14 +148,16 @@ def _cv_modern(
         heading = SECTION_HEADINGS_MODERN[key]
         parts += ["", f"## {heading}"]
         if key == "summary":
-            # Summary as paragraphs (still verbatim lines)
             for b in bullets:
-                parts.append(b)
+                parts.append(_normalize_bullet(b))
                 parts.append("")
             if parts[-1] == "":
                 parts.pop()
+        elif key == "skills":
+            normed = [_normalize_bullet(b) for b in bullets]
+            parts.append(", ".join(normed))
         else:
-            parts.extend(f"- {b}" for b in bullets)
+            parts.extend(f"- {_normalize_bullet(b)}" for b in bullets)
     return "\n".join(parts)
 
 
@@ -213,12 +221,15 @@ def _cv_minimal(
 def _cl_modern(
     name: str, job_title: str, company: str, lead: str, support: str
 ) -> str:
+    lead_c = _normalize_bullet(lead)
+    support_c = _normalize_bullet(support)
     return (
         f"Dear Hiring Team at {company},\n\n"
-        f"I am applying for the {job_title} role. "
-        f"My background includes: {lead}\n\n"
-        f"Additionally: {support}\n\n"
-        f"I would welcome the chance to discuss how this experience aligns with your needs.\n\n"
+        f"I am writing to apply for the {job_title} position. "
+        f"In recent work, {lead_c}\n\n"
+        f"A related highlight is that {support_c}\n\n"
+        f"I would welcome the opportunity to discuss how this background supports "
+        f"your goals at {company}.\n\n"
         f"Sincerely,\n{name}"
     )
 

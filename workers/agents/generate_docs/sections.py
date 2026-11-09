@@ -149,7 +149,14 @@ def resolve_chunk_section(chunk: dict) -> CvSection:
     content = str(chunk.get("content") or "")
     stored = str(chunk.get("section_type") or "") or None
     section = classify_cv_section(content, stored_section_type=stored)
-    # Untyped body paragraphs without a heading become experience for CV layout
-    if section == "body":
+    if section != "body":
+        return section
+    lower = content.lower()
+    if re.search(r"fundamentals of|certification|certificate|cohort", lower):
+        return "certifications"  # type: ignore[return-value]
+    if re.search(
+        r"\b(built|designed|implemented|developed|engineered|led|managed)\b",
+        lower,
+    ):
         return "experience"
-    return section
+    return "body"

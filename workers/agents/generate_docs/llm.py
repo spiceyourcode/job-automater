@@ -19,10 +19,12 @@ Hard rules (HG-9 — never invent):
 - bullet_traces[].chunk_id must be a chunk id from the input.
 - bullet_traces[].section must be one of: summary, experience, education, skills, projects, certifications, languages.
 - Include standard headings only when you have chunk content for that section: Professional Summary, Work Experience, Education, Skills, Projects, Certifications, Languages. Omit empty sections.
-- Prefer 3–6 experience bullets when chunks support them; use more if chunks provide more (do not invent).
-- Cover letter: 3 short paragraphs that embed two verbatim traced lines (lead + support).
+- Prefer 4–8 experience bullets and 4–6 certifications when chunks support them; cap total traces at 25.
+- Put certifications only under certifications, not work experience.
+- Cover letter: 3 short paragraphs embedding two verbatim traced lines (lead + support) from experience or projects — never certification-only lines.
 - Do NOT use banned fluff: results-driven, passionate about, team player, proven track record, detail-oriented, self-starter, synergy, thought leader, go-getter, outside the box.
-- Single-column plain text / markdown; hyphen (-) bullets only.
+- Single-column plain text / markdown; hyphen (-) bullets only (no ● characters).
+- bullet_traces[].status should be \"accepted\".
 - Return JSON only: tailored_cv, cover_letter, bullet_traces (array of {text, chunk_id, section}).
 """
 
