@@ -27,6 +27,27 @@ def test_embed_texts_empty_without_keys():
         assert embed_texts(["hello"]) == [None]
 
 
+def test_embed_texts_prefers_google_when_both_keys():
+    fake_vec = [0.0] * EMBED_DIM
+    fake_vec[0] = 1.0
+    google_payload = {"embedding": {"values": fake_vec}}
+    mock_res = MagicMock()
+    mock_res.json.return_value = google_payload
+    mock_res.raise_for_status = MagicMock()
+
+    with (
+        patch("lib.embeddings.settings") as s,
+        patch("lib.embeddings.httpx.Client") as client_cls,
+    ):
+        s.openai_api_key = "sk-test"
+        s.google_api_key = "AIza-test"
+        client_cls.return_value.__enter__.return_value.post.return_value = mock_res
+        out = embed_texts(["hello"])
+    assert len(out) == 1
+    assert out[0] is not None
+    assert "gemini-embedding" in client_cls.return_value.__enter__.return_value.post.call_args.args[0]
+
+
 def test_embed_texts_openai_batch():
     fake_vec = [0.0] * EMBED_DIM
     fake_vec[0] = 1.0

@@ -188,14 +188,14 @@ def test_chat_json_http_error_raises_after_retry():
             chat_json(purpose="extract", messages=[{"role": "user", "content": "x"}])
 
 
-def test_match_prefers_openai_when_all_keys_present():
-    openai_payload = {
-        "choices": [{"message": {"content": '{"reasoning":"strong match"}'}}],
-        "usage": {"prompt_tokens": 1, "completion_tokens": 1},
+def test_match_prefers_google_when_all_keys_present():
+    google_payload = {
+        "candidates": [{"content": {"parts": [{"text": '{"reasoning":"strong match"}'}]}}],
+        "usageMetadata": {},
     }
-    openai_res = MagicMock()
-    openai_res.json.return_value = openai_payload
-    openai_res.raise_for_status = MagicMock()
+    google_res = MagicMock()
+    google_res.json.return_value = google_payload
+    google_res.raise_for_status = MagicMock()
 
     with (
         patch("lib.llm.settings") as s,
@@ -207,11 +207,40 @@ def test_match_prefers_openai_when_all_keys_present():
         s.google_api_key = "AIza-test"
         s.cerebras_api_key = "csk-test"
         post = client_cls.return_value.__enter__.return_value.post
-        post.return_value = openai_res
+        post.return_value = google_res
         out = chat_json(purpose="match", messages=[{"role": "user", "content": "x"}])
-    assert out["_provider"] == "openai"
+    assert out["_provider"] == "google"
     assert post.call_count == 1
-    assert "openai.com" in post.call_args.args[0]
+    assert "generateContent" in post.call_args.args[0]
+
+
+def test_extract_falls_back_to_openai_when_google_fails():
+    google_res = MagicMock()
+    google_res.raise_for_status.side_effect = httpx.HTTPStatusError(
+        "err", request=MagicMock(), response=MagicMock(status_code=500)
+    )
+    openai_payload = {
+        "choices": [{"message": {"content": '{"title":"Eng"}'}}],
+        "usage": {},
+    }
+    openai_res = MagicMock()
+    openai_res.json.return_value = openai_payload
+    openai_res.raise_for_status = MagicMock()
+
+    with (
+        patch("lib.llm.settings") as s,
+        patch("lib.llm.httpx.Client") as client_cls,
+    ):
+        s.openai_api_key = "sk-test"
+        s.qrok_api_key = ""
+        s.groq_api_key = ""
+        s.google_api_key = "AIza-test"
+        s.cerebras_api_key = ""
+        post = client_cls.return_value.__enter__.return_value.post
+        post.side_effect = [google_res, openai_res]
+        out = chat_json(purpose="extract", messages=[{"role": "user", "content": "x"}])
+    assert out["_provider"] == "openai"
+    assert out["title"] == "Eng"
 
 
 def test_match_skips_cerebras_after_402_cooldown():

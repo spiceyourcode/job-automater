@@ -1,4 +1,4 @@
-"""Unified chat JSON router — OpenAI, Groq (QROK_*), Google Gemini, Cerebras.
+"""Unified chat JSON router — Google Gemini (default), OpenAI fallback, Groq, Cerebras.
 
 Endpoints/models follow current provider docs (Aug 2026):
 - Groq: https://console.groq.com/docs/overview (OpenAI-compat)
@@ -25,11 +25,12 @@ logger = logging.getLogger(__name__)
 Purpose = Literal["extract", "docs", "classify", "match"]
 
 # Prefer providers that typically have quota; cooldown skips 402/429 dead-ends.
+# Gemini first when GOOGLE_API_KEY is set; OpenAI second; then Groq/Cerebras.
 PURPOSE_ORDER: dict[Purpose, tuple[str, ...]] = {
-    "extract": ("openai", "qrok", "google", "cerebras"),
-    "docs": ("openai", "google", "qrok"),
-    "classify": ("openai", "qrok", "google", "cerebras"),
-    "match": ("openai", "qrok", "google", "cerebras"),
+    "extract": ("google", "openai", "qrok", "cerebras"),
+    "docs": ("google", "openai", "qrok"),
+    "classify": ("google", "openai", "qrok", "cerebras"),
+    "match": ("google", "openai", "qrok", "cerebras"),
 }
 
 # Production model IDs per current provider catalogs

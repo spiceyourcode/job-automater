@@ -1,4 +1,4 @@
-"""1536-d embeddings — OpenAI text-embedding-3-small, else Gemini 1536.
+"""1536-d embeddings — Gemini gemini-embedding-001 first, OpenAI text-embedding-3-small fallback.
 
 Matches cv_chunks.embedding vector(1536). Never logs input text (HG-8).
 """
@@ -79,11 +79,19 @@ def embed_texts(texts: list[str], *, timeout: float = 60.0) -> list[list[float] 
     clipped = [t[:8000] if t else " " for t in texts]
     try:
         vectors: list[list[float]] = []
-        if settings.openai_api_key:
+        if settings.google_api_key:
+            try:
+                vectors = _google_embed(clipped, timeout)
+            except Exception:  # noqa: BLE001
+                logger.warning("embed_google_failed_trying_openai")
+                if not settings.openai_api_key:
+                    raise
+                vectors = []
+                for i in range(0, len(clipped), _BATCH):
+                    vectors.extend(_openai_embed(clipped[i : i + _BATCH], timeout))
+        elif settings.openai_api_key:
             for i in range(0, len(clipped), _BATCH):
                 vectors.extend(_openai_embed(clipped[i : i + _BATCH], timeout))
-        elif settings.google_api_key:
-            vectors = _google_embed(clipped, timeout)
         else:
             return [None] * len(texts)
         if len(vectors) != len(texts):
