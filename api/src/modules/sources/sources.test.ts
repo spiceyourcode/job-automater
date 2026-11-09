@@ -24,6 +24,8 @@ vi.mock("./sources.service.js", async (importOriginal) => {
     testSource: vi.fn(),
     runSource: vi.fn(),
     listSourceRuns: vi.fn(),
+    listJobSourceCatalog: vi.fn(),
+    installCatalogSources: vi.fn(),
     SourceError: actual.SourceError,
   };
 });
@@ -403,6 +405,67 @@ describe("createSourceBodySchema", () => {
       config: { exportPath: "/data/whatsapp-export.txt" },
     });
     expect(r.success).toBe(true);
+  });
+});
+
+describe("GET /api/v1/sources/catalog", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("200 returns catalog entries", async () => {
+    mockService.listJobSourceCatalog.mockReturnValue({
+      version: 1,
+      entries: [
+        {
+          id: "remoteok_rss",
+          name: "Remote OK",
+          description: "Remote jobs",
+          region: "global",
+          tags: ["rss"],
+          sourceType: "rss",
+          status: "stable",
+        },
+      ],
+    });
+    const res = await buildApp().request("/api/v1/sources/catalog", {
+      headers: { Authorization: await authHeader() },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { entries: unknown[] };
+    expect(body.entries).toHaveLength(1);
+  });
+});
+
+describe("POST /api/v1/sources/install-catalog", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("201 installs presets", async () => {
+    mockService.installCatalogSources.mockResolvedValue({
+      created: [sampleSource],
+      skipped: [],
+      needsInput: [],
+    });
+    const res = await buildApp().request("/api/v1/sources/install-catalog", {
+      method: "POST",
+      headers: {
+        Authorization: await authHeader(),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ catalogIds: ["remoteok_rss"] }),
+    });
+    expect(res.status).toBe(201);
+    expect(mockService.installCatalogSources).toHaveBeenCalled();
+  });
+
+  it("403 member cannot install", async () => {
+    const res = await buildApp().request("/api/v1/sources/install-catalog", {
+      method: "POST",
+      headers: {
+        Authorization: await authHeader("user-a", "member"),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ catalogIds: ["remoteok_rss"] }),
+    });
+    expect(res.status).toBe(403);
   });
 });
 

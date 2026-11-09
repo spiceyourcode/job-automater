@@ -3,6 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import { requireAuth, requireRole } from "../../middleware/require-auth.js";
 import {
   createSourceBodySchema,
+  installCatalogBodySchema,
   patchSourceBodySchema,
   sourceIdParamSchema,
   sourceRunsQuerySchema,
@@ -25,6 +26,33 @@ sourcesRoutes.get("/", requireRole("owner", "member"), async (c) => {
 sourcesRoutes.get("/templates", requireRole("owner", "member"), (c) => {
   return c.json(sourcesService.listSourceTemplates(), 200);
 });
+
+sourcesRoutes.get("/catalog", requireRole("owner", "member"), (c) => {
+  return c.json(sourcesService.listJobSourceCatalog(), 200);
+});
+
+sourcesRoutes.post(
+  "/install-catalog",
+  requireRole("owner"),
+  zValidator("json", installCatalogBodySchema),
+  async (c) => {
+    const { userId, workspaceId } = c.get("auth");
+    const body = c.req.valid("json");
+    try {
+      const result = await sourcesService.installCatalogSources(
+        userId,
+        workspaceId,
+        body,
+      );
+      return c.json(result, 201);
+    } catch (err) {
+      if (isSourceError(err)) {
+        return c.json({ error: err.message }, err.statusCode);
+      }
+      throw err;
+    }
+  },
+);
 
 sourcesRoutes.post(
   "/",

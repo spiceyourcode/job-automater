@@ -27,13 +27,16 @@ import {
 import {
   createSourceAction,
   deleteSourceAction,
+  installCatalogSourcesAction,
   listSourceRunsAction,
   runSourceAction,
   testSourceAction,
   updateSourceAction,
+  type SourceCatalogEntry,
   type SourcePublic,
   type SourceRunPublic,
 } from "@/lib/actions/sources";
+import { SourceCatalogPicker } from "@/components/source-catalog-picker";
 
 type SourceType =
   | "rss"
@@ -45,11 +48,14 @@ type SourceType =
 
 type Props = {
   initialSources: SourcePublic[];
+  catalogEntries: SourceCatalogEntry[];
 };
 
-export function SourcesManager({ initialSources }: Props) {
+export function SourcesManager({ initialSources, catalogEntries }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [panel, setPanel] = useState<"catalog" | "advanced">("catalog");
+  const [catalogSelection, setCatalogSelection] = useState<string[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [sourceType, setSourceType] = useState<SourceType>("rss");
@@ -94,7 +100,39 @@ export function SourcesManager({ initialSources }: Props) {
     setSourceType("rss");
   }
 
+  function onInstallCatalog() {
+    if (catalogSelection.length < 1) {
+      toast.error("Select at least one board");
+      return;
+    }
+    startTransition(async () => {
+      const result = await installCatalogSourcesAction(catalogSelection);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      const data = result.data!;
+      if (data.needsInput.length > 0) {
+        toast.message(
+          `${data.createdCount} added — ${data.needsInput.length} need extra setup (LinkedIn RSS, email, etc.)`,
+        );
+      } else {
+        toast.success(
+          data.createdCount > 0
+            ? `Added ${data.createdCount} source(s)`
+            : "Already connected",
+        );
+      }
+      setCatalogSelection([]);
+      refresh();
+    });
+  }
+
   function beginEdit(s: SourcePublic) {
+    if (s.config?.catalogId) {
+      toast.message("This preset is managed — remove and re-add from the catalog to change it.");
+      return;
+    }
     const cfg = s.config ?? {};
     setEditingId(s.id);
     setShowForm(true);
@@ -241,24 +279,72 @@ export function SourcesManager({ initialSources }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">
-          RSS, API, IMAP, Playwright, career pages, Telegram
-        </p>
-        <Button
-          type="button"
-          className="cursor-pointer"
-          onClick={() => {
-            if (showForm) resetForm();
-            else setShowForm(true);
-          }}
-        >
-          <Plus className="mr-2 h-4 w-4" aria-hidden />
-          Add source
-        </Button>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex rounded-lg border p-0.5">
+          <Button
+            type="button"
+            size="sm"
+            variant={panel === "catalog" ? "secondary" : "ghost"}
+            className="cursor-pointer"
+            onClick={() => {
+              setPanel("catalog");
+              resetForm();
+            }}
+          >
+            Browse catalog
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={panel === "advanced" ? "secondary" : "ghost"}
+            className="cursor-pointer"
+            onClick={() => setPanel("advanced")}
+          >
+            Advanced
+          </Button>
+        </div>
+        {panel === "advanced" && (
+          <Button
+            type="button"
+            className="cursor-pointer"
+            onClick={() => {
+              if (showForm) resetForm();
+              else setShowForm(true);
+            }}
+          >
+            <Plus className="mr-2 h-4 w-4" aria-hidden />
+            Custom source
+          </Button>
+        )}
       </div>
 
-      {showForm && (
+      {panel === "catalog" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Job boards</CardTitle>
+            <CardDescription>
+              Pick from our maintained list — selectors and feeds are preset.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <SourceCatalogPicker
+              entries={catalogEntries}
+              selected={catalogSelection}
+              onChange={setCatalogSelection}
+            />
+            <StatefulButton
+              type="button"
+              className="cursor-pointer"
+              disabled={isPending || catalogSelection.length < 1}
+              onClick={onInstallCatalog}
+            >
+              Add selected
+            </StatefulButton>
+          </CardContent>
+        </Card>
+      )}
+
+      {panel === "advanced" && showForm && (
         <Card>
           <CardHeader>
             <CardTitle>{editingId ? "Edit source" : "New source"}</CardTitle>
@@ -527,17 +613,17 @@ export function SourcesManager({ initialSources }: Props) {
         </Card>
       )}
 
-      {initialSources.length === 0 && !showForm ? (
+      {initialSources.length === 0 && panel === "advanced" && !showForm ? (
         <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
           <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted text-muted-foreground">
             <Radio className="h-8 w-8" aria-hidden />
           </div>
           <h3 className="mb-2 text-lg font-semibold tracking-tight">
-            No sources connected
+            No custom sources yet
           </h3>
           <p className="mb-6 max-w-xs text-sm text-muted-foreground">
-            Add an RSS feed, API, IMAP mailbox, or career-page scraper to start
-            collecting jobs.
+            Use the catalog tab for common boards, or add a custom RSS feed,
+            mailbox, or scraper here.
           </p>
           <Button
             type="button"
@@ -545,10 +631,12 @@ export function SourcesManager({ initialSources }: Props) {
             onClick={() => setShowForm(true)}
           >
             <Plus className="mr-2 h-4 w-4" aria-hidden />
-            Add source
+            Custom source
           </Button>
         </div>
-      ) : (
+      ) : initialSources.length > 0 ? (
+        <div className="space-y-3">
+          <h2 className="text-sm font-medium tracking-tight">Connected sources</h2>
         <ul aria-label="Your sources" className="space-y-2">
           {initialSources.map((s) => (
             <li key={s.id}>
@@ -558,6 +646,9 @@ export function SourcesManager({ initialSources }: Props) {
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="font-medium">{s.name}</h3>
                       <Badge variant="secondary">{s.sourceType}</Badge>
+                      {typeof s.config.catalogId === "string" && (
+                        <Badge variant="outline">Managed preset</Badge>
+                      )}
                       {s.lastRunStatus && (
                         <Badge variant="outline">{s.lastRunStatus}</Badge>
                       )}
@@ -678,7 +769,8 @@ export function SourcesManager({ initialSources }: Props) {
              </li>
            ))}
          </ul>
-      )}
+        </div>
+      ) : null}
     </div>
   );
 }

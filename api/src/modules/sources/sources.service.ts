@@ -10,8 +10,15 @@ import {
 import { enqueueCollectSource } from "../../lib/queue.js";
 import { assertPublicHttpUrl } from "../../lib/safe-url.js";
 import {
+  buildCreateBodyFromCatalog,
+  getCatalogEntryById,
+  listPublicCatalogEntries,
+  SourceCatalogNeedsInputError,
+} from "./sources.catalog.js";
+import {
   sourceConfigByType,
   type CreateSourceBody,
+  type InstallCatalogBody,
   type PatchSourceBody,
   type SourceRunsQuery,
   type SourceType,
@@ -535,6 +542,84 @@ export async function listSourceRuns(
     .offset(query.offset);
 
   return { runs: rows };
+}
+
+export function listJobSourceCatalog() {
+  return listPublicCatalogEntries();
+}
+
+function workspaceHasCatalogId(
+  rows: SourceConfig[],
+  catalogId: string,
+): boolean {
+  return rows.some((row) => {
+    const cfg = row.config as Record<string, unknown>;
+    return cfg.catalogId === catalogId;
+  });
+}
+
+export async function installCatalogSources(
+  userId: string,
+  workspaceId: string,
+  body: InstallCatalogBody,
+) {
+  const existing = await db
+    .select()
+    .from(sourceConfigs)
+    .where(eq(sourceConfigs.workspaceId, workspaceId));
+
+  const created: SourceConfig[] = [];
+  const skipped: string[] = [];
+  const needsInput: Array<{
+    catalogId: string;
+    name: string;
+    fields: string[];
+  }> = [];
+
+  for (const catalogId of body.catalogIds) {
+    const entry = getCatalogEntryById(catalogId);
+    if (!entry) {
+      throw new SourceError(`Unknown catalog id: ${catalogId}`, 400);
+    }
+    if (workspaceHasCatalogId(existing, catalogId)) {
+      skipped.push(catalogId);
+      continue;
+    }
+    const overrides = body.overrides?.[catalogId];
+    try {
+      const draft = buildCreateBodyFromCatalog(entry, overrides);
+      const createBody: CreateSourceBody = {
+        sourceType: draft.sourceType,
+        name: draft.name,
+        description: draft.description,
+        config: draft.config,
+        isActive: true,
+      };
+      const { sourceConfig } = await createSource(
+        userId,
+        workspaceId,
+        createBody,
+      );
+      created.push(sourceConfig);
+      existing.push(sourceConfig);
+    } catch (err) {
+      if (err instanceof SourceCatalogNeedsInputError) {
+        needsInput.push({
+          catalogId: entry.id,
+          name: entry.name,
+          fields: err.fields,
+        });
+        continue;
+      }
+      throw err;
+    }
+  }
+
+  return {
+    created: created.map(toPublicSource),
+    skipped,
+    needsInput,
+  };
 }
 
 /** Static templates for source types (no secrets). */

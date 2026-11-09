@@ -12,11 +12,14 @@ export const sourceTypeSchema = z.enum([
   "whatsapp",
 ]);
 
+const catalogIdField = { catalogId: z.string().max(100).optional() };
+
 const rssConfigSchema = z
   .object({
     feedUrl: z.string().url(),
     keywords: z.array(z.string()).optional(),
     pollIntervalMinutes: z.number().int().positive().optional(),
+    ...catalogIdField,
   })
   .strict();
 
@@ -31,6 +34,7 @@ const apiConfigSchema = z
       .optional(),
     endpoints: z.array(z.string()).optional(),
     fieldMapping: z.record(z.string(), z.string()).optional(),
+    ...catalogIdField,
   })
   .strict();
 
@@ -42,6 +46,7 @@ const imapConfigSchema = z
     password: z.string().min(1),
     folder: z.string().default("INBOX"),
     searchCriteria: z.string().optional(),
+    ...catalogIdField,
   })
   .strict();
 
@@ -69,6 +74,7 @@ const playwrightConfigSchema = z
     maxPages: z.number().int().positive().max(20).default(1),
     timeoutMs: z.number().int().positive().max(60000).optional(),
     login: playwrightLoginSchema.optional(),
+    ...catalogIdField,
   })
   .strict();
 
@@ -85,6 +91,7 @@ const careerPageConfigSchema = z
     paginationNextSelector: z.string().min(1).max(500).optional(),
     maxPages: z.number().int().positive().max(20).default(1),
     timeoutMs: z.number().int().positive().max(60000).optional(),
+    ...catalogIdField,
   })
   .strict();
 
@@ -94,6 +101,7 @@ const telegramConfigSchema = z
     channelId: z.string().min(1).max(100),
     messageFilter: z.string().max(500).optional(),
     limit: z.number().int().positive().max(100).default(50),
+    ...catalogIdField,
   })
   .strict();
 
@@ -102,6 +110,7 @@ const whatsappConfigSchema = z
     exportPath: z.string().min(1).max(1000),
     messageFilter: z.string().max(500).optional(),
     sessionDir: z.string().max(1000).optional(),
+    ...catalogIdField,
   })
   .strict();
 
@@ -178,7 +187,15 @@ export const sourceRunsQuerySchema = z
   })
   .strict();
 
+export const installCatalogBodySchema = z
+  .object({
+    catalogIds: z.array(z.string().min(1).max(100)).min(1).max(50),
+    overrides: z.record(z.string(), z.record(z.string(), z.unknown())).optional(),
+  })
+  .strict();
+
 export type CreateSourceBody = z.infer<typeof createSourceBodySchema>;
+export type InstallCatalogBody = z.infer<typeof installCatalogBodySchema>;
 export type PatchSourceBody = z.infer<typeof patchSourceBodySchema>;
 export type SourceType = z.infer<typeof sourceTypeSchema>;
 export type SourceRunsQuery = z.infer<typeof sourceRunsQuerySchema>;

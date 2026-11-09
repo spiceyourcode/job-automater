@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { jwtVerify } from "jose";
 import { OnboardingWizard } from "@/components/onboarding-wizard";
+import { listSourceCatalogAction } from "@/lib/actions/sources";
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET ?? "");
 
@@ -23,6 +24,10 @@ export default async function OnboardingPage() {
     redirect("/dashboard");
   }
 
+  const catalogResult = await listSourceCatalogAction();
+  const catalogEntries =
+    catalogResult.ok && catalogResult.data ? catalogResult.data.entries : [];
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4 py-10">
       <div className="mb-8 text-center space-y-1">
@@ -35,7 +40,13 @@ export default async function OnboardingPage() {
           fields cannot be skipped.
         </p>
       </div>
-      <OnboardingWizard />
+      {catalogResult.ok ? (
+        <OnboardingWizard catalogEntries={catalogEntries} />
+      ) : (
+        <p className="text-sm text-destructive" role="alert">
+          {catalogResult.error}
+        </p>
+      )}
     </div>
   );
 }

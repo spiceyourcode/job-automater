@@ -7,7 +7,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import {
-  Briefcase,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -45,6 +44,8 @@ import {
   saveSkillsAction,
   uploadCvAction,
 } from "@/lib/actions/profile";
+import { SourceCatalogPicker } from "@/components/source-catalog-picker";
+import type { SourceCatalogEntry } from "@/lib/actions/sources";
 
 const STEPS = [
   { id: "identity", title: "Professional identity" },
@@ -92,16 +93,13 @@ const preferencesSchema = z
     path: ["salaryMaxDollars"],
   });
 
-const SOURCE_OPTIONS = [
-  { id: "linkedin_rss", label: "LinkedIn RSS" },
-  { id: "indeed_email", label: "Indeed email alerts" },
-  { id: "telegram", label: "Telegram channels" },
-  { id: "career_pages", label: "Company career pages" },
-] as const;
-
 const LEVELS = ["beginner", "intermediate", "advanced", "expert"] as const;
 
-export function OnboardingWizard() {
+type OnboardingWizardProps = {
+  catalogEntries: SourceCatalogEntry[];
+};
+
+export function OnboardingWizard({ catalogEntries }: OnboardingWizardProps) {
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [isPending, startTransition] = useTransition();
@@ -655,31 +653,16 @@ export function OnboardingWizard() {
           <CardHeader>
             <CardTitle>Connect sources</CardTitle>
             <CardDescription>
-              Pick at least one channel to watch (wiring to collectors is Phase 2)
+              Choose job boards we monitor for you — no technical setup needed.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-3">
-              {SOURCE_OPTIONS.map((opt) => (
-                <label
-                  key={opt.id}
-                  className="flex items-center gap-3 rounded-md border p-3 cursor-pointer"
-                >
-                  <Checkbox
-                    checked={sources.includes(opt.id)}
-                    onCheckedChange={(checked) => {
-                      setSources((prev) =>
-                        checked
-                          ? [...prev, opt.id]
-                          : prev.filter((id) => id !== opt.id),
-                      );
-                    }}
-                  />
-                  <Briefcase className="h-4 w-4 text-muted-foreground" aria-hidden />
-                  <span className="text-sm">{opt.label}</span>
-                </label>
-              ))}
-            </div>
+            <SourceCatalogPicker
+              entries={catalogEntries}
+              selected={sources}
+              onChange={setSources}
+              onboardingMode
+            />
             <div className="flex gap-2">
               <Button
                 type="button"

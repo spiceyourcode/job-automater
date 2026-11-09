@@ -1,0 +1,259 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "id": "remoteok_rss",
+      "name": "Remote OK",
+      "description": "Remote tech and general roles worldwide",
+      "region": "global",
+      "tags": ["remote", "rss", "tech"],
+      "sourceType": "rss",
+      "status": "stable",
+      "config": {
+        "feedUrl": "https://remoteok.com/remote-jobs.rss"
+      }
+    },
+    {
+      "id": "remoteok_api",
+      "name": "Remote OK (API)",
+      "description": "Same board via public JSON API",
+      "region": "global",
+      "tags": ["remote", "api", "tech"],
+      "sourceType": "api",
+      "status": "stable",
+      "config": {
+        "baseUrl": "https://remoteok.com/api",
+        "fieldMapping": {
+          "title": "position",
+          "company": "company",
+          "url": "url",
+          "id": "id"
+        }
+      }
+    },
+    {
+      "id": "weworkremotely_all",
+      "name": "We Work Remotely",
+      "description": "All remote job categories",
+      "region": "global",
+      "tags": ["remote", "rss"],
+      "sourceType": "rss",
+      "status": "stable",
+      "config": {
+        "feedUrl": "https://weworkremotely.com/remote-jobs.rss"
+      }
+    },
+    {
+      "id": "weworkremotely_programming",
+      "name": "We Work Remotely — Programming",
+      "description": "Remote developer roles",
+      "region": "global",
+      "tags": ["remote", "rss", "tech"],
+      "sourceType": "rss",
+      "status": "stable",
+      "config": {
+        "feedUrl": "https://weworkremotely.com/categories/remote-programming-jobs.rss"
+      }
+    },
+    {
+      "id": "remotive_rss",
+      "name": "Remotive",
+      "description": "Curated remote jobs feed",
+      "region": "global",
+      "tags": ["remote", "rss"],
+      "sourceType": "rss",
+      "status": "stable",
+      "config": {
+        "feedUrl": "https://remotive.com/remote-jobs/rss"
+      }
+    },
+    {
+      "id": "jobicy_rss",
+      "name": "Jobicy",
+      "description": "Remote jobs with locations",
+      "region": "global",
+      "tags": ["remote", "rss", "tech"],
+      "sourceType": "rss",
+      "status": "stable",
+      "config": {
+        "feedUrl": "https://jobicy.com/?feed=job_feed"
+      }
+    },
+    {
+      "id": "himalayas_rss",
+      "name": "Himalayas",
+      "description": "Remote jobs from Himalayas",
+      "region": "global",
+      "tags": ["remote", "rss"],
+      "sourceType": "rss",
+      "status": "stable",
+      "config": {
+        "feedUrl": "https://himalayas.app/jobs/rss"
+      }
+    },
+    {
+      "id": "authenticjobs_rss",
+      "name": "Authentic Jobs",
+      "description": "Design and tech freelance and full-time",
+      "region": "global",
+      "tags": ["rss", "tech", "design"],
+      "sourceType": "rss",
+      "status": "stable",
+      "config": {
+        "feedUrl": "https://authenticjobs.com/rss/custom.php?type=rss"
+      }
+    },
+    {
+      "id": "hn_jobs_rss",
+      "name": "Hacker News — Who is hiring?",
+      "description": "Monthly hiring threads via HN RSS",
+      "region": "global",
+      "tags": ["rss", "tech", "startup"],
+      "sourceType": "rss",
+      "status": "stable",
+      "config": {
+        "feedUrl": "https://hnrss.org/jobs"
+      }
+    },
+    {
+      "id": "python_jobs_rss",
+      "name": "Python.org Jobs",
+      "description": "Python community job board",
+      "region": "global",
+      "tags": ["rss", "tech", "python"],
+      "sourceType": "rss",
+      "status": "stable",
+      "config": {
+        "feedUrl": "https://www.python.org/jobs/feed/rss/"
+      }
+    },
+    {
+      "id": "brightermonday_ke_rss",
+      "name": "BrighterMonday Kenya",
+      "description": "Kenya job listings",
+      "region": "kenya",
+      "tags": ["rss", "africa"],
+      "sourceType": "rss",
+      "status": "beta",
+      "config": {
+        "feedUrl": "https://www.brightermonday.co.ke/jobs/rss"
+      }
+    },
+    {
+      "id": "myjobmag_ng_rss",
+      "name": "MyJobMag Nigeria",
+      "description": "Nigeria vacancies feed",
+      "region": "africa",
+      "tags": ["rss", "africa"],
+      "sourceType": "rss",
+      "status": "beta",
+      "config": {
+        "feedUrl": "https://www.myjobmag.com/jobsxml_feed.php"
+      }
+    },
+    {
+      "id": "jobwebkenya_rss",
+      "name": "JobWeb Kenya",
+      "description": "Kenya careers RSS",
+      "region": "kenya",
+      "tags": ["rss", "africa"],
+      "sourceType": "rss",
+      "status": "beta",
+      "config": {
+        "feedUrl": "https://www.jobwebkenya.com/feed/"
+      }
+    },
+    {
+      "id": "careers24_za_rss",
+      "name": "Careers24 South Africa",
+      "description": "South Africa job feed",
+      "region": "africa",
+      "tags": ["rss", "africa"],
+      "sourceType": "rss",
+      "status": "beta",
+      "config": {
+        "feedUrl": "https://www.careers24.com/jobs/rss/"
+      }
+    },
+    {
+      "id": "relocateme_rss",
+      "name": "Relocate.me",
+      "description": "Relocation-friendly tech jobs",
+      "region": "global",
+      "tags": ["rss", "tech", "relocation"],
+      "sourceType": "rss",
+      "status": "stable",
+      "config": {
+        "feedUrl": "https://relocate.me/rss"
+      }
+    },
+    {
+      "id": "dynamitejobs_rss",
+      "name": "Dynamite Jobs",
+      "description": "Remote-first companies",
+      "region": "global",
+      "tags": ["remote", "rss"],
+      "sourceType": "rss",
+      "status": "stable",
+      "config": {
+        "feedUrl": "https://dynamitejobs.com/job_feed"
+      }
+    },
+    {
+      "id": "flexjobs_rss",
+      "name": "FlexJobs sample feed",
+      "description": "Flexible and remote work (public sample RSS)",
+      "region": "global",
+      "tags": ["remote", "rss"],
+      "sourceType": "rss",
+      "status": "beta",
+      "config": {
+        "feedUrl": "https://www.flexjobs.com/blog/post/job-feed/"
+      }
+    },
+    {
+      "id": "linkedin_saved_search_rss",
+      "name": "LinkedIn saved search (your RSS)",
+      "description": "Paste the RSS link from your LinkedIn job alert",
+      "region": "global",
+      "tags": ["rss", "linkedin"],
+      "sourceType": "rss",
+      "status": "stable",
+      "userFields": ["feedUrl"],
+      "config": {}
+    },
+    {
+      "id": "indeed_email_alerts",
+      "name": "Indeed email alerts (IMAP)",
+      "description": "Connect the inbox that receives Indeed alert emails",
+      "region": "global",
+      "tags": ["imap", "indeed", "email"],
+      "sourceType": "imap",
+      "status": "stable",
+      "userFields": ["imapServer", "username", "password"],
+      "config": {
+        "port": 993,
+        "folder": "INBOX"
+      }
+    },
+    {
+      "id": "gitlab_jobs_api",
+      "name": "GitLab open roles",
+      "description": "GitLab careers JSON API",
+      "region": "global",
+      "tags": ["api", "tech"],
+      "sourceType": "api",
+      "status": "beta",
+      "config": {
+        "baseUrl": "https://about.gitlab.com",
+        "endpoints": ["/jobs/api/v1/jobs"],
+        "fieldMapping": {
+          "list": "data",
+          "title": "title",
+          "url": "webUrl",
+          "id": "id"
+        }
+      }
+    }
+  ]
+}

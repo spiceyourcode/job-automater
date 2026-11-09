@@ -231,9 +231,9 @@ export async function uploadCvAction(formData: FormData): Promise<ActionResult> 
 
 /** Finish only after profile proves all required steps + ≥1 source. */
 export async function completeOnboardingAction(
-  sources: string[],
+  catalogIds: string[],
 ): Promise<ActionResult> {
-  if (sources.length < 1) {
+  if (catalogIds.length < 1) {
     return { ok: false, error: "Select at least one source" };
   }
 
@@ -245,6 +245,39 @@ export async function completeOnboardingAction(
   const gate = profileMeetsOnboardingRequirements(profileResult.data);
   if (!gate.ok) {
     return { ok: false, error: gate.error };
+  }
+
+  const headers = await authHeaders();
+  if (!headers) {
+    return { ok: false, error: "Unauthorized" };
+  }
+
+  try {
+    const res = await fetch(`${API_URL}/api/v1/sources/install-catalog`, {
+      method: "POST",
+      headers: { ...headers, "content-type": "application/json" },
+      body: JSON.stringify({ catalogIds }),
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      const errBody = (await res.json().catch(() => ({}))) as { error?: string };
+      return { ok: false, error: errBody.error ?? "Could not add job sources" };
+    }
+    const body = (await res.json()) as {
+      created: unknown[];
+      skipped: string[];
+      needsInput: unknown[];
+    };
+    const installed = body.created.length + body.skipped.length;
+    if (installed < 1) {
+      return {
+        ok: false,
+        error:
+          "Those sources need extra setup in Settings. Pick ready-made feeds instead.",
+      };
+    }
+  } catch {
+    return { ok: false, error: "Network error — is the API running?" };
   }
 
   await setOnboardingCompleteCookie(true);

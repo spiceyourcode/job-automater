@@ -23,6 +23,17 @@ export type SourcePublic = {
   config: Record<string, unknown>;
 };
 
+export type SourceCatalogEntry = {
+  id: string;
+  name: string;
+  description: string;
+  region: string;
+  tags: string[];
+  sourceType: string;
+  status: "stable" | "beta";
+  userFields?: string[];
+};
+
 async function authHeaders(): Promise<HeadersInit | null> {
   const token = await getAccessToken();
   if (!token) return null;
@@ -55,6 +66,71 @@ const createSchema = z.object({
   channelId: z.string().optional(),
   messageFilter: z.string().optional(),
 });
+
+export async function listSourceCatalogAction(): Promise<
+  ActionResult<{ version: number; entries: SourceCatalogEntry[] }>
+> {
+  const headers = await authHeaders();
+  if (!headers) return { ok: false, error: "Unauthorized" };
+  try {
+    const res = await fetch(`${API_URL}/api/v1/sources/catalog`, {
+      headers,
+      cache: "no-store",
+    });
+    if (!res.ok) return { ok: false, error: "Failed to load source catalog" };
+    const data = (await res.json()) as {
+      version: number;
+      entries: SourceCatalogEntry[];
+    };
+    return { ok: true, data };
+  } catch {
+    return { ok: false, error: "Network error — is the API running?" };
+  }
+}
+
+export async function installCatalogSourcesAction(
+  catalogIds: string[],
+): Promise<
+  ActionResult<{
+    createdCount: number;
+    skipped: string[];
+    needsInput: Array<{ catalogId: string; name: string; fields: string[] }>;
+  }>
+> {
+  if (catalogIds.length < 1) {
+    return { ok: false, error: "Select at least one source" };
+  }
+  const headers = await authHeaders();
+  if (!headers) return { ok: false, error: "Unauthorized" };
+  try {
+    const res = await fetch(`${API_URL}/api/v1/sources/install-catalog`, {
+      method: "POST",
+      headers: { ...headers, "content-type": "application/json" },
+      body: JSON.stringify({ catalogIds }),
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      const errBody = (await res.json().catch(() => ({}))) as { error?: string };
+      return { ok: false, error: errBody.error ?? "Install failed" };
+    }
+    const body = (await res.json()) as {
+      created: unknown[];
+      skipped: string[];
+      needsInput: Array<{ catalogId: string; name: string; fields: string[] }>;
+    };
+    revalidatePath("/settings/sources");
+    return {
+      ok: true,
+      data: {
+        createdCount: body.created.length,
+        skipped: body.skipped,
+        needsInput: body.needsInput,
+      },
+    };
+  } catch {
+    return { ok: false, error: "Network error — is the API running?" };
+  }
+}
 
 export async function listSourcesAction(): Promise<
   ActionResult<{ sources: SourcePublic[] }>
