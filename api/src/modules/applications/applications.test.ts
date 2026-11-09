@@ -471,7 +471,7 @@ describe("normalizeBulletTraces (HG-9)", () => {
     ]);
     expect(traces).toHaveLength(1);
     expect(traces[0]?.chunkId).toBe("c1");
-    expect(traces[0]?.status).toBe("pending");
+    expect(traces[0]?.status).toBe("accepted");
   });
 });
 

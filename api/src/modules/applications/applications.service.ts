@@ -71,7 +71,11 @@ export function normalizeBulletTraces(raw: unknown): BulletTracePublic[] {
     const section = String(t.section ?? "").trim() || "experience";
     if (text.length < 8 || !chunkId) continue;
     const status =
-      t.status === "accepted" || t.status === "rejected" ? t.status : "pending";
+      t.status === "rejected"
+        ? "rejected"
+        : t.status === "accepted" || t.status === "pending" || t.status == null
+          ? "accepted"
+          : "accepted";
     out.push({ text, chunkId, section, status });
   }
   return out;
@@ -514,9 +518,9 @@ export async function markDocumentsReviewed(userId: string, id: string) {
     throw new ApplicationError("Documents not ready for review", 400);
   }
   const traces = normalizeBulletTraces(app.bulletTraces);
-  if (traces.some((t) => t.status === "pending")) {
+  if (traces.some((t) => t.status === "rejected")) {
     throw new ApplicationError(
-      "Accept or reject every bullet before confirming review",
+      "Remove or replace rejected source lines before confirming review",
       400,
     );
   }
