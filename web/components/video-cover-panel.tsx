@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
+import { BlurText } from "@/components/ui/blur-text";
 import { StatefulButton } from "@/components/ui/stateful-button";
 import {
   Card,
@@ -48,9 +49,12 @@ export function VideoCoverPanel({
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Video cover letter
-          </h1>
+          <BlurText
+            text="Video cover letter"
+            className="text-2xl font-semibold tracking-tight text-foreground"
+            animateBy="words"
+            delay={40}
+          />
           <p className="mt-1 text-sm text-muted-foreground">
             Spoken script from your CV chunks only. Company names come from the
             job listing.
@@ -80,13 +84,13 @@ export function VideoCoverPanel({
       ) : null}
 
       {pack && pack.status === "ready" && pack.script ? (
-        <Card>
+        <Card className="border-border/60 bg-card/80 shadow-sm backdrop-blur-sm">
           <CardHeader>
             <CardTitle className="text-base">
               About {pack.estimatedSeconds ?? "—"} seconds
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm leading-relaxed whitespace-pre-wrap">
+          <CardContent className="rounded-lg border border-border/40 bg-muted/15 p-4 text-sm leading-relaxed whitespace-pre-wrap">
             {pack.script}
           </CardContent>
         </Card>
