@@ -98,7 +98,7 @@ export function SourceCatalogPicker({
 
       <div className="space-y-5 max-h-[min(28rem,50vh)] overflow-y-auto pr-1">
         {REGION_ORDER.filter((r) => byRegion.has(r)).map((region) => (
-          <motionlessRegionBlock
+          <CatalogRegionBlock
             key={region}
             region={region}
             items={byRegion.get(region)!}
@@ -109,7 +109,7 @@ export function SourceCatalogPicker({
         {Array.from(byRegion.keys())
           .filter((r) => !REGION_ORDER.includes(r))
           .map((region) => (
-            <motionlessRegionBlock
+            <CatalogRegionBlock
               key={region}
               region={region}
               items={byRegion.get(region)!}
@@ -122,7 +122,7 @@ export function SourceCatalogPicker({
   );
 }
 
-function motionlessRegionBlock({
+function CatalogRegionBlock({
   region,
   items,
   selected,
