@@ -14,7 +14,7 @@ import {
   userSessions,
 } from "../../db/schema/index.js";
 import { getPresignedGetUrl, uploadObject, deleteObject, downloadObject } from "../../lib/s3.js";
-import { enqueueReindexCv } from "../../lib/queue.js";
+import { enqueueParseCv, enqueueReindexCv } from "../../lib/queue.js";
 import { CvParseError, extractCvText } from "../../lib/cv-parse.js";
 import {
   ALLOWED_CV_EXTENSIONS,
@@ -88,6 +88,15 @@ function sanitizeFilename(name: string): string {
   return base.length > 0 ? base : "cv.pdf";
 }
 
+const MIN_PARSED_CV_CHARS = 40;
+
+function isPdfCv(mimeType: string, filename: string): boolean {
+  return (
+    mimeType === "application/pdf" ||
+    filename.toLowerCase().endsWith(".pdf")
+  );
+}
+
 export async function uploadCv(
   userId: string,
   file: {
@@ -114,18 +123,27 @@ export async function uploadCv(
     throw new ProfileError("Invalid Content-Type for CV upload", 400);
   }
 
-  let parsedText: string;
+  let parsedText = "";
+  let parsePending = false;
   try {
     parsedText = await extractCvText({
       data: file.data,
       mimeType,
       filename: file.filename,
     });
-  } catch (err) {
-    if (err instanceof CvParseError) {
-      throw new ProfileError(err.message, 422);
+    if (isPdfCv(mimeType, file.filename) && parsedText.length < MIN_PARSED_CV_CHARS) {
+      parsePending = true;
+      parsedText = "";
     }
-    throw err;
+  } catch (err) {
+    if (isPdfCv(mimeType, file.filename)) {
+      parsePending = true;
+      parsedText = "";
+    } else if (err instanceof CvParseError) {
+      throw new ProfileError(err.message, 422);
+    } else {
+      throw err;
+    }
   }
 
   const fileHash = createHash("sha256").update(file.data).digest("hex");
@@ -216,17 +234,21 @@ export async function uploadCv(
   }
 
   const taskId = randomUUID();
+  const queuePayload = {
+    task_id: taskId,
+    user_id: userId,
+    cv_document_id: created!.id,
+  };
   try {
-    await enqueueReindexCv({
-      task_id: taskId,
-      user_id: userId,
-      cv_document_id: created!.id,
-    });
+    if (parsePending) {
+      await enqueueParseCv(queuePayload);
+    } else {
+      await enqueueReindexCv(queuePayload);
+    }
   } catch {
-    // File + parsed text are saved; client can manually reindex
     console.info(
       JSON.stringify({
-        event: "cv_reindex_enqueue_failed",
+        event: parsePending ? "cv_parse_enqueue_failed" : "cv_reindex_enqueue_failed",
         userId,
         cvDocumentId: created!.id,
       }),
@@ -236,6 +258,7 @@ export async function uploadCv(
   const fileUrl = await getPresignedGetUrl(key);
 
   return {
+    parsePending,
     cvDocument: {
       id: created!.id,
       version: created!.version,
@@ -449,27 +472,59 @@ export async function reindexCv(userId: string, body: ReindexCvBody) {
     doc = active;
   }
 
-  // Backfill parsed_text for older uploads that never ran extraction
   if (!doc.parsedText?.trim()) {
-    try {
-      const bytes = await downloadObject(doc.fileUrl);
-      const text = await extractCvText({
-        data: bytes,
-        mimeType: doc.mimeType || "application/pdf",
-        filename: doc.originalFilename || "cv.pdf",
-      });
-      await db
-        .update(cvDocuments)
-        .set({ parsedText: text })
-        .where(eq(cvDocuments.id, doc.id));
-    } catch (err) {
-      if (err instanceof CvParseError) {
-        throw new ProfileError(err.message, 422);
+    const mime = doc.mimeType || "application/pdf";
+    const name = doc.originalFilename || "cv.pdf";
+    const pdf = isPdfCv(mime, name);
+    if (pdf) {
+      let filled = false;
+      try {
+        const bytes = await downloadObject(doc.fileUrl);
+        const text = await extractCvText({
+          data: bytes,
+          mimeType: mime,
+          filename: name,
+        });
+        if (text.length >= MIN_PARSED_CV_CHARS) {
+          await db
+            .update(cvDocuments)
+            .set({ parsedText: text })
+            .where(eq(cvDocuments.id, doc.id));
+          filled = true;
+        }
+      } catch {
+        filled = false;
       }
-      throw new ProfileError(
-        "Could not re-parse CV from storage — re-upload as PDF or DOCX",
-        422,
-      );
+      if (!filled) {
+        const taskId = randomUUID();
+        await enqueueParseCv({
+          task_id: taskId,
+          user_id: userId,
+          cv_document_id: doc.id,
+        });
+        return { taskId, parsePending: true };
+      }
+    } else {
+      try {
+        const bytes = await downloadObject(doc.fileUrl);
+        const text = await extractCvText({
+          data: bytes,
+          mimeType: mime,
+          filename: name,
+        });
+        await db
+          .update(cvDocuments)
+          .set({ parsedText: text })
+          .where(eq(cvDocuments.id, doc.id));
+      } catch (err) {
+        if (err instanceof CvParseError) {
+          throw new ProfileError(err.message, 422);
+        }
+        throw new ProfileError(
+          "Could not re-parse CV from storage — re-upload as PDF or DOCX",
+          422,
+        );
+      }
     }
   }
 

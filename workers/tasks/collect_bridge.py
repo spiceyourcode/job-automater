@@ -19,6 +19,7 @@ GENERATE_DOCS_KEY = "jobautomater:generate_docs"
 SUBMIT_APPLICATION_KEY = "jobautomater:submit_application"
 MONITOR_EMAIL_KEY = "jobautomater:monitor_email"
 REINDEX_CV_KEY = "jobautomater:reindex_cv"
+PARSE_CV_KEY = "jobautomater:parse_cv"
 MATCH_SCORE_KEY = "jobautomater:match_score"
 ENRICH_COMPANY_KEY = "jobautomater:enrich_company"
 INTERVIEW_PREP_KEY = "jobautomater:interview_prep"
@@ -79,6 +80,15 @@ def _dispatch(key: str, payload: dict[str, Any]) -> None:
             payload.get("cv_document_id"),
             payload.get("task_id"),
         )
+    elif key == PARSE_CV_KEY:
+        from tasks.parse_cv import parse_cv
+
+        parse_cv.delay(payload)
+        logger.info(
+            "bridge_parse_cv cv_document_id=%s task_id=%s",
+            payload.get("cv_document_id"),
+            payload.get("task_id"),
+        )
     elif key == MATCH_SCORE_KEY:
         from tasks.match_score import match_score
 
@@ -127,6 +137,7 @@ def _loop() -> None:
                     SUBMIT_APPLICATION_KEY,
                     MONITOR_EMAIL_KEY,
                     REINDEX_CV_KEY,
+                    PARSE_CV_KEY,
                     MATCH_SCORE_KEY,
                     ENRICH_COMPANY_KEY,
                     INTERVIEW_PREP_KEY,

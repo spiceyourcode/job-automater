@@ -101,7 +101,7 @@ This document defines the technical specifications, architecture decisions, and 
 
 | ID | Requirement | Priority | Details |
 |----|-------------|----------|---------|
-| FR-CV-01 | Multi-format parsing | P0 | PDF (pdf-parse), DOCX (mammoth), TXT |
+| FR-CV-01 | Multi-format parsing | P0 | PDF: pdf-parse (API fast path); scanned PDF fallback Indra OCR in workers (`parse_cv` → reindex). DOCX (mammoth), TXT |
 | FR-CV-02 | Semantic chunking | P0 | Section-aware (experience, skills, education, projects), 512 tokens, 50 overlap |
 | FR-CV-03 | Embedding generation | P0 | text-embedding-3-small (1536 dim, matches `cv_chunks.embedding`); Gemini 1536 fallback |
 | FR-CV-04 | Vector storage & search | P0 | pgvector HNSW index, cosine similarity, metadata filtering |

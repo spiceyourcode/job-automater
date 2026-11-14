@@ -226,7 +226,11 @@ export async function uploadCvAction(formData: FormData): Promise<ActionResult> 
     const data = (await res.json().catch(() => ({}))) as { error?: string };
     return { ok: false, error: data.error ?? "Upload failed" };
   }
-  return { ok: true };
+  const data = (await res.json()) as { parsePending?: boolean };
+  return {
+    ok: true,
+    data: { parsePending: data.parsePending === true },
+  };
 }
 
 /** Finish only after profile proves all required steps + ≥1 source. */

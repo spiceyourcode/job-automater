@@ -150,6 +150,19 @@ export async function enqueueReindexCv(
   }
 }
 
+/** OCR fallback for scanned PDFs — never logs file bytes (HG-8). */
+export async function enqueueParseCv(
+  payload: ReindexCvPayload,
+): Promise<void> {
+  const client = createClient({ url: env.redisUrl });
+  try {
+    await client.connect();
+    await client.lPush("jobautomater:parse_cv", JSON.stringify(payload));
+  } finally {
+    await client.quit().catch(() => {});
+  }
+}
+
 export type MatchScorePayload = {
   job_ids: string[];
   user_id: string;

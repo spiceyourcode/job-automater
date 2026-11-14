@@ -37,7 +37,13 @@ export function CvVersionsManager({
       const r = await uploadCvAction(fd);
       if (!r.ok) toast.error(r.error);
       else {
-        toast.success("CV uploaded");
+        if (r.data?.parsePending) {
+          toast.message(
+            "Indexing your CV — this can take a minute for scanned PDFs",
+          );
+        } else {
+          toast.success("CV uploaded");
+        }
         refresh();
       }
     });

@@ -29,6 +29,9 @@ dev = [
 playwright = [
     "playwright>=1.40",
 ]
+ocr = [
+    "indra-ocr>=1.1.2",
+]
 
 [tool.setuptools]
 py-modules = ["celery_app", "config", "db", "storage"]

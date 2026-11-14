@@ -225,7 +225,13 @@ export function OnboardingWizard({ catalogEntries }: OnboardingWizardProps) {
         return;
       }
       setCvReady(true);
-      toast.success("CV uploaded");
+      if (result.data?.parsePending) {
+        toast.message(
+          "Indexing your CV — this can take a minute for scanned PDFs",
+        );
+      } else {
+        toast.success("CV uploaded");
+      }
       setStep(4);
     });
   }
