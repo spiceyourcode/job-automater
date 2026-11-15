@@ -15,6 +15,8 @@ import {
   setTemplateBodySchema,
   updateBulletsBodySchema,
   updateStageBodySchema,
+  mockInterviewTurnBodySchema,
+  mockInterviewEndBodySchema,
 } from "./applications.schema.js";
 import * as applicationsService from "./applications.service.js";
 
@@ -411,14 +413,96 @@ applicationsRoutes.post(
   requireRole("owner", "member"),
   zValidator("param", applicationIdParamSchema),
   async (c) => {
+    return c.json(
+      {
+        error:
+          "Video cover scripts were replaced by voice mock interview. Use POST /mock-interview/start.",
+      },
+      410,
+    );
+  },
+);
+
+applicationsRoutes.get(
+  "/:id/video-script",
+  requireRole("owner", "member", "viewer"),
+  zValidator("param", applicationIdParamSchema),
+  async () => {
+    return c.json(
+      {
+        error:
+          "Video cover scripts were replaced by voice mock interview. Use GET /mock-interview.",
+      },
+      410,
+    );
+  },
+);
+
+applicationsRoutes.post(
+  "/:id/mock-interview/start",
+  requireRole("owner", "member"),
+  zValidator("param", applicationIdParamSchema),
+  async (c) => {
     const { userId } = c.get("auth");
     try {
       return c.json(
-        await applicationsService.requestVideoCover(
+        await applicationsService.startMockInterview(
           userId,
           c.req.valid("param").id,
         ),
-        202,
+        201,
+      );
+    } catch (err) {
+      if (isAppError(err)) {
+        return c.json({ error: err.message }, err.statusCode);
+      }
+      throw err;
+    }
+  },
+);
+
+applicationsRoutes.post(
+  "/:id/mock-interview/turn",
+  requireRole("owner", "member"),
+  zValidator("param", applicationIdParamSchema),
+  zValidator("json", mockInterviewTurnBodySchema),
+  async (c) => {
+    const { userId } = c.get("auth");
+    const id = c.req.valid("param").id;
+    try {
+      return c.json(
+        await applicationsService.mockInterviewTurn(
+          userId,
+          id,
+          c.req.valid("json"),
+        ),
+        200,
+      );
+    } catch (err) {
+      if (isAppError(err)) {
+        return c.json({ error: err.message }, err.statusCode);
+      }
+      throw err;
+    }
+  },
+);
+
+applicationsRoutes.post(
+  "/:id/mock-interview/end",
+  requireRole("owner", "member"),
+  zValidator("param", applicationIdParamSchema),
+  zValidator("json", mockInterviewEndBodySchema),
+  async (c) => {
+    const { userId } = c.get("auth");
+    const id = c.req.valid("param").id;
+    try {
+      return c.json(
+        await applicationsService.endMockInterview(
+          userId,
+          id,
+          c.req.valid("json").sessionId,
+        ),
+        200,
       );
     } catch (err) {
       if (isAppError(err)) {
@@ -430,14 +514,14 @@ applicationsRoutes.post(
 );
 
 applicationsRoutes.get(
-  "/:id/video-script",
+  "/:id/mock-interview",
   requireRole("owner", "member", "viewer"),
   zValidator("param", applicationIdParamSchema),
   async (c) => {
     const { userId } = c.get("auth");
     try {
       return c.json(
-        await applicationsService.getVideoCover(
+        await applicationsService.getMockInterview(
           userId,
           c.req.valid("param").id,
         ),

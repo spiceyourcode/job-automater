@@ -168,6 +168,13 @@ This document defines the technical specifications, architecture decisions, and 
 | FR-DA-04 | Profile completeness | P1 | Guided setup, missing field indicators |
 | FR-DA-05 | Export capabilities | P2 | CSV, PDF reports |
 
+### 2.10 Interview practice (FR-IP)
+
+| ID | Requirement | Priority | Details |
+|----|-------------|----------|---------|
+| FR-IP-01 | Interview prep pack | P0 | Q&A, STAR, negotiation grounded in `cv_chunks` (workers) |
+| FR-IP-02 | Voice mock interview | P1 | Browser Web Speech + `speechSynthesis`; sync API turns in `mock_interview_sessions`; requires ready prep; replaces deprecated video cover script |
+
 ---
 
 ## 3. Non-Functional Requirements

@@ -5,10 +5,19 @@ import {
   interviewPreps,
   jobScores,
   jobs,
+  mockInterviewSessions,
   profiles,
   videoCoverScripts,
   type Application,
+  type MockInterviewTurn,
 } from "../../db/schema/index.js";
+import {
+  generateMockInterviewReply,
+  isInterviewEndPhrase,
+  openingLine,
+  shouldEndSession,
+  type MockInterviewTurnForLlm,
+} from "../../lib/mock-interview-llm.js";
 import {
   enqueueGenerateDocs,
   enqueueInterviewPrep,
@@ -1113,4 +1122,322 @@ export async function getVideoCover(userId: string, id: string) {
     .limit(1);
   if (!row) return { script: null, status: "idle" as const };
   return { script: toPublicVideoScript(row), status: row.status };
+}
+
+async function loadMockInterviewContext(userId: string, applicationId: string) {
+  const [prepRow] = await db
+    .select()
+    .from(interviewPreps)
+    .where(
+      and(
+        eq(interviewPreps.userId, userId),
+        eq(interviewPreps.applicationId, applicationId),
+      ),
+    )
+    .limit(1);
+  if (!prepRow || prepRow.status !== "ready" || prepRow.errorCode) {
+    throw new ApplicationError(
+      "Interview prep must be ready before voice practice",
+      409,
+    );
+  }
+  const prep = toPublicPrep(prepRow);
+  const [job] = await db
+    .select({ title: jobs.title, company: jobs.company })
+    .from(jobs)
+    .innerJoin(applications, eq(applications.jobId, jobs.id))
+    .where(
+      and(eq(applications.id, applicationId), eq(applications.userId, userId)),
+    )
+    .limit(1);
+  return {
+    prepId: prepRow.id,
+    jobTitle: job?.title ?? "Role",
+    company: job?.company ?? "Company",
+    sampleQuestions: prep.questions.map((q) => q.question),
+    starTitles: prep.starStories.map((s) => s.title),
+  };
+}
+
+function toPublicMockSession(row: typeof mockInterviewSessions.$inferSelect) {
+  const turns = Array.isArray(row.turns) ? row.turns : [];
+  return {
+    sessionId: row.id,
+    applicationId: row.applicationId,
+    status: row.status,
+    turns: turns.map((t) => ({
+      role: t.role,
+      content: t.content,
+    })),
+    turnIndex: turns.filter((t) => t.role === "user").length,
+    modelUsed: row.modelUsed,
+    updatedAt: row.updatedAt,
+  };
+}
+
+function nowIso(): string {
+  return new Date().toISOString();
+}
+
+export async function startMockInterview(userId: string, applicationId: string) {
+  await getOwned(userId, applicationId);
+  const ctx = await loadMockInterviewContext(userId, applicationId);
+
+  await db
+    .update(mockInterviewSessions)
+    .set({
+      status: "abandoned",
+      endedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(mockInterviewSessions.userId, userId),
+        eq(mockInterviewSessions.applicationId, applicationId),
+        eq(mockInterviewSessions.status, "active"),
+      ),
+    );
+
+  const seedUser: MockInterviewTurn = {
+    role: "user",
+    content: "Hello, I'm ready for the interview.",
+    createdAt: nowIso(),
+  };
+  const llmTurns: MockInterviewTurnForLlm[] = [
+    { role: "user", content: seedUser.content },
+  ];
+  let assistantText: string;
+  let modelUsed: string;
+  try {
+    const out = await generateMockInterviewReply(
+      {
+        jobTitle: ctx.jobTitle,
+        company: ctx.company,
+        sampleQuestions: ctx.sampleQuestions,
+        starTitles: ctx.starTitles,
+      },
+      llmTurns,
+    );
+    assistantText = out.assistantText;
+    modelUsed = out.modelUsed;
+  } catch {
+    const out = openingLine({
+      jobTitle: ctx.jobTitle,
+      company: ctx.company,
+      sampleQuestions: ctx.sampleQuestions,
+      starTitles: ctx.starTitles,
+    });
+    assistantText = out.assistantText;
+    modelUsed = out.modelUsed;
+  }
+
+  const assistantTurn: MockInterviewTurn = {
+    role: "assistant",
+    content: assistantText,
+    createdAt: nowIso(),
+  };
+
+  const [row] = await db
+    .insert(mockInterviewSessions)
+    .values({
+      userId,
+      applicationId,
+      status: "active",
+      turns: [seedUser, assistantTurn],
+      meta: {
+        jobTitle: ctx.jobTitle,
+        company: ctx.company,
+        prepId: ctx.prepId,
+      },
+      modelUsed,
+    })
+    .returning();
+
+  if (!row) throw new ApplicationError("Failed to start mock interview", 503);
+
+  console.info(
+    JSON.stringify({
+      event: "mock_interview_start",
+      userId,
+      applicationId,
+      sessionId: row.id,
+      turnCount: 0,
+    }),
+  );
+
+  return {
+    sessionId: row.id,
+    assistantText,
+    turnIndex: 0,
+    done: false,
+  };
+}
+
+export async function mockInterviewTurn(
+  userId: string,
+  applicationId: string,
+  body: { sessionId: string; candidateText: string },
+) {
+  await getOwned(userId, applicationId);
+  const [row] = await db
+    .select()
+    .from(mockInterviewSessions)
+    .where(
+      and(
+        eq(mockInterviewSessions.id, body.sessionId),
+        eq(mockInterviewSessions.userId, userId),
+        eq(mockInterviewSessions.applicationId, applicationId),
+      ),
+    )
+    .limit(1);
+  if (!row) throw new ApplicationError("Session not found", 404);
+  if (row.status !== "active") {
+    throw new ApplicationError("Session is not active", 409);
+  }
+
+  const text = body.candidateText.trim();
+  const turns = [...(Array.isArray(row.turns) ? row.turns : [])];
+  const userTurn: MockInterviewTurn = {
+    role: "user",
+    content: text,
+    createdAt: nowIso(),
+  };
+  turns.push(userTurn);
+  const userCount = turns.filter((t) => t.role === "user").length;
+
+  const meta = row.meta;
+  const ctx = {
+    jobTitle: meta?.jobTitle ?? "Role",
+    company: meta?.company ?? "Company",
+    sampleQuestions: [] as string[],
+    starTitles: [] as string[],
+  };
+
+  let done =
+    isInterviewEndPhrase(text) || shouldEndSession(userCount);
+  let assistantText =
+    done
+      ? "Thank you for your time today. Good luck with your application!"
+      : "";
+
+  let modelUsed = row.modelUsed;
+  if (!done) {
+    const llmTurns: MockInterviewTurnForLlm[] = turns.map((t) => ({
+      role: t.role,
+      content: t.content,
+    }));
+    try {
+      const prepCtx = await loadMockInterviewContext(userId, applicationId);
+      ctx.sampleQuestions = prepCtx.sampleQuestions;
+      ctx.starTitles = prepCtx.starTitles;
+      const out = await generateMockInterviewReply(ctx, llmTurns);
+      assistantText = out.assistantText;
+      modelUsed = out.modelUsed;
+    } catch {
+      assistantText =
+        "Let's continue. Can you expand on how your experience fits this role?";
+      modelUsed = "heuristic:fallback";
+    }
+  }
+
+  turns.push({
+    role: "assistant",
+    content: assistantText,
+    createdAt: nowIso(),
+  });
+
+  const status = done ? "completed" : "active";
+  await db
+    .update(mockInterviewSessions)
+    .set({
+      turns,
+      status,
+      modelUsed,
+      endedAt: done ? new Date() : null,
+      updatedAt: new Date(),
+    })
+    .where(eq(mockInterviewSessions.id, row.id));
+
+  console.info(
+    JSON.stringify({
+      event: "mock_interview_turn",
+      userId,
+      applicationId,
+      sessionId: row.id,
+      turnIndex: userCount,
+      candidateChars: text.length,
+      done,
+    }),
+  );
+
+  return {
+    assistantText,
+    turnIndex: userCount,
+    done,
+    sessionId: row.id,
+  };
+}
+
+export async function endMockInterview(
+  userId: string,
+  applicationId: string,
+  sessionId: string,
+) {
+  await getOwned(userId, applicationId);
+  const [row] = await db
+    .select()
+    .from(mockInterviewSessions)
+    .where(
+      and(
+        eq(mockInterviewSessions.id, sessionId),
+        eq(mockInterviewSessions.userId, userId),
+        eq(mockInterviewSessions.applicationId, applicationId),
+      ),
+    )
+    .limit(1);
+  if (!row) throw new ApplicationError("Session not found", 404);
+  if (row.status === "completed") {
+    return { sessionId: row.id, status: "completed" as const };
+  }
+  await db
+    .update(mockInterviewSessions)
+    .set({
+      status: "completed",
+      endedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(mockInterviewSessions.id, row.id));
+  return { sessionId: row.id, status: "completed" as const };
+}
+
+export async function getMockInterview(userId: string, applicationId: string) {
+  await getOwned(userId, applicationId);
+  const [active] = await db
+    .select()
+    .from(mockInterviewSessions)
+    .where(
+      and(
+        eq(mockInterviewSessions.userId, userId),
+        eq(mockInterviewSessions.applicationId, applicationId),
+        eq(mockInterviewSessions.status, "active"),
+      ),
+    )
+    .orderBy(desc(mockInterviewSessions.updatedAt))
+    .limit(1);
+  if (active) {
+    return { session: toPublicMockSession(active) };
+  }
+  const [last] = await db
+    .select()
+    .from(mockInterviewSessions)
+    .where(
+      and(
+        eq(mockInterviewSessions.userId, userId),
+        eq(mockInterviewSessions.applicationId, applicationId),
+      ),
+    )
+    .orderBy(desc(mockInterviewSessions.updatedAt))
+    .limit(1);
+  if (!last) return { session: null };
+  return { session: toPublicMockSession(last) };
 }

@@ -23,7 +23,7 @@ export default async function ApplicationReviewPage({ params }: Props) {
             <a href={`/applications/${id}/prep`}>Interview prep</a>
           </Button>
           <Button asChild variant="ghost" size="sm" className="cursor-pointer">
-            <a href={`/applications/${id}/video-script`}>Video script</a>
+            <a href={`/applications/${id}/mock-interview`}>Voice practice</a>
           </Button>
           <Button asChild variant="ghost" size="sm" className="cursor-pointer">
             <a href="/dashboard">Back to dashboard</a>

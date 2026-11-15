@@ -177,6 +177,15 @@ export function InterviewPrepPanel({
 
       {ready ? (
         <div className="space-y-6">
+          <p className="text-sm text-muted-foreground">
+            Ready for live practice?{" "}
+            <a
+              href={`/applications/${applicationId}/mock-interview`}
+              className="font-medium text-primary underline-offset-4 hover:underline"
+            >
+              Start voice mock interview
+            </a>
+          </p>
           <RubberSegment
             theme={theme}
             size="sm"

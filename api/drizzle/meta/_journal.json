@@ -141,6 +141,13 @@
       "when": 1786752000000,
       "tag": "0019_video_cover_referrals",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1786753000000,
+      "tag": "0020_mock_interview_sessions",
+      "breakpoints": true
     }
   ]
 }

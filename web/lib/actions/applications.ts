@@ -525,6 +525,132 @@ export async function generateInterviewPrepAction(
   }
 }
 
+export type MockInterviewTurnPublic = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+export type MockInterviewSessionPublic = {
+  sessionId: string;
+  applicationId: string;
+  status: string;
+  turns: MockInterviewTurnPublic[];
+  turnIndex: number;
+  modelUsed: string | null;
+  updatedAt: string | Date;
+};
+
+export async function getMockInterviewAction(
+  id: string,
+): Promise<ActionResult<{ session: MockInterviewSessionPublic | null }>> {
+  const headers = await authHeaders();
+  if (!headers) return { ok: false, error: "Unauthorized" };
+  try {
+    const res = await fetch(
+      `${API_URL}/api/v1/applications/${id}/mock-interview`,
+      { headers, cache: "no-store" },
+    );
+    if (!res.ok) {
+      const err = (await res.json().catch(() => ({}))) as { error?: string };
+      return { ok: false, error: err.error ?? "Could not load session" };
+    }
+    return {
+      ok: true,
+      data: (await res.json()) as {
+        session: MockInterviewSessionPublic | null;
+      },
+    };
+  } catch {
+    return { ok: false, error: "Network error" };
+  }
+}
+
+export async function startMockInterviewAction(
+  id: string,
+): Promise<
+  ActionResult<{
+    sessionId: string;
+    assistantText: string;
+    turnIndex: number;
+    done: boolean;
+  }>
+> {
+  const headers = await authHeaders();
+  if (!headers) return { ok: false, error: "Unauthorized" };
+  try {
+    const res = await fetch(
+      `${API_URL}/api/v1/applications/${id}/mock-interview/start`,
+      { method: "POST", headers },
+    );
+    if (!res.ok) {
+      const err = (await res.json().catch(() => ({}))) as { error?: string };
+      return { ok: false, error: err.error ?? "Could not start session" };
+    }
+    revalidatePath(`/applications/${id}/mock-interview`);
+    return { ok: true, data: await res.json() };
+  } catch {
+    return { ok: false, error: "Network error" };
+  }
+}
+
+export async function mockInterviewTurnAction(
+  id: string,
+  body: { sessionId: string; candidateText: string },
+): Promise<
+  ActionResult<{
+    assistantText: string;
+    turnIndex: number;
+    done: boolean;
+    sessionId: string;
+  }>
+> {
+  const headers = await authHeaders();
+  if (!headers) return { ok: false, error: "Unauthorized" };
+  try {
+    const res = await fetch(
+      `${API_URL}/api/v1/applications/${id}/mock-interview/turn`,
+      {
+        method: "POST",
+        headers: { ...headers, "content-type": "application/json" },
+        body: JSON.stringify(body),
+      },
+    );
+    if (!res.ok) {
+      const err = (await res.json().catch(() => ({}))) as { error?: string };
+      return { ok: false, error: err.error ?? "Could not send answer" };
+    }
+    return { ok: true, data: await res.json() };
+  } catch {
+    return { ok: false, error: "Network error" };
+  }
+}
+
+export async function endMockInterviewAction(
+  id: string,
+  sessionId: string,
+): Promise<ActionResult<{ sessionId: string; status: string }>> {
+  const headers = await authHeaders();
+  if (!headers) return { ok: false, error: "Unauthorized" };
+  try {
+    const res = await fetch(
+      `${API_URL}/api/v1/applications/${id}/mock-interview/end`,
+      {
+        method: "POST",
+        headers: { ...headers, "content-type": "application/json" },
+        body: JSON.stringify({ sessionId }),
+      },
+    );
+    if (!res.ok) {
+      const err = (await res.json().catch(() => ({}))) as { error?: string };
+      return { ok: false, error: err.error ?? "Could not end session" };
+    }
+    revalidatePath(`/applications/${id}/mock-interview`);
+    return { ok: true, data: await res.json() };
+  } catch {
+    return { ok: false, error: "Network error" };
+  }
+}
+
 export type VideoCoverPublic = {
   id: string;
   applicationId: string;

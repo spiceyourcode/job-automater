@@ -143,6 +143,22 @@ export type PatchApplicationMetaBody = z.infer<
 >;
 export type PipelineStage = z.infer<typeof pipelineStageSchema>;
 
+export const mockInterviewTurnBodySchema = z
+  .object({
+    sessionId: z.string().uuid(),
+    candidateText: z.string().min(1).max(4000),
+  })
+  .strict();
+
+export const mockInterviewEndBodySchema = z
+  .object({
+    sessionId: z.string().uuid(),
+  })
+  .strict();
+
+export type MockInterviewTurnBody = z.infer<typeof mockInterviewTurnBodySchema>;
+export type MockInterviewEndBody = z.infer<typeof mockInterviewEndBodySchema>;
+
 /** Map Kanban stage → applications.status */
 export const STAGE_TO_STATUS: Record<PipelineStage, string> = {
   applied: "submitted",

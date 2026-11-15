@@ -28,6 +28,10 @@ vi.mock("./applications.service.js", async (importOriginal) => {
     getInterviewPrep: vi.fn(),
     requestVideoCover: vi.fn(),
     getVideoCover: vi.fn(),
+    startMockInterview: vi.fn(),
+    mockInterviewTurn: vi.fn(),
+    endMockInterview: vi.fn(),
+    getMockInterview: vi.fn(),
     ApplicationError: actual.ApplicationError,
   };
 });
@@ -705,39 +709,53 @@ describe("GET /api/v1/applications/:id/prep", () => {
 });
 
 describe("POST /api/v1/applications/:id/video-script", () => {
-  afterEach(() => vi.clearAllMocks());
-
-  it("401 without auth", async () => {
-    const res = await buildApp().request(
-      `/api/v1/applications/${sampleApp.id}/video-script`,
-      { method: "POST" },
-    );
-    expect(res.status).toBe(401);
-  });
-
-  it("202 queues video cover script", async () => {
-    mockService.requestVideoCover.mockResolvedValue({
-      status: "generating",
-      applicationId: sampleApp.id,
-    });
+  it("410 deprecated", async () => {
     const res = await buildApp().request(
       `/api/v1/applications/${sampleApp.id}/video-script`,
       { method: "POST", headers: { Authorization: await authHeader() } },
     );
-    expect(res.status).toBe(202);
+    expect(res.status).toBe(410);
+  });
+});
+
+describe("mock interview routes", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("POST start 201", async () => {
+    mockService.startMockInterview.mockResolvedValue({
+      sessionId: "sess-1",
+      assistantText: "Hi there.",
+      turnIndex: 0,
+      done: false,
+    });
+    const res = await buildApp().request(
+      `/api/v1/applications/${sampleApp.id}/mock-interview/start`,
+      { method: "POST", headers: { Authorization: await authHeader() } },
+    );
+    expect(res.status).toBe(201);
   });
 
-  it("404 IDOR — other user cannot generate video script", async () => {
-    mockService.requestVideoCover.mockRejectedValue(
-      new applicationsService.ApplicationError("Application not found", 404),
-    );
+  it("POST turn 401 without auth", async () => {
     const res = await buildApp().request(
-      `/api/v1/applications/${sampleApp.id}/video-script`,
+      `/api/v1/applications/${sampleApp.id}/mock-interview/turn`,
       {
         method: "POST",
-        headers: { Authorization: await authHeader("user-b") },
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          sessionId: "00000000-0000-4000-8000-000000000001",
+          candidateText: "My answer",
+        }),
       },
     );
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(401);
+  });
+
+  it("GET mock-interview 200", async () => {
+    mockService.getMockInterview.mockResolvedValue({ session: null });
+    const res = await buildApp().request(
+      `/api/v1/applications/${sampleApp.id}/mock-interview`,
+      { headers: { Authorization: await authHeader() } },
+    );
+    expect(res.status).toBe(200);
   });
 });

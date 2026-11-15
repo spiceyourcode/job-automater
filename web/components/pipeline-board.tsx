@@ -545,8 +545,8 @@ export function PipelineBoard({ initial }: Props) {
                         size="sm"
                         className="h-auto px-0 text-xs"
                       >
-                        <a href={`/applications/${app.id}/video-script`}>
-                          Video
+                        <a href={`/applications/${app.id}/mock-interview`}>
+                          Voice
                         </a>
                       </Button>
                     </nav>

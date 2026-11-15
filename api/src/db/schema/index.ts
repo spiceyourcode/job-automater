@@ -100,6 +100,13 @@ export {
   type NewVideoCoverScript,
 } from "./video-cover-scripts.js";
 export {
+  mockInterviewSessions,
+  type MockInterviewSession,
+  type NewMockInterviewSession,
+  type MockInterviewTurn,
+  type MockInterviewMeta,
+} from "./mock-interview-sessions.js";
+export {
   sourceRuns,
   type SourceRun,
   type NewSourceRun,

@@ -19,7 +19,7 @@ export default async function InterviewPrepPage({ params }: Props) {
           <a href={`/applications/${id}/review`}>Documents</a>
         </Button>
         <Button asChild variant="ghost" size="sm" className="cursor-pointer">
-          <a href={`/applications/${id}/video-script`}>Video script</a>
+          <a href={`/applications/${id}/mock-interview`}>Voice practice</a>
         </Button>
       </div>
       <InterviewPrepPanel
