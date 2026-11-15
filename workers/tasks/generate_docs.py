@@ -62,7 +62,7 @@ def _fail(
                 "error": error,
             },
         )
-    except Exception:  # noqa: BLE001
+    except Exception:                
         pass
     return {"status": "error", "error": error, "duration_ms": duration_ms}
 
@@ -91,7 +91,7 @@ def process_generate_docs(payload: dict[str, Any]) -> dict[str, Any]:
             return _fail(conn, job=job, error="no_cv_chunks", started=started)
 
         profile = load_profile_for_user(conn, job.user_id)
-        # Email/name only for CV contact line — never log (HG-8)
+                                                                
         contact = load_user_contact(conn, job.user_id)
         cv_template = str(app_row.get("cv_template") or "modern")
         cl_template = str(app_row.get("cl_template") or "modern")
@@ -106,7 +106,7 @@ def process_generate_docs(payload: dict[str, Any]) -> dict[str, Any]:
             regenerate_sections=job.regenerate_sections,
         )
         if validated is None:
-            # HG-9: never persist ungrounded docs
+                                                 
             logger.warning("generate_docs_grounding_failed")
             return _fail(conn, job=job, error="grounding_failed", started=started)
 
@@ -121,7 +121,7 @@ def process_generate_docs(payload: dict[str, Any]) -> dict[str, Any]:
             model_used=validated.get("model_used") or "heuristic-docs-v1",
             duration_ms=duration_ms,
         )
-        # Never log CV/CL body (HG-8)
+                                     
         logger.info(
             "generate_docs_ok application_id=%s traces=%s ms=%s",
             job.application_id,
@@ -144,7 +144,7 @@ def process_generate_docs(payload: dict[str, Any]) -> dict[str, Any]:
                 },
                 priority=1,
             )
-        except Exception:  # noqa: BLE001
+        except Exception:                
             logger.exception(
                 "generate_docs_notify_failed application_id=%s",
                 job.application_id,
@@ -160,7 +160,7 @@ def process_generate_docs(payload: dict[str, Any]) -> dict[str, Any]:
                     "status": "ok",
                 },
             )
-        except Exception:  # noqa: BLE001
+        except Exception:                
             pass
         return {
             "status": "ok",

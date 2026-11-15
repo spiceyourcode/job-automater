@@ -20,13 +20,13 @@ def upload_bytes(*, key: str, body: bytes, content_type: str) -> str:
     """
     endpoint = settings.s3_endpoint.rstrip("/")
     bucket = settings.s3_bucket
-    # Path-style: http://host/bucket/key
+                                        
     url = f"{endpoint}/{bucket}/{key}"
     try:
-        # MinIO often allows unsigned puts in local dev; production should use
-        # signed clients. Keep payload off logs (HG-8).
+                                                                              
+                                                       
         with httpx.Client(timeout=30.0) as client:
-            # Ensure bucket exists (ignore errors)
+                                                  
             client.put(f"{endpoint}/{bucket}")
             resp = client.put(
                 url,
@@ -41,7 +41,7 @@ def upload_bytes(*, key: str, body: bytes, content_type: str) -> str:
                 )
             else:
                 logger.info("s3_put_ok key=%s bytes=%s", key, len(body))
-    except Exception:  # noqa: BLE001
+    except Exception:                
         logger.warning("s3_put_unreachable key=%s", key)
     return key
 
@@ -57,6 +57,6 @@ def download_bytes(key: str) -> bytes:
             resp.raise_for_status()
             logger.info("s3_get_ok key=%s bytes=%s", key, len(resp.content))
             return resp.content
-    except Exception:  # noqa: BLE001
+    except Exception:                
         logger.warning("s3_get_failed key=%s host=%s", key, urlparse(endpoint).hostname)
         raise

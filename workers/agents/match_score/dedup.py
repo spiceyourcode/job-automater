@@ -9,10 +9,10 @@ from typing import Any
 _WS = re.compile(r"\s+")
 _PUNCT = re.compile(r"[^\w\s]", re.UNICODE)
 
-# Levenshtein-ish ratio distance threshold (< 0.3 distance ≈ > 0.7 similarity)
+                                                                              
 FUZZY_DISTANCE_MAX = 0.3
 
-# Values that carry no discriminating signal — treated as "company unknown".
+                                                                            
 _PLACEHOLDER_COMPANIES = frozenset(
     {"unknown", "n a", "na", "none", "not specified", "not available", "tbd"}
 )
@@ -79,8 +79,8 @@ def is_fuzzy_duplicate(
     if fuzzy_distance(title_a, title_b) > max_distance:
         return False
 
-    # Title is a near-match. Without a meaningful company on both sides we
-    # cannot tell roles apart, so demand an exact title.
+                                                                          
+                                                        
     if not company_a or not company_b:
         return title_a == title_b
 

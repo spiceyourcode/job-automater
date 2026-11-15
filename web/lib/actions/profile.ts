@@ -1,469 +1,436 @@
 "use server";
-
 import { cookies } from "next/headers";
 import { z } from "zod";
 import { getAccessToken } from "@/lib/auth-token";
 import { profileMeetsOnboardingRequirements } from "../onboarding";
-
-const API_URL =
-  process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4001";
-
-export type ActionResult<T = undefined> =
-  | { ok: true; data?: T }
-  | { ok: false; error: string };
-
+const API_URL = process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4001";
+export type ActionResult<T = undefined> = {
+    ok: true;
+    data?: T;
+} | {
+    ok: false;
+    error: string;
+};
 export type ProfileRow = {
-  headline: string | null;
-  summary: string | null;
-  yearsExperience: number | null;
-  currentRole: string | null;
-  currentCompany: string | null;
-  technicalSkills: unknown[];
-  softSkills: unknown[];
-  preferredRoles: unknown[];
-  preferredLocations: unknown[];
-  salaryMin: number | null;
-  salaryMax: number | null;
-  salaryCurrency: string;
-  employmentTypes: string[];
-  visaStatus: string | null;
-  cvFileId: string | null;
-  cvVersion: number;
-  cvLastIndexedAt: string | null;
+    headline: string | null;
+    summary: string | null;
+    yearsExperience: number | null;
+    currentRole: string | null;
+    currentCompany: string | null;
+    technicalSkills: unknown[];
+    softSkills: unknown[];
+    preferredRoles: unknown[];
+    preferredLocations: unknown[];
+    salaryMin: number | null;
+    salaryMax: number | null;
+    salaryCurrency: string;
+    employmentTypes: string[];
+    visaStatus: string | null;
+    cvFileId: string | null;
+    cvVersion: number;
+    cvLastIndexedAt: string | null;
 };
-
 export type CvVersionRow = {
-  id: string;
-  version: number;
-  filename: string | null;
-  isActive: boolean;
-  createdAt: string;
-  chunkCount: number;
-  fileUrl: string;
-  fileSize: number | null;
+    id: string;
+    version: number;
+    filename: string | null;
+    isActive: boolean;
+    createdAt: string;
+    chunkCount: number;
+    fileUrl: string;
+    fileSize: number | null;
 };
-
 async function authHeaders(): Promise<HeadersInit | null> {
-  const token = await getAccessToken();
-  if (!token) return null;
-  return { authorization: `Bearer ${token}` };
+    const token = await getAccessToken();
+    if (!token)
+        return null;
+    return { authorization: `Bearer ${token}` };
 }
-
 const identitySchema = z.object({
-  headline: z.string().min(1).max(120),
-  summary: z.string().min(1).max(500),
-  yearsExperience: z.number().int().nonnegative(),
-  currentRole: z.string().min(1).max(255),
-  currentCompany: z.string().max(255).optional(),
+    headline: z.string().min(1).max(120),
+    summary: z.string().min(1).max(500),
+    yearsExperience: z.number().int().nonnegative(),
+    currentRole: z.string().min(1).max(255),
+    currentCompany: z.string().max(255).optional(),
 });
-
 const skillsSchema = z.object({
-  technicalSkills: z
-    .array(
-      z.object({
+    technicalSkills: z
+        .array(z.object({
         name: z.string().min(1),
         level: z.enum(["beginner", "intermediate", "advanced", "expert"]),
         years: z.number().int().nonnegative().optional(),
-      }),
-    )
-    .min(5, "Add at least 5 skills")
-    .refine((skills) => skills.some((s) => s.level === "expert"), {
-      message: "At least one skill must be expert",
+    }))
+        .min(5, "Add at least 5 skills")
+        .refine((skills) => skills.some((s) => s.level === "expert"), {
+        message: "At least one skill must be expert",
     }),
 });
-
 const preferencesSchema = z
-  .object({
+    .object({
     preferredRoles: z
-      .array(z.object({ title: z.string().min(1) }))
-      .min(1, "Add at least one target role"),
+        .array(z.object({ title: z.string().min(1) }))
+        .min(1, "Add at least one target role"),
     preferredLocations: z
-      .array(
-        z.object({
-          city: z.string().min(1),
-          remoteOk: z.boolean().optional(),
-        }),
-      )
-      .min(1, "Add at least one location"),
+        .array(z.object({
+        city: z.string().min(1),
+        remoteOk: z.boolean().optional(),
+    }))
+        .min(1, "Add at least one location"),
     salaryMinDollars: z.number().int().nonnegative(),
     salaryMaxDollars: z.number().int().positive(),
     salaryCurrency: z.string().length(3).optional(),
     employmentTypes: z.array(z.string()).min(1),
     visaStatus: z.string().optional(),
-  })
-  .refine((d) => d.salaryMinDollars < d.salaryMaxDollars, {
+})
+    .refine((d) => d.salaryMinDollars < d.salaryMaxDollars, {
     message: "Salary min must be less than max",
     path: ["salaryMaxDollars"],
-  });
-
+});
 async function patchProfile(body: Record<string, unknown>): Promise<ActionResult> {
-  const headers = await authHeaders();
-  if (!headers) return { ok: false, error: "Unauthorized" };
-
-  let res: Response;
-  try {
-    res = await fetch(`${API_URL}/api/v1/profile`, {
-      method: "PATCH",
-      headers: { ...headers, "content-type": "application/json" },
-      body: JSON.stringify(body),
-      cache: "no-store",
-    });
-  } catch {
-    return { ok: false, error: "Network error — is the API running?" };
-  }
-
-  if (!res.ok) {
-    const data = (await res.json().catch(() => ({}))) as { error?: string };
-    return { ok: false, error: data.error ?? "Failed to save profile" };
-  }
-  return { ok: true };
-}
-
-export async function fetchOwnProfile(): Promise<ActionResult<ProfileRow>> {
-  const headers = await authHeaders();
-  if (!headers) return { ok: false, error: "Unauthorized" };
-
-  let res: Response;
-  try {
-    res = await fetch(`${API_URL}/api/v1/profile`, {
-      headers,
-      cache: "no-store",
-    });
-  } catch {
-    return { ok: false, error: "Network error — is the API running?" };
-  }
-
-  if (!res.ok) {
-    return { ok: false, error: "Failed to load profile" };
-  }
-
-  const body = (await res.json()) as { profile: ProfileRow };
-  return { ok: true, data: body.profile };
-}
-
-export async function setOnboardingCompleteCookie(complete: boolean): Promise<void> {
-  const cookieStore = await cookies();
-  if (complete) {
-    cookieStore.set("onboarding_complete", "1", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 365,
-      path: "/",
-    });
-  } else {
-    cookieStore.delete("onboarding_complete");
-  }
-}
-
-export async function saveIdentityAction(
-  input: z.infer<typeof identitySchema>,
-): Promise<ActionResult> {
-  const parsed = identitySchema.safeParse(input);
-  if (!parsed.success) {
-    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
-  }
-  return patchProfile(parsed.data);
-}
-
-export async function saveSkillsAction(
-  input: z.infer<typeof skillsSchema>,
-): Promise<ActionResult> {
-  const parsed = skillsSchema.safeParse(input);
-  if (!parsed.success) {
-    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid skills" };
-  }
-  return patchProfile({ technicalSkills: parsed.data.technicalSkills });
-}
-
-export async function savePreferencesAction(
-  input: z.infer<typeof preferencesSchema>,
-): Promise<ActionResult> {
-  const parsed = preferencesSchema.safeParse(input);
-  if (!parsed.success) {
-    return {
-      ok: false,
-      error: parsed.error.issues[0]?.message ?? "Invalid preferences",
-    };
-  }
-  const d = parsed.data;
-  return patchProfile({
-    preferredRoles: d.preferredRoles,
-    preferredLocations: d.preferredLocations.map((l) => ({
-      city: l.city,
-      remoteOk: l.remoteOk ?? false,
-    })),
-    salaryMin: d.salaryMinDollars * 100,
-    salaryMax: d.salaryMaxDollars * 100,
-    salaryCurrency: d.salaryCurrency || "USD",
-    employmentTypes: d.employmentTypes,
-    visaStatus: d.visaStatus || null,
-  });
-}
-
-export async function uploadCvAction(formData: FormData): Promise<ActionResult> {
-  const headers = await authHeaders();
-  if (!headers) return { ok: false, error: "Unauthorized" };
-
-  const file = formData.get("file");
-  if (!(file instanceof File)) {
-    return { ok: false, error: "Missing file" };
-  }
-
-  let res: Response;
-  try {
-    res = await fetch(`${API_URL}/api/v1/profile/cv`, {
-      method: "POST",
-      headers,
-      body: formData,
-      cache: "no-store",
-    });
-  } catch {
-    return { ok: false, error: "Network error — is the API running?" };
-  }
-
-  if (!res.ok) {
-    const data = (await res.json().catch(() => ({}))) as { error?: string };
-    return { ok: false, error: data.error ?? "Upload failed" };
-  }
-  const data = (await res.json()) as { parsePending?: boolean };
-  return {
-    ok: true,
-    data: { parsePending: data.parsePending === true },
-  };
-}
-
-/** Finish only after profile proves all required steps + ≥1 source. */
-export async function completeOnboardingAction(
-  catalogIds: string[],
-): Promise<ActionResult> {
-  if (catalogIds.length < 1) {
-    return { ok: false, error: "Select at least one source" };
-  }
-
-  const profileResult = await fetchOwnProfile();
-  if (!profileResult.ok || !profileResult.data) {
-    return { ok: false, error: profileResult.ok ? "Profile missing" : profileResult.error };
-  }
-
-  const gate = profileMeetsOnboardingRequirements(profileResult.data);
-  if (!gate.ok) {
-    return { ok: false, error: gate.error };
-  }
-
-  const headers = await authHeaders();
-  if (!headers) {
-    return { ok: false, error: "Unauthorized" };
-  }
-
-  try {
-    const res = await fetch(`${API_URL}/api/v1/sources/install-catalog`, {
-      method: "POST",
-      headers: { ...headers, "content-type": "application/json" },
-      body: JSON.stringify({ catalogIds }),
-      cache: "no-store",
-    });
+    const headers = await authHeaders();
+    if (!headers)
+        return { ok: false, error: "Unauthorized" };
+    let res: Response;
+    try {
+        res = await fetch(`${API_URL}/api/v1/profile`, {
+            method: "PATCH",
+            headers: { ...headers, "content-type": "application/json" },
+            body: JSON.stringify(body),
+            cache: "no-store",
+        });
+    }
+    catch {
+        return { ok: false, error: "Network error — is the API running?" };
+    }
     if (!res.ok) {
-      const errBody = (await res.json().catch(() => ({}))) as { error?: string };
-      return { ok: false, error: errBody.error ?? "Could not add job sources" };
+        const data = (await res.json().catch(() => ({}))) as {
+            error?: string;
+        };
+        return { ok: false, error: data.error ?? "Failed to save profile" };
+    }
+    return { ok: true };
+}
+export async function fetchOwnProfile(): Promise<ActionResult<ProfileRow>> {
+    const headers = await authHeaders();
+    if (!headers)
+        return { ok: false, error: "Unauthorized" };
+    let res: Response;
+    try {
+        res = await fetch(`${API_URL}/api/v1/profile`, {
+            headers,
+            cache: "no-store",
+        });
+    }
+    catch {
+        return { ok: false, error: "Network error — is the API running?" };
+    }
+    if (!res.ok) {
+        return { ok: false, error: "Failed to load profile" };
     }
     const body = (await res.json()) as {
-      created: unknown[];
-      skipped: string[];
-      needsInput: unknown[];
+        profile: ProfileRow;
     };
-    const installed = body.created.length + body.skipped.length;
-    if (installed < 1) {
-      return {
-        ok: false,
-        error:
-          "Those sources need extra setup in Settings. Pick ready-made feeds instead.",
-      };
-    }
-  } catch {
-    return { ok: false, error: "Network error — is the API running?" };
-  }
-
-  await setOnboardingCompleteCookie(true);
-  return { ok: true };
+    return { ok: true, data: body.profile };
 }
-
-/**
- * Get the user's preferred currency. Checks in order:
- * 1. Explicit currency preference from profile (salaryCurrency)
- * 2. User's locale from user table (via API)
- * 3. Browser locale (fallback)
- * 4. Default to USD
- */
+export async function setOnboardingCompleteCookie(complete: boolean): Promise<void> {
+    const cookieStore = await cookies();
+    if (complete) {
+        cookieStore.set("onboarding_complete", "1", {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "lax",
+            maxAge: 60 * 60 * 24 * 365,
+            path: "/",
+        });
+    }
+    else {
+        cookieStore.delete("onboarding_complete");
+    }
+}
+export async function saveIdentityAction(input: z.infer<typeof identitySchema>): Promise<ActionResult> {
+    const parsed = identitySchema.safeParse(input);
+    if (!parsed.success) {
+        return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
+    }
+    return patchProfile(parsed.data);
+}
+export async function saveSkillsAction(input: z.infer<typeof skillsSchema>): Promise<ActionResult> {
+    const parsed = skillsSchema.safeParse(input);
+    if (!parsed.success) {
+        return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid skills" };
+    }
+    return patchProfile({ technicalSkills: parsed.data.technicalSkills });
+}
+export async function savePreferencesAction(input: z.infer<typeof preferencesSchema>): Promise<ActionResult> {
+    const parsed = preferencesSchema.safeParse(input);
+    if (!parsed.success) {
+        return {
+            ok: false,
+            error: parsed.error.issues[0]?.message ?? "Invalid preferences",
+        };
+    }
+    const d = parsed.data;
+    return patchProfile({
+        preferredRoles: d.preferredRoles,
+        preferredLocations: d.preferredLocations.map((l) => ({
+            city: l.city,
+            remoteOk: l.remoteOk ?? false,
+        })),
+        salaryMin: d.salaryMinDollars * 100,
+        salaryMax: d.salaryMaxDollars * 100,
+        salaryCurrency: d.salaryCurrency || "USD",
+        employmentTypes: d.employmentTypes,
+        visaStatus: d.visaStatus || null,
+    });
+}
+export async function uploadCvAction(formData: FormData): Promise<ActionResult> {
+    const headers = await authHeaders();
+    if (!headers)
+        return { ok: false, error: "Unauthorized" };
+    const file = formData.get("file");
+    if (!(file instanceof File)) {
+        return { ok: false, error: "Missing file" };
+    }
+    let res: Response;
+    try {
+        res = await fetch(`${API_URL}/api/v1/profile/cv`, {
+            method: "POST",
+            headers,
+            body: formData,
+            cache: "no-store",
+        });
+    }
+    catch {
+        return { ok: false, error: "Network error — is the API running?" };
+    }
+    if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as {
+            error?: string;
+        };
+        return { ok: false, error: data.error ?? "Upload failed" };
+    }
+    const data = (await res.json()) as {
+        parsePending?: boolean;
+    };
+    return {
+        ok: true,
+        data: { parsePending: data.parsePending === true },
+    };
+}
+export async function completeOnboardingAction(catalogIds: string[]): Promise<ActionResult> {
+    if (catalogIds.length < 1) {
+        return { ok: false, error: "Select at least one source" };
+    }
+    const profileResult = await fetchOwnProfile();
+    if (!profileResult.ok || !profileResult.data) {
+        return { ok: false, error: profileResult.ok ? "Profile missing" : profileResult.error };
+    }
+    const gate = profileMeetsOnboardingRequirements(profileResult.data);
+    if (!gate.ok) {
+        return { ok: false, error: gate.error };
+    }
+    const headers = await authHeaders();
+    if (!headers) {
+        return { ok: false, error: "Unauthorized" };
+    }
+    try {
+        const res = await fetch(`${API_URL}/api/v1/sources/install-catalog`, {
+            method: "POST",
+            headers: { ...headers, "content-type": "application/json" },
+            body: JSON.stringify({ catalogIds }),
+            cache: "no-store",
+        });
+        if (!res.ok) {
+            const errBody = (await res.json().catch(() => ({}))) as {
+                error?: string;
+            };
+            return { ok: false, error: errBody.error ?? "Could not add job sources" };
+        }
+        const body = (await res.json()) as {
+            created: unknown[];
+            skipped: string[];
+            needsInput: unknown[];
+        };
+        const installed = body.created.length + body.skipped.length;
+        if (installed < 1) {
+            return {
+                ok: false,
+                error: "Those sources need extra setup in Settings. Pick ready-made feeds instead.",
+            };
+        }
+    }
+    catch {
+        return { ok: false, error: "Network error — is the API running?" };
+    }
+    await setOnboardingCompleteCookie(true);
+    return { ok: true };
+}
 export async function getUserCurrency(): Promise<ActionResult<string>> {
-  const headers = await authHeaders();
-  if (!headers) return { ok: false, error: "Unauthorized" };
-
-  try {
-    // First get the profile to check for explicit currency preference
-    const profileRes = await fetch(`${API_URL}/api/v1/profile`, {
-      headers,
-      cache: "no-store",
-    });
-    
-    if (profileRes.ok) {
-      const body = (await profileRes.json()) as { profile: ProfileRow };
-      if (body.profile?.salaryCurrency) {
-        return { ok: true, data: body.profile.salaryCurrency };
-      }
+    const headers = await authHeaders();
+    if (!headers)
+        return { ok: false, error: "Unauthorized" };
+    try {
+        const profileRes = await fetch(`${API_URL}/api/v1/profile`, {
+            headers,
+            cache: "no-store",
+        });
+        if (profileRes.ok) {
+            const body = (await profileRes.json()) as {
+                profile: ProfileRow;
+            };
+            if (body.profile?.salaryCurrency) {
+                return { ok: true, data: body.profile.salaryCurrency };
+            }
+        }
+        const userRes = await fetch(`${API_URL}/api/v1/auth/me`, {
+            headers,
+            cache: "no-store",
+        });
+        if (userRes.ok) {
+            const userBody = (await userRes.json()) as {
+                locale?: string;
+            };
+            if (userBody?.locale) {
+                const { getCurrencyFromLocale } = await import("@/lib/currency");
+                return { ok: true, data: getCurrencyFromLocale(userBody.locale) };
+            }
+        }
+        return { ok: true, data: "USD" };
     }
-
-    // Fall back to user's locale from auth/me
-    const userRes = await fetch(`${API_URL}/api/v1/auth/me`, {
-      headers,
-      cache: "no-store",
-    });
-    
-    if (userRes.ok) {
-      const userBody = (await userRes.json()) as { locale?: string };
-      if (userBody?.locale) {
-        // Import getCurrencyFromLocale dynamically to avoid circular deps
-        const { getCurrencyFromLocale } = await import("@/lib/currency");
-        return { ok: true, data: getCurrencyFromLocale(userBody.locale) };
-      }
+    catch {
+        return { ok: false, error: "Network error — is the API running?" };
     }
-
-    return { ok: true, data: "USD" };
-  } catch {
-    return { ok: false, error: "Network error — is the API running?" };
-  }
 }
-
-/** GDPR — download structured JSON export of the caller's data. */
-export async function exportOwnDataAction(): Promise<
-  ActionResult<Record<string, unknown>>
-> {
-  const headers = await authHeaders();
-  if (!headers) return { ok: false, error: "Unauthorized" };
-
-  let res: Response;
-  try {
-    res = await fetch(`${API_URL}/api/v1/profile/export`, {
-      headers,
-      cache: "no-store",
-    });
-  } catch {
-    return { ok: false, error: "Network error — is the API running?" };
-  }
-
-  if (!res.ok) {
-    return { ok: false, error: "Failed to export data" };
-  }
-
-  const data = (await res.json()) as Record<string, unknown>;
-  return { ok: true, data };
+export async function exportOwnDataAction(): Promise<ActionResult<Record<string, unknown>>> {
+    const headers = await authHeaders();
+    if (!headers)
+        return { ok: false, error: "Unauthorized" };
+    let res: Response;
+    try {
+        res = await fetch(`${API_URL}/api/v1/profile/export`, {
+            headers,
+            cache: "no-store",
+        });
+    }
+    catch {
+        return { ok: false, error: "Network error — is the API running?" };
+    }
+    if (!res.ok) {
+        return { ok: false, error: "Failed to export data" };
+    }
+    const data = (await res.json()) as Record<string, unknown>;
+    return { ok: true, data };
 }
-
-/** GDPR — permanently delete account + cascading PII (including cv_chunks). */
 export async function deleteOwnAccountAction(): Promise<ActionResult> {
-  const headers = await authHeaders();
-  if (!headers) return { ok: false, error: "Unauthorized" };
-
-  let res: Response;
-  try {
-    res = await fetch(`${API_URL}/api/v1/profile`, {
-      method: "DELETE",
-      headers,
-    });
-  } catch {
-    return { ok: false, error: "Network error — is the API running?" };
-  }
-
-  if (!res.ok) {
-    return { ok: false, error: "Failed to delete account" };
-  }
-
-  const cookieStore = await cookies();
-  cookieStore.delete("access_token");
-  cookieStore.delete("refresh_token");
-  cookieStore.delete("onboarding_complete");
-  return { ok: true };
-}
-
-export async function listCvVersionsAction(): Promise<
-  ActionResult<{ versions: CvVersionRow[] }>
-> {
-  const headers = await authHeaders();
-  if (!headers) return { ok: false, error: "Unauthorized" };
-  try {
-    const res = await fetch(`${API_URL}/api/v1/profile/cv/versions`, {
-      headers,
-      cache: "no-store",
-    });
-    if (!res.ok) return { ok: false, error: "Failed to load CV versions" };
-    const data = (await res.json()) as { versions: CvVersionRow[] };
-    return { ok: true, data };
-  } catch {
-    return { ok: false, error: "Network error — is the API running?" };
-  }
-}
-
-export async function activateCvVersionAction(
-  version: number,
-): Promise<ActionResult> {
-  const headers = await authHeaders();
-  if (!headers) return { ok: false, error: "Unauthorized" };
-  try {
-    const res = await fetch(
-      `${API_URL}/api/v1/profile/cv/${version}/activate`,
-      { method: "POST", headers, cache: "no-store" },
-    );
-    if (!res.ok) {
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
-      return { ok: false, error: data.error ?? "Activate failed" };
+    const headers = await authHeaders();
+    if (!headers)
+        return { ok: false, error: "Unauthorized" };
+    let res: Response;
+    try {
+        res = await fetch(`${API_URL}/api/v1/profile`, {
+            method: "DELETE",
+            headers,
+        });
     }
+    catch {
+        return { ok: false, error: "Network error — is the API running?" };
+    }
+    if (!res.ok) {
+        return { ok: false, error: "Failed to delete account" };
+    }
+    const cookieStore = await cookies();
+    cookieStore.delete("access_token");
+    cookieStore.delete("refresh_token");
+    cookieStore.delete("onboarding_complete");
     return { ok: true };
-  } catch {
-    return { ok: false, error: "Network error — is the API running?" };
-  }
 }
-
-export async function deleteCvVersionAction(
-  version: number,
-): Promise<ActionResult> {
-  const headers = await authHeaders();
-  if (!headers) return { ok: false, error: "Unauthorized" };
-  try {
-    const res = await fetch(`${API_URL}/api/v1/profile/cv/${version}`, {
-      method: "DELETE",
-      headers,
-      cache: "no-store",
-    });
-    if (!res.ok) {
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
-      return { ok: false, error: data.error ?? "Delete failed" };
+export async function listCvVersionsAction(): Promise<ActionResult<{
+    versions: CvVersionRow[];
+}>> {
+    const headers = await authHeaders();
+    if (!headers)
+        return { ok: false, error: "Unauthorized" };
+    try {
+        const res = await fetch(`${API_URL}/api/v1/profile/cv/versions`, {
+            headers,
+            cache: "no-store",
+        });
+        if (!res.ok)
+            return { ok: false, error: "Failed to load CV versions" };
+        const data = (await res.json()) as {
+            versions: CvVersionRow[];
+        };
+        return { ok: true, data };
     }
-    return { ok: true };
-  } catch {
-    return { ok: false, error: "Network error — is the API running?" };
-  }
-}
-
-export async function reindexCvAction(
-  version?: number,
-): Promise<ActionResult<{ taskId: string }>> {
-  const headers = await authHeaders();
-  if (!headers) return { ok: false, error: "Unauthorized" };
-  try {
-    const res = await fetch(`${API_URL}/api/v1/profile/cv/reindex`, {
-      method: "POST",
-      headers: { ...headers, "content-type": "application/json" },
-      body: JSON.stringify(version != null ? { version } : {}),
-      cache: "no-store",
-    });
-    if (!res.ok) {
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
-      return { ok: false, error: data.error ?? "Reindex failed" };
+    catch {
+        return { ok: false, error: "Network error — is the API running?" };
     }
-    const data = (await res.json()) as { taskId: string };
-    return { ok: true, data };
-  } catch {
-    return { ok: false, error: "Network error — is the API running?" };
-  }
 }
-
+export async function activateCvVersionAction(version: number): Promise<ActionResult> {
+    const headers = await authHeaders();
+    if (!headers)
+        return { ok: false, error: "Unauthorized" };
+    try {
+        const res = await fetch(`${API_URL}/api/v1/profile/cv/${version}/activate`, { method: "POST", headers, cache: "no-store" });
+        if (!res.ok) {
+            const data = (await res.json().catch(() => ({}))) as {
+                error?: string;
+            };
+            return { ok: false, error: data.error ?? "Activate failed" };
+        }
+        return { ok: true };
+    }
+    catch {
+        return { ok: false, error: "Network error — is the API running?" };
+    }
+}
+export async function deleteCvVersionAction(version: number): Promise<ActionResult> {
+    const headers = await authHeaders();
+    if (!headers)
+        return { ok: false, error: "Unauthorized" };
+    try {
+        const res = await fetch(`${API_URL}/api/v1/profile/cv/${version}`, {
+            method: "DELETE",
+            headers,
+            cache: "no-store",
+        });
+        if (!res.ok) {
+            const data = (await res.json().catch(() => ({}))) as {
+                error?: string;
+            };
+            return { ok: false, error: data.error ?? "Delete failed" };
+        }
+        return { ok: true };
+    }
+    catch {
+        return { ok: false, error: "Network error — is the API running?" };
+    }
+}
+export async function reindexCvAction(version?: number): Promise<ActionResult<{
+    taskId: string;
+}>> {
+    const headers = await authHeaders();
+    if (!headers)
+        return { ok: false, error: "Unauthorized" };
+    try {
+        const res = await fetch(`${API_URL}/api/v1/profile/cv/reindex`, {
+            method: "POST",
+            headers: { ...headers, "content-type": "application/json" },
+            body: JSON.stringify(version != null ? { version } : {}),
+            cache: "no-store",
+        });
+        if (!res.ok) {
+            const data = (await res.json().catch(() => ({}))) as {
+                error?: string;
+            };
+            return { ok: false, error: data.error ?? "Reindex failed" };
+        }
+        const data = (await res.json()) as {
+            taskId: string;
+        };
+        return { ok: true, data };
+    }
+    catch {
+        return { ok: false, error: "Network error — is the API running?" };
+    }
+}

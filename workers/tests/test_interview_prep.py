@@ -105,7 +105,7 @@ def test_process_skips_other_users_application():
 
 
 def test_ungrounded_star_fails_validation():
-    with pytest.raises(Exception):  # noqa: B017
+    with pytest.raises(Exception):              
         pack = validate_prep(
             {
                 "questions": [

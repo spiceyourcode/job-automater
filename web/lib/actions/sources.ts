@@ -1,421 +1,467 @@
 "use server";
-
 import { getAccessToken } from "@/lib/auth-token";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-
-const API_URL =
-  process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4001";
-
-export type ActionResult<T = undefined> =
-  | { ok: true; data?: T }
-  | { ok: false; error: string };
-
+const API_URL = process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4001";
+export type ActionResult<T = undefined> = {
+    ok: true;
+    data?: T;
+} | {
+    ok: false;
+    error: string;
+};
 export type SourcePublic = {
-  id: string;
-  sourceType: string;
-  name: string;
-  description: string | null;
-  isActive: boolean;
-  lastRunAt: string | null;
-  lastRunStatus: string | null;
-  lastError: string | null;
-  config: Record<string, unknown>;
+    id: string;
+    sourceType: string;
+    name: string;
+    description: string | null;
+    isActive: boolean;
+    lastRunAt: string | null;
+    lastRunStatus: string | null;
+    lastError: string | null;
+    config: Record<string, unknown>;
 };
-
 export type SourceCatalogEntry = {
-  id: string;
-  name: string;
-  description: string;
-  region: string;
-  tags: string[];
-  sourceType: string;
-  status: "stable" | "beta";
-  userFields?: string[];
+    id: string;
+    name: string;
+    description: string;
+    region: string;
+    tags: string[];
+    sourceType: string;
+    status: "stable" | "beta";
+    userFields?: string[];
 };
-
 async function authHeaders(): Promise<HeadersInit | null> {
-  const token = await getAccessToken();
-  if (!token) return null;
-  return { authorization: `Bearer ${token}` };
+    const token = await getAccessToken();
+    if (!token)
+        return null;
+    return { authorization: `Bearer ${token}` };
 }
-
 const createSchema = z.object({
-  sourceType: z.enum([
-    "rss",
-    "api",
-    "imap",
-    "playwright",
-    "career_page",
-    "telegram",
-  ]),
-  name: z.string().min(1).max(255),
-  feedUrl: z.string().url().optional(),
-  baseUrl: z.string().url().optional(),
-  imapServer: z.string().optional(),
-  imapUsername: z.string().optional(),
-  imapPassword: z.string().optional(),
-  imapPort: z.coerce.number().int().positive().optional(),
-  startUrl: z.string().url().optional(),
-  jobListPath: z.string().optional(),
-  jobCardSelector: z.string().optional(),
-  titleSelector: z.string().optional(),
-  urlSelector: z.string().optional(),
-  maxPages: z.coerce.number().int().positive().max(20).optional(),
-  botToken: z.string().optional(),
-  channelId: z.string().optional(),
-  messageFilter: z.string().optional(),
+    sourceType: z.enum([
+        "rss",
+        "api",
+        "imap",
+        "playwright",
+        "career_page",
+        "telegram",
+    ]),
+    name: z.string().min(1).max(255),
+    feedUrl: z.string().url().optional(),
+    baseUrl: z.string().url().optional(),
+    imapServer: z.string().optional(),
+    imapUsername: z.string().optional(),
+    imapPassword: z.string().optional(),
+    imapPort: z.coerce.number().int().positive().optional(),
+    startUrl: z.string().url().optional(),
+    jobListPath: z.string().optional(),
+    jobCardSelector: z.string().optional(),
+    titleSelector: z.string().optional(),
+    urlSelector: z.string().optional(),
+    maxPages: z.coerce.number().int().positive().max(20).optional(),
+    botToken: z.string().optional(),
+    channelId: z.string().optional(),
+    messageFilter: z.string().optional(),
 });
-
-export async function listSourceCatalogAction(): Promise<
-  ActionResult<{ version: number; entries: SourceCatalogEntry[] }>
-> {
-  const headers = await authHeaders();
-  if (!headers) return { ok: false, error: "Unauthorized" };
-  try {
-    const res = await fetch(`${API_URL}/api/v1/sources/catalog`, {
-      headers,
-      cache: "no-store",
-    });
-    if (!res.ok) return { ok: false, error: "Failed to load source catalog" };
-    const data = (await res.json()) as {
-      version: number;
-      entries: SourceCatalogEntry[];
-    };
-    return { ok: true, data };
-  } catch {
-    return { ok: false, error: "Network error — is the API running?" };
-  }
+export async function listSourceCatalogAction(): Promise<ActionResult<{
+    version: number;
+    entries: SourceCatalogEntry[];
+}>> {
+    const headers = await authHeaders();
+    if (!headers)
+        return { ok: false, error: "Unauthorized" };
+    try {
+        const res = await fetch(`${API_URL}/api/v1/sources/catalog`, {
+            headers,
+            cache: "no-store",
+        });
+        if (!res.ok)
+            return { ok: false, error: "Failed to load source catalog" };
+        const data = (await res.json()) as {
+            version: number;
+            entries: SourceCatalogEntry[];
+        };
+        return { ok: true, data };
+    }
+    catch {
+        return { ok: false, error: "Network error — is the API running?" };
+    }
 }
-
-export async function installCatalogSourcesAction(
-  catalogIds: string[],
-): Promise<
-  ActionResult<{
+export async function installCatalogSourcesAction(catalogIds: string[]): Promise<ActionResult<{
     createdCount: number;
     skipped: string[];
-    needsInput: Array<{ catalogId: string; name: string; fields: string[] }>;
-  }>
-> {
-  if (catalogIds.length < 1) {
-    return { ok: false, error: "Select at least one source" };
-  }
-  const headers = await authHeaders();
-  if (!headers) return { ok: false, error: "Unauthorized" };
-  try {
-    const res = await fetch(`${API_URL}/api/v1/sources/install-catalog`, {
-      method: "POST",
-      headers: { ...headers, "content-type": "application/json" },
-      body: JSON.stringify({ catalogIds }),
-      cache: "no-store",
-    });
-    if (!res.ok) {
-      const errBody = (await res.json().catch(() => ({}))) as { error?: string };
-      return { ok: false, error: errBody.error ?? "Install failed" };
+    needsInput: Array<{
+        catalogId: string;
+        name: string;
+        fields: string[];
+    }>;
+}>> {
+    if (catalogIds.length < 1) {
+        return { ok: false, error: "Select at least one source" };
     }
-    const body = (await res.json()) as {
-      created: unknown[];
-      skipped: string[];
-      needsInput: Array<{ catalogId: string; name: string; fields: string[] }>;
-    };
-    revalidatePath("/settings/sources");
-    return {
-      ok: true,
-      data: {
-        createdCount: body.created.length,
-        skipped: body.skipped,
-        needsInput: body.needsInput,
-      },
-    };
-  } catch {
-    return { ok: false, error: "Network error — is the API running?" };
-  }
+    const headers = await authHeaders();
+    if (!headers)
+        return { ok: false, error: "Unauthorized" };
+    try {
+        const res = await fetch(`${API_URL}/api/v1/sources/install-catalog`, {
+            method: "POST",
+            headers: { ...headers, "content-type": "application/json" },
+            body: JSON.stringify({ catalogIds }),
+            cache: "no-store",
+        });
+        if (!res.ok) {
+            const errBody = (await res.json().catch(() => ({}))) as {
+                error?: string;
+            };
+            return { ok: false, error: errBody.error ?? "Install failed" };
+        }
+        const body = (await res.json()) as {
+            created: unknown[];
+            skipped: string[];
+            needsInput: Array<{
+                catalogId: string;
+                name: string;
+                fields: string[];
+            }>;
+        };
+        revalidatePath("/settings/sources");
+        return {
+            ok: true,
+            data: {
+                createdCount: body.created.length,
+                skipped: body.skipped,
+                needsInput: body.needsInput,
+            },
+        };
+    }
+    catch {
+        return { ok: false, error: "Network error — is the API running?" };
+    }
 }
-
-export async function listSourcesAction(): Promise<
-  ActionResult<{ sources: SourcePublic[] }>
-> {
-  const headers = await authHeaders();
-  if (!headers) return { ok: false, error: "Unauthorized" };
-  try {
-    const res = await fetch(`${API_URL}/api/v1/sources`, {
-      headers,
-      cache: "no-store",
-    });
-    if (!res.ok) return { ok: false, error: "Failed to load sources" };
-    const data = (await res.json()) as { sources: SourcePublic[] };
-    return { ok: true, data };
-  } catch {
-    return { ok: false, error: "Network error — is the API running?" };
-  }
+export async function listSourcesAction(): Promise<ActionResult<{
+    sources: SourcePublic[];
+}>> {
+    const headers = await authHeaders();
+    if (!headers)
+        return { ok: false, error: "Unauthorized" };
+    try {
+        const res = await fetch(`${API_URL}/api/v1/sources`, {
+            headers,
+            cache: "no-store",
+        });
+        if (!res.ok)
+            return { ok: false, error: "Failed to load sources" };
+        const data = (await res.json()) as {
+            sources: SourcePublic[];
+        };
+        return { ok: true, data };
+    }
+    catch {
+        return { ok: false, error: "Network error — is the API running?" };
+    }
 }
-
-export async function createSourceAction(
-  input: z.infer<typeof createSchema>,
-): Promise<ActionResult> {
-  const parsed = createSchema.safeParse(input);
-  if (!parsed.success) {
-    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid" };
-  }
-  const headers = await authHeaders();
-  if (!headers) return { ok: false, error: "Unauthorized" };
-
-  const d = parsed.data;
-  let config: Record<string, unknown>;
-  if (d.sourceType === "rss") {
-    if (!d.feedUrl) return { ok: false, error: "Feed URL is required" };
-    config = { feedUrl: d.feedUrl };
-  } else if (d.sourceType === "api") {
-    if (!d.baseUrl) return { ok: false, error: "Base URL is required" };
-    config = { baseUrl: d.baseUrl, auth: { type: "none" } };
-  } else if (d.sourceType === "imap") {
-    if (!d.imapServer || !d.imapUsername || !d.imapPassword) {
-      return { ok: false, error: "IMAP server, username, and password required" };
+export async function createSourceAction(input: z.infer<typeof createSchema>): Promise<ActionResult> {
+    const parsed = createSchema.safeParse(input);
+    if (!parsed.success) {
+        return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid" };
     }
-    config = {
-      imapServer: d.imapServer,
-      port: d.imapPort ?? 993,
-      username: d.imapUsername,
-      password: d.imapPassword,
-      folder: "INBOX",
-    };
-  } else if (d.sourceType === "playwright") {
-    if (!d.startUrl || !d.jobCardSelector || !d.titleSelector) {
-      return {
-        ok: false,
-        error: "Start URL, job card selector, and title selector required",
-      };
+    const headers = await authHeaders();
+    if (!headers)
+        return { ok: false, error: "Unauthorized" };
+    const d = parsed.data;
+    let config: Record<string, unknown>;
+    if (d.sourceType === "rss") {
+        if (!d.feedUrl)
+            return { ok: false, error: "Feed URL is required" };
+        config = { feedUrl: d.feedUrl };
     }
-    config = {
-      startUrl: d.startUrl,
-      jobCardSelector: d.jobCardSelector,
-      titleSelector: d.titleSelector,
-      urlSelector: d.urlSelector || undefined,
-      maxPages: d.maxPages ?? 1,
-    };
-  } else if (d.sourceType === "career_page") {
-    if (!d.baseUrl || !d.jobCardSelector || !d.titleSelector) {
-      return {
-        ok: false,
-        error: "Base URL, job card selector, and title selector required",
-      };
+    else if (d.sourceType === "api") {
+        if (!d.baseUrl)
+            return { ok: false, error: "Base URL is required" };
+        config = { baseUrl: d.baseUrl, auth: { type: "none" } };
     }
-    config = {
-      baseUrl: d.baseUrl,
-      jobListPath: d.jobListPath || "/careers",
-      jobCardSelector: d.jobCardSelector,
-      titleSelector: d.titleSelector,
-      urlSelector: d.urlSelector || undefined,
-      maxPages: d.maxPages ?? 1,
-    };
-  } else if (d.sourceType === "telegram") {
-    if (!d.botToken || !d.channelId) {
-      return { ok: false, error: "Bot token and channel ID required" };
+    else if (d.sourceType === "imap") {
+        if (!d.imapServer || !d.imapUsername || !d.imapPassword) {
+            return { ok: false, error: "IMAP server, username, and password required" };
+        }
+        config = {
+            imapServer: d.imapServer,
+            port: d.imapPort ?? 993,
+            username: d.imapUsername,
+            password: d.imapPassword,
+            folder: "INBOX",
+        };
     }
-    config = {
-      botToken: d.botToken,
-      channelId: d.channelId,
-      messageFilter: d.messageFilter || undefined,
-      limit: 50,
-    };
-  } else {
-    return { ok: false, error: "Unsupported source type" };
-  }
-
-  try {
-    const res = await fetch(`${API_URL}/api/v1/sources`, {
-      method: "POST",
-      headers: { ...headers, "content-type": "application/json" },
-      body: JSON.stringify({
-        sourceType: d.sourceType,
-        name: d.name,
-        config,
-      }),
-      cache: "no-store",
-    });
-    if (!res.ok) {
-      const body = (await res.json().catch(() => ({}))) as { error?: string };
-      return { ok: false, error: body.error ?? "Create failed" };
+    else if (d.sourceType === "playwright") {
+        if (!d.startUrl || !d.jobCardSelector || !d.titleSelector) {
+            return {
+                ok: false,
+                error: "Start URL, job card selector, and title selector required",
+            };
+        }
+        config = {
+            startUrl: d.startUrl,
+            jobCardSelector: d.jobCardSelector,
+            titleSelector: d.titleSelector,
+            urlSelector: d.urlSelector || undefined,
+            maxPages: d.maxPages ?? 1,
+        };
     }
-    revalidatePath("/settings/sources");
-    return { ok: true };
-  } catch {
-    return { ok: false, error: "Network error — is the API running?" };
-  }
+    else if (d.sourceType === "career_page") {
+        if (!d.baseUrl || !d.jobCardSelector || !d.titleSelector) {
+            return {
+                ok: false,
+                error: "Base URL, job card selector, and title selector required",
+            };
+        }
+        config = {
+            baseUrl: d.baseUrl,
+            jobListPath: d.jobListPath || "/careers",
+            jobCardSelector: d.jobCardSelector,
+            titleSelector: d.titleSelector,
+            urlSelector: d.urlSelector || undefined,
+            maxPages: d.maxPages ?? 1,
+        };
+    }
+    else if (d.sourceType === "telegram") {
+        if (!d.botToken || !d.channelId) {
+            return { ok: false, error: "Bot token and channel ID required" };
+        }
+        config = {
+            botToken: d.botToken,
+            channelId: d.channelId,
+            messageFilter: d.messageFilter || undefined,
+            limit: 50,
+        };
+    }
+    else {
+        return { ok: false, error: "Unsupported source type" };
+    }
+    try {
+        const res = await fetch(`${API_URL}/api/v1/sources`, {
+            method: "POST",
+            headers: { ...headers, "content-type": "application/json" },
+            body: JSON.stringify({
+                sourceType: d.sourceType,
+                name: d.name,
+                config,
+            }),
+            cache: "no-store",
+        });
+        if (!res.ok) {
+            const body = (await res.json().catch(() => ({}))) as {
+                error?: string;
+            };
+            return { ok: false, error: body.error ?? "Create failed" };
+        }
+        revalidatePath("/settings/sources");
+        return { ok: true };
+    }
+    catch {
+        return { ok: false, error: "Network error — is the API running?" };
+    }
 }
-
 export async function runSourceAction(id: string): Promise<ActionResult> {
-  const headers = await authHeaders();
-  if (!headers) return { ok: false, error: "Unauthorized" };
-  try {
-    const res = await fetch(`${API_URL}/api/v1/sources/${id}/run`, {
-      method: "POST",
-      headers,
-      cache: "no-store",
-    });
-    if (!res.ok) {
-      const body = (await res.json().catch(() => ({}))) as { error?: string };
-      return { ok: false, error: body.error ?? "Run failed" };
+    const headers = await authHeaders();
+    if (!headers)
+        return { ok: false, error: "Unauthorized" };
+    try {
+        const res = await fetch(`${API_URL}/api/v1/sources/${id}/run`, {
+            method: "POST",
+            headers,
+            cache: "no-store",
+        });
+        if (!res.ok) {
+            const body = (await res.json().catch(() => ({}))) as {
+                error?: string;
+            };
+            return { ok: false, error: body.error ?? "Run failed" };
+        }
+        revalidatePath("/settings/sources");
+        return { ok: true };
     }
-    revalidatePath("/settings/sources");
-    return { ok: true };
-  } catch {
-    return { ok: false, error: "Network error — is the API running?" };
-  }
+    catch {
+        return { ok: false, error: "Network error — is the API running?" };
+    }
 }
-
 export async function testSourceAction(id: string): Promise<ActionResult> {
-  const headers = await authHeaders();
-  if (!headers) return { ok: false, error: "Unauthorized" };
-  try {
-    const res = await fetch(`${API_URL}/api/v1/sources/${id}/test`, {
-      method: "POST",
-      headers,
-      cache: "no-store",
-    });
-    const body = (await res.json().catch(() => ({}))) as {
-      success?: boolean;
-      errors?: string[];
-      error?: string;
-    };
-    if (!res.ok) return { ok: false, error: body.error ?? "Test failed" };
-    if (!body.success) {
-      return { ok: false, error: body.errors?.[0] ?? "Test failed" };
+    const headers = await authHeaders();
+    if (!headers)
+        return { ok: false, error: "Unauthorized" };
+    try {
+        const res = await fetch(`${API_URL}/api/v1/sources/${id}/test`, {
+            method: "POST",
+            headers,
+            cache: "no-store",
+        });
+        const body = (await res.json().catch(() => ({}))) as {
+            success?: boolean;
+            errors?: string[];
+            error?: string;
+        };
+        if (!res.ok)
+            return { ok: false, error: body.error ?? "Test failed" };
+        if (!body.success) {
+            return { ok: false, error: body.errors?.[0] ?? "Test failed" };
+        }
+        return { ok: true };
     }
-    return { ok: true };
-  } catch {
-    return { ok: false, error: "Network error — is the API running?" };
-  }
+    catch {
+        return { ok: false, error: "Network error — is the API running?" };
+    }
 }
-
 const updateSchema = z.object({
-  id: z.string().uuid(),
-  name: z.string().min(1).max(255).optional(),
-  feedUrl: z.string().url().optional(),
-  baseUrl: z.string().url().optional(),
-  imapServer: z.string().optional(),
-  imapUsername: z.string().optional(),
-  imapPassword: z.string().optional(),
-  startUrl: z.string().url().optional(),
-  jobListPath: z.string().optional(),
-  jobCardSelector: z.string().optional(),
-  titleSelector: z.string().optional(),
-  urlSelector: z.string().optional(),
-  botToken: z.string().optional(),
-  channelId: z.string().optional(),
-  messageFilter: z.string().optional(),
-  isActive: z.boolean().optional(),
+    id: z.string().uuid(),
+    name: z.string().min(1).max(255).optional(),
+    feedUrl: z.string().url().optional(),
+    baseUrl: z.string().url().optional(),
+    imapServer: z.string().optional(),
+    imapUsername: z.string().optional(),
+    imapPassword: z.string().optional(),
+    startUrl: z.string().url().optional(),
+    jobListPath: z.string().optional(),
+    jobCardSelector: z.string().optional(),
+    titleSelector: z.string().optional(),
+    urlSelector: z.string().optional(),
+    botToken: z.string().optional(),
+    channelId: z.string().optional(),
+    messageFilter: z.string().optional(),
+    isActive: z.boolean().optional(),
 });
-
-export async function updateSourceAction(
-  input: z.infer<typeof updateSchema> & { sourceType: string },
-): Promise<ActionResult> {
-  const parsed = updateSchema.safeParse(input);
-  if (!parsed.success) {
-    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid" };
-  }
-  const headers = await authHeaders();
-  if (!headers) return { ok: false, error: "Unauthorized" };
-
-  const d = parsed.data;
-  const config: Record<string, unknown> = {};
-  const t = input.sourceType;
-
-  if (t === "rss" && d.feedUrl) config.feedUrl = d.feedUrl;
-  if ((t === "api" || t === "career_page") && d.baseUrl) config.baseUrl = d.baseUrl;
-  if (t === "imap") {
-    if (d.imapServer) config.imapServer = d.imapServer;
-    if (d.imapUsername) config.username = d.imapUsername;
-    if (d.imapPassword) config.password = d.imapPassword;
-  }
-  if (t === "playwright") {
-    if (d.startUrl) config.startUrl = d.startUrl;
-    if (d.jobCardSelector) config.jobCardSelector = d.jobCardSelector;
-    if (d.titleSelector) config.titleSelector = d.titleSelector;
-    if (d.urlSelector !== undefined) config.urlSelector = d.urlSelector || undefined;
-  }
-  if (t === "career_page") {
-    if (d.jobListPath) config.jobListPath = d.jobListPath;
-    if (d.jobCardSelector) config.jobCardSelector = d.jobCardSelector;
-    if (d.titleSelector) config.titleSelector = d.titleSelector;
-    if (d.urlSelector !== undefined) config.urlSelector = d.urlSelector || undefined;
-  }
-  if (t === "telegram") {
-    if (d.botToken) config.botToken = d.botToken;
-    if (d.channelId) config.channelId = d.channelId;
-    if (d.messageFilter !== undefined) {
-      config.messageFilter = d.messageFilter || undefined;
+export async function updateSourceAction(input: z.infer<typeof updateSchema> & {
+    sourceType: string;
+}): Promise<ActionResult> {
+    const parsed = updateSchema.safeParse(input);
+    if (!parsed.success) {
+        return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid" };
     }
-  }
-
-  const body: Record<string, unknown> = {};
-  if (d.name) body.name = d.name;
-  if (d.isActive !== undefined) body.isActive = d.isActive;
-  if (Object.keys(config).length > 0) body.config = config;
-
-  try {
-    const res = await fetch(`${API_URL}/api/v1/sources/${d.id}`, {
-      method: "PATCH",
-      headers: { ...headers, "content-type": "application/json" },
-      body: JSON.stringify(body),
-      cache: "no-store",
-    });
-    if (!res.ok) {
-      const errBody = (await res.json().catch(() => ({}))) as { error?: string };
-      return { ok: false, error: errBody.error ?? "Update failed" };
+    const headers = await authHeaders();
+    if (!headers)
+        return { ok: false, error: "Unauthorized" };
+    const d = parsed.data;
+    const config: Record<string, unknown> = {};
+    const t = input.sourceType;
+    if (t === "rss" && d.feedUrl)
+        config.feedUrl = d.feedUrl;
+    if ((t === "api" || t === "career_page") && d.baseUrl)
+        config.baseUrl = d.baseUrl;
+    if (t === "imap") {
+        if (d.imapServer)
+            config.imapServer = d.imapServer;
+        if (d.imapUsername)
+            config.username = d.imapUsername;
+        if (d.imapPassword)
+            config.password = d.imapPassword;
     }
-    revalidatePath("/settings/sources");
-    return { ok: true };
-  } catch {
-    return { ok: false, error: "Network error — is the API running?" };
-  }
+    if (t === "playwright") {
+        if (d.startUrl)
+            config.startUrl = d.startUrl;
+        if (d.jobCardSelector)
+            config.jobCardSelector = d.jobCardSelector;
+        if (d.titleSelector)
+            config.titleSelector = d.titleSelector;
+        if (d.urlSelector !== undefined)
+            config.urlSelector = d.urlSelector || undefined;
+    }
+    if (t === "career_page") {
+        if (d.jobListPath)
+            config.jobListPath = d.jobListPath;
+        if (d.jobCardSelector)
+            config.jobCardSelector = d.jobCardSelector;
+        if (d.titleSelector)
+            config.titleSelector = d.titleSelector;
+        if (d.urlSelector !== undefined)
+            config.urlSelector = d.urlSelector || undefined;
+    }
+    if (t === "telegram") {
+        if (d.botToken)
+            config.botToken = d.botToken;
+        if (d.channelId)
+            config.channelId = d.channelId;
+        if (d.messageFilter !== undefined) {
+            config.messageFilter = d.messageFilter || undefined;
+        }
+    }
+    const body: Record<string, unknown> = {};
+    if (d.name)
+        body.name = d.name;
+    if (d.isActive !== undefined)
+        body.isActive = d.isActive;
+    if (Object.keys(config).length > 0)
+        body.config = config;
+    try {
+        const res = await fetch(`${API_URL}/api/v1/sources/${d.id}`, {
+            method: "PATCH",
+            headers: { ...headers, "content-type": "application/json" },
+            body: JSON.stringify(body),
+            cache: "no-store",
+        });
+        if (!res.ok) {
+            const errBody = (await res.json().catch(() => ({}))) as {
+                error?: string;
+            };
+            return { ok: false, error: errBody.error ?? "Update failed" };
+        }
+        revalidatePath("/settings/sources");
+        return { ok: true };
+    }
+    catch {
+        return { ok: false, error: "Network error — is the API running?" };
+    }
 }
-
 export async function deleteSourceAction(id: string): Promise<ActionResult> {
-  const headers = await authHeaders();
-  if (!headers) return { ok: false, error: "Unauthorized" };
-  try {
-    const res = await fetch(`${API_URL}/api/v1/sources/${id}`, {
-      method: "DELETE",
-      headers,
-      cache: "no-store",
-    });
-    if (!res.ok) {
-      const body = (await res.json().catch(() => ({}))) as { error?: string };
-      return { ok: false, error: body.error ?? "Delete failed" };
+    const headers = await authHeaders();
+    if (!headers)
+        return { ok: false, error: "Unauthorized" };
+    try {
+        const res = await fetch(`${API_URL}/api/v1/sources/${id}`, {
+            method: "DELETE",
+            headers,
+            cache: "no-store",
+        });
+        if (!res.ok) {
+            const body = (await res.json().catch(() => ({}))) as {
+                error?: string;
+            };
+            return { ok: false, error: body.error ?? "Delete failed" };
+        }
+        revalidatePath("/settings/sources");
+        return { ok: true };
     }
-    revalidatePath("/settings/sources");
-    return { ok: true };
-  } catch {
-    return { ok: false, error: "Network error — is the API running?" };
-  }
+    catch {
+        return { ok: false, error: "Network error — is the API running?" };
+    }
 }
-
 export type SourceRunPublic = {
-  id: string;
-  status: string;
-  jobsFound: number;
-  durationMs: number | null;
-  error: string | null;
-  startedAt: string;
-  completedAt: string | null;
+    id: string;
+    status: string;
+    jobsFound: number;
+    durationMs: number | null;
+    error: string | null;
+    startedAt: string;
+    completedAt: string | null;
 };
-
-export async function listSourceRunsAction(
-  id: string,
-): Promise<ActionResult<{ runs: SourceRunPublic[] }>> {
-  const headers = await authHeaders();
-  if (!headers) return { ok: false, error: "Unauthorized" };
-  try {
-    const res = await fetch(`${API_URL}/api/v1/sources/${id}/runs?limit=20`, {
-      headers,
-      cache: "no-store",
-    });
-    if (res.status === 404) return { ok: false, error: "Source not found" };
-    if (!res.ok) return { ok: false, error: "Failed to load runs" };
-    const data = (await res.json()) as { runs: SourceRunPublic[] };
-    return { ok: true, data };
-  } catch {
-    return { ok: false, error: "Network error — is the API running?" };
-  }
+export async function listSourceRunsAction(id: string): Promise<ActionResult<{
+    runs: SourceRunPublic[];
+}>> {
+    const headers = await authHeaders();
+    if (!headers)
+        return { ok: false, error: "Unauthorized" };
+    try {
+        const res = await fetch(`${API_URL}/api/v1/sources/${id}/runs?limit=20`, {
+            headers,
+            cache: "no-store",
+        });
+        if (res.status === 404)
+            return { ok: false, error: "Source not found" };
+        if (!res.ok)
+            return { ok: false, error: "Failed to load runs" };
+        const data = (await res.json()) as {
+            runs: SourceRunPublic[];
+        };
+        return { ok: true, data };
+    }
+    catch {
+        return { ok: false, error: "Network error — is the API running?" };
+    }
 }

@@ -1,325 +1,247 @@
 "use client";
-
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import {
-  Play,
-  Plus,
-  Radio,
-  Trash2,
-  FlaskConical,
-  History,
-  Pencil,
-} from "lucide-react";
+import { Play, Plus, Radio, Trash2, FlaskConical, History, Pencil, } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatefulButton } from "@/components/ui/stateful-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  createSourceAction,
-  deleteSourceAction,
-  installCatalogSourcesAction,
-  listSourceRunsAction,
-  runSourceAction,
-  testSourceAction,
-  updateSourceAction,
-  type SourceCatalogEntry,
-  type SourcePublic,
-  type SourceRunPublic,
-} from "@/lib/actions/sources";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, } from "@/components/ui/card";
+import { createSourceAction, deleteSourceAction, installCatalogSourcesAction, listSourceRunsAction, runSourceAction, testSourceAction, updateSourceAction, type SourceCatalogEntry, type SourcePublic, type SourceRunPublic, } from "@/lib/actions/sources";
 import { SourceCatalogPicker } from "@/components/source-catalog-picker";
-
-type SourceType =
-  | "rss"
-  | "api"
-  | "imap"
-  | "playwright"
-  | "career_page"
-  | "telegram";
-
+type SourceType = "rss" | "api" | "imap" | "playwright" | "career_page" | "telegram";
 type Props = {
-  initialSources: SourcePublic[];
-  catalogEntries: SourceCatalogEntry[];
+    initialSources: SourcePublic[];
+    catalogEntries: SourceCatalogEntry[];
 };
-
 export function SourcesManager({ initialSources, catalogEntries }: Props) {
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
-  const [panel, setPanel] = useState<"catalog" | "advanced">("catalog");
-  const [catalogSelection, setCatalogSelection] = useState<string[]>([]);
-  const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [sourceType, setSourceType] = useState<SourceType>("rss");
-  const [name, setName] = useState("");
-  const [feedUrl, setFeedUrl] = useState("");
-  const [baseUrl, setBaseUrl] = useState("");
-  const [imapServer, setImapServer] = useState("");
-  const [imapUsername, setImapUsername] = useState("");
-  const [imapPassword, setImapPassword] = useState("");
-  const [startUrl, setStartUrl] = useState("");
-  const [jobListPath, setJobListPath] = useState("/careers");
-  const [jobCardSelector, setJobCardSelector] = useState(".job-card");
-  const [titleSelector, setTitleSelector] = useState(".job-title a");
-  const [urlSelector, setUrlSelector] = useState("");
-  const [botToken, setBotToken] = useState("");
-  const [channelId, setChannelId] = useState("");
-  const [messageFilter, setMessageFilter] = useState("");
-  const [runsFor, setRunsFor] = useState<string | null>(null);
-  const [runs, setRuns] = useState<SourceRunPublic[]>([]);
-
-  function refresh() {
-    router.refresh();
-  }
-
-  function resetForm() {
-    setShowForm(false);
-    setEditingId(null);
-    setName("");
-    setFeedUrl("");
-    setBaseUrl("");
-    setImapServer("");
-    setImapUsername("");
-    setImapPassword("");
-    setStartUrl("");
-    setJobListPath("/careers");
-    setJobCardSelector(".job-card");
-    setTitleSelector(".job-title a");
-    setUrlSelector("");
-    setBotToken("");
-    setChannelId("");
-    setMessageFilter("");
-    setSourceType("rss");
-  }
-
-  function onInstallCatalog() {
-    if (catalogSelection.length < 1) {
-      toast.error("Select at least one board");
-      return;
+    const router = useRouter();
+    const [isPending, startTransition] = useTransition();
+    const [panel, setPanel] = useState<"catalog" | "advanced">("catalog");
+    const [catalogSelection, setCatalogSelection] = useState<string[]>([]);
+    const [showForm, setShowForm] = useState(false);
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [sourceType, setSourceType] = useState<SourceType>("rss");
+    const [name, setName] = useState("");
+    const [feedUrl, setFeedUrl] = useState("");
+    const [baseUrl, setBaseUrl] = useState("");
+    const [imapServer, setImapServer] = useState("");
+    const [imapUsername, setImapUsername] = useState("");
+    const [imapPassword, setImapPassword] = useState("");
+    const [startUrl, setStartUrl] = useState("");
+    const [jobListPath, setJobListPath] = useState("/careers");
+    const [jobCardSelector, setJobCardSelector] = useState(".job-card");
+    const [titleSelector, setTitleSelector] = useState(".job-title a");
+    const [urlSelector, setUrlSelector] = useState("");
+    const [botToken, setBotToken] = useState("");
+    const [channelId, setChannelId] = useState("");
+    const [messageFilter, setMessageFilter] = useState("");
+    const [runsFor, setRunsFor] = useState<string | null>(null);
+    const [runs, setRuns] = useState<SourceRunPublic[]>([]);
+    function refresh() {
+        router.refresh();
     }
-    startTransition(async () => {
-      const result = await installCatalogSourcesAction(catalogSelection);
-      if (!result.ok) {
-        toast.error(result.error);
-        return;
-      }
-      const data = result.data!;
-      if (data.needsInput.length > 0) {
-        toast.message(
-          `${data.createdCount} added — ${data.needsInput.length} need extra setup (LinkedIn RSS, email, etc.)`,
-        );
-      } else {
-        toast.success(
-          data.createdCount > 0
-            ? `Added ${data.createdCount} source(s)`
-            : "Already connected",
-        );
-      }
-      setCatalogSelection([]);
-      refresh();
-    });
-  }
-
-  function beginEdit(s: SourcePublic) {
-    if (s.config?.catalogId) {
-      toast.message("This preset is managed — remove and re-add from the catalog to change it.");
-      return;
+    function resetForm() {
+        setShowForm(false);
+        setEditingId(null);
+        setName("");
+        setFeedUrl("");
+        setBaseUrl("");
+        setImapServer("");
+        setImapUsername("");
+        setImapPassword("");
+        setStartUrl("");
+        setJobListPath("/careers");
+        setJobCardSelector(".job-card");
+        setTitleSelector(".job-title a");
+        setUrlSelector("");
+        setBotToken("");
+        setChannelId("");
+        setMessageFilter("");
+        setSourceType("rss");
     }
-    const cfg = s.config ?? {};
-    setEditingId(s.id);
-    setShowForm(true);
-    setSourceType(s.sourceType as SourceType);
-    setName(s.name);
-    setFeedUrl(String(cfg.feedUrl ?? ""));
-    setBaseUrl(String(cfg.baseUrl ?? ""));
-    setImapServer(String(cfg.imapServer ?? ""));
-    setImapUsername(String(cfg.username ?? ""));
-    setImapPassword("");
-    setStartUrl(String(cfg.startUrl ?? ""));
-    setJobListPath(String(cfg.jobListPath ?? "/careers"));
-    setJobCardSelector(String(cfg.jobCardSelector ?? ".job-card"));
-    setTitleSelector(String(cfg.titleSelector ?? ".job-title a"));
-    setUrlSelector(String(cfg.urlSelector ?? ""));
-    setBotToken("");
-    setChannelId(String(cfg.channelId ?? ""));
-    setMessageFilter(String(cfg.messageFilter ?? ""));
-  }
-
-  function onCreate(e: React.FormEvent) {
-    e.preventDefault();
-    startTransition(async () => {
-      if (editingId) {
-        const result = await updateSourceAction({
-          id: editingId,
-          sourceType,
-          name,
-          feedUrl: sourceType === "rss" ? feedUrl : undefined,
-          baseUrl:
-            sourceType === "api" || sourceType === "career_page"
-              ? baseUrl
-              : undefined,
-          imapServer: sourceType === "imap" ? imapServer : undefined,
-          imapUsername: sourceType === "imap" ? imapUsername : undefined,
-          imapPassword:
-            sourceType === "imap" && imapPassword
-              ? imapPassword
-              : undefined,
-          startUrl: sourceType === "playwright" ? startUrl : undefined,
-          jobListPath: sourceType === "career_page" ? jobListPath : undefined,
-          jobCardSelector:
-            sourceType === "playwright" || sourceType === "career_page"
-              ? jobCardSelector
-              : undefined,
-          titleSelector:
-            sourceType === "playwright" || sourceType === "career_page"
-              ? titleSelector
-              : undefined,
-          urlSelector:
-            sourceType === "playwright" || sourceType === "career_page"
-              ? urlSelector || undefined
-              : undefined,
-          botToken:
-            sourceType === "telegram" && botToken ? botToken : undefined,
-          channelId: sourceType === "telegram" ? channelId : undefined,
-          messageFilter:
-            sourceType === "telegram" ? messageFilter || undefined : undefined,
-        });
-        if (!result.ok) {
-          toast.error(result.error);
-          return;
+    function onInstallCatalog() {
+        if (catalogSelection.length < 1) {
+            toast.error("Select at least one board");
+            return;
         }
-        toast.success("Source updated");
-        resetForm();
-        refresh();
-        return;
-      }
-
-      const result = await createSourceAction({
-        sourceType,
-        name,
-        feedUrl: sourceType === "rss" ? feedUrl : undefined,
-        baseUrl:
-          sourceType === "api" || sourceType === "career_page"
-            ? baseUrl
-            : undefined,
-        imapServer: sourceType === "imap" ? imapServer : undefined,
-        imapUsername: sourceType === "imap" ? imapUsername : undefined,
-        imapPassword: sourceType === "imap" ? imapPassword : undefined,
-        startUrl: sourceType === "playwright" ? startUrl : undefined,
-        jobListPath: sourceType === "career_page" ? jobListPath : undefined,
-        jobCardSelector:
-          sourceType === "playwright" || sourceType === "career_page"
-            ? jobCardSelector
-            : undefined,
-        titleSelector:
-          sourceType === "playwright" || sourceType === "career_page"
-            ? titleSelector
-            : undefined,
-        urlSelector:
-          sourceType === "playwright" || sourceType === "career_page"
-            ? urlSelector || undefined
-            : undefined,
-        botToken: sourceType === "telegram" ? botToken : undefined,
-        channelId: sourceType === "telegram" ? channelId : undefined,
-        messageFilter:
-          sourceType === "telegram" ? messageFilter || undefined : undefined,
-      });
-      if (!result.ok) {
-        toast.error(result.error);
-        return;
-      }
-      toast.success("Source added");
-      resetForm();
-      refresh();
-    });
-  }
-
-  function onRun(id: string) {
-    startTransition(async () => {
-      const result = await runSourceAction(id);
-      if (!result.ok) {
-        toast.error(result.error);
-        return;
-      }
-      toast.success("Collection queued");
-      refresh();
-    });
-  }
-
-  function onTest(id: string) {
-    startTransition(async () => {
-      const result = await testSourceAction(id);
-      if (!result.ok) {
-        toast.error(result.error);
-        return;
-      }
-      toast.success("Test passed");
-    });
-  }
-
-  function onDelete(id: string) {
-    startTransition(async () => {
-      const result = await deleteSourceAction(id);
-      if (!result.ok) {
-        toast.error(result.error);
-        return;
-      }
-      toast.success("Source removed");
-      refresh();
-    });
-  }
-
-  return (
-    <div className="space-y-6">
+        startTransition(async () => {
+            const result = await installCatalogSourcesAction(catalogSelection);
+            if (!result.ok) {
+                toast.error(result.error);
+                return;
+            }
+            const data = result.data!;
+            if (data.needsInput.length > 0) {
+                toast.message(`${data.createdCount} added — ${data.needsInput.length} need extra setup (LinkedIn RSS, email, etc.)`);
+            }
+            else {
+                toast.success(data.createdCount > 0
+                    ? `Added ${data.createdCount} source(s)`
+                    : "Already connected");
+            }
+            setCatalogSelection([]);
+            refresh();
+        });
+    }
+    function beginEdit(s: SourcePublic) {
+        if (s.config?.catalogId) {
+            toast.message("This preset is managed — remove and re-add from the catalog to change it.");
+            return;
+        }
+        const cfg = s.config ?? {};
+        setEditingId(s.id);
+        setShowForm(true);
+        setSourceType(s.sourceType as SourceType);
+        setName(s.name);
+        setFeedUrl(String(cfg.feedUrl ?? ""));
+        setBaseUrl(String(cfg.baseUrl ?? ""));
+        setImapServer(String(cfg.imapServer ?? ""));
+        setImapUsername(String(cfg.username ?? ""));
+        setImapPassword("");
+        setStartUrl(String(cfg.startUrl ?? ""));
+        setJobListPath(String(cfg.jobListPath ?? "/careers"));
+        setJobCardSelector(String(cfg.jobCardSelector ?? ".job-card"));
+        setTitleSelector(String(cfg.titleSelector ?? ".job-title a"));
+        setUrlSelector(String(cfg.urlSelector ?? ""));
+        setBotToken("");
+        setChannelId(String(cfg.channelId ?? ""));
+        setMessageFilter(String(cfg.messageFilter ?? ""));
+    }
+    function onCreate(e: React.FormEvent) {
+        e.preventDefault();
+        startTransition(async () => {
+            if (editingId) {
+                const result = await updateSourceAction({
+                    id: editingId,
+                    sourceType,
+                    name,
+                    feedUrl: sourceType === "rss" ? feedUrl : undefined,
+                    baseUrl: sourceType === "api" || sourceType === "career_page"
+                        ? baseUrl
+                        : undefined,
+                    imapServer: sourceType === "imap" ? imapServer : undefined,
+                    imapUsername: sourceType === "imap" ? imapUsername : undefined,
+                    imapPassword: sourceType === "imap" && imapPassword
+                        ? imapPassword
+                        : undefined,
+                    startUrl: sourceType === "playwright" ? startUrl : undefined,
+                    jobListPath: sourceType === "career_page" ? jobListPath : undefined,
+                    jobCardSelector: sourceType === "playwright" || sourceType === "career_page"
+                        ? jobCardSelector
+                        : undefined,
+                    titleSelector: sourceType === "playwright" || sourceType === "career_page"
+                        ? titleSelector
+                        : undefined,
+                    urlSelector: sourceType === "playwright" || sourceType === "career_page"
+                        ? urlSelector || undefined
+                        : undefined,
+                    botToken: sourceType === "telegram" && botToken ? botToken : undefined,
+                    channelId: sourceType === "telegram" ? channelId : undefined,
+                    messageFilter: sourceType === "telegram" ? messageFilter || undefined : undefined,
+                });
+                if (!result.ok) {
+                    toast.error(result.error);
+                    return;
+                }
+                toast.success("Source updated");
+                resetForm();
+                refresh();
+                return;
+            }
+            const result = await createSourceAction({
+                sourceType,
+                name,
+                feedUrl: sourceType === "rss" ? feedUrl : undefined,
+                baseUrl: sourceType === "api" || sourceType === "career_page"
+                    ? baseUrl
+                    : undefined,
+                imapServer: sourceType === "imap" ? imapServer : undefined,
+                imapUsername: sourceType === "imap" ? imapUsername : undefined,
+                imapPassword: sourceType === "imap" ? imapPassword : undefined,
+                startUrl: sourceType === "playwright" ? startUrl : undefined,
+                jobListPath: sourceType === "career_page" ? jobListPath : undefined,
+                jobCardSelector: sourceType === "playwright" || sourceType === "career_page"
+                    ? jobCardSelector
+                    : undefined,
+                titleSelector: sourceType === "playwright" || sourceType === "career_page"
+                    ? titleSelector
+                    : undefined,
+                urlSelector: sourceType === "playwright" || sourceType === "career_page"
+                    ? urlSelector || undefined
+                    : undefined,
+                botToken: sourceType === "telegram" ? botToken : undefined,
+                channelId: sourceType === "telegram" ? channelId : undefined,
+                messageFilter: sourceType === "telegram" ? messageFilter || undefined : undefined,
+            });
+            if (!result.ok) {
+                toast.error(result.error);
+                return;
+            }
+            toast.success("Source added");
+            resetForm();
+            refresh();
+        });
+    }
+    function onRun(id: string) {
+        startTransition(async () => {
+            const result = await runSourceAction(id);
+            if (!result.ok) {
+                toast.error(result.error);
+                return;
+            }
+            toast.success("Collection queued");
+            refresh();
+        });
+    }
+    function onTest(id: string) {
+        startTransition(async () => {
+            const result = await testSourceAction(id);
+            if (!result.ok) {
+                toast.error(result.error);
+                return;
+            }
+            toast.success("Test passed");
+        });
+    }
+    function onDelete(id: string) {
+        startTransition(async () => {
+            const result = await deleteSourceAction(id);
+            if (!result.ok) {
+                toast.error(result.error);
+                return;
+            }
+            toast.success("Source removed");
+            refresh();
+        });
+    }
+    return (<div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex rounded-lg border p-0.5">
-          <Button
-            type="button"
-            size="sm"
-            variant={panel === "catalog" ? "secondary" : "ghost"}
-            className="cursor-pointer"
-            onClick={() => {
-              setPanel("catalog");
-              resetForm();
-            }}
-          >
+          <Button type="button" size="sm" variant={panel === "catalog" ? "secondary" : "ghost"} className="cursor-pointer" onClick={() => {
+            setPanel("catalog");
+            resetForm();
+        }}>
             Browse catalog
           </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant={panel === "advanced" ? "secondary" : "ghost"}
-            className="cursor-pointer"
-            onClick={() => setPanel("advanced")}
-          >
+          <Button type="button" size="sm" variant={panel === "advanced" ? "secondary" : "ghost"} className="cursor-pointer" onClick={() => setPanel("advanced")}>
             Advanced
           </Button>
         </div>
-        {panel === "advanced" && (
-          <Button
-            type="button"
-            className="cursor-pointer"
-            onClick={() => {
-              if (showForm) resetForm();
-              else setShowForm(true);
-            }}
-          >
-            <Plus className="mr-2 h-4 w-4" aria-hidden />
+        {panel === "advanced" && (<Button type="button" className="cursor-pointer" onClick={() => {
+                if (showForm)
+                    resetForm();
+                else
+                    setShowForm(true);
+            }}>
+            <Plus className="mr-2 h-4 w-4" aria-hidden/>
             Custom source
-          </Button>
-        )}
+          </Button>)}
       </div>
 
-      {panel === "catalog" && (
-        <Card>
+      {panel === "catalog" && (<Card>
           <CardHeader>
             <CardTitle>Job boards</CardTitle>
             <CardDescription>
@@ -327,25 +249,14 @@ export function SourcesManager({ initialSources, catalogEntries }: Props) {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <SourceCatalogPicker
-              entries={catalogEntries}
-              selected={catalogSelection}
-              onChange={setCatalogSelection}
-            />
-            <StatefulButton
-              type="button"
-              className="cursor-pointer"
-              disabled={isPending || catalogSelection.length < 1}
-              onClick={onInstallCatalog}
-            >
+            <SourceCatalogPicker entries={catalogEntries} selected={catalogSelection} onChange={setCatalogSelection}/>
+            <StatefulButton type="button" className="cursor-pointer" disabled={isPending || catalogSelection.length < 1} onClick={onInstallCatalog}>
               Add selected
             </StatefulButton>
           </CardContent>
-        </Card>
-      )}
+        </Card>)}
 
-      {panel === "advanced" && showForm && (
-        <Card>
+      {panel === "advanced" && showForm && (<Card>
           <CardHeader>
             <CardTitle>{editingId ? "Edit source" : "New source"}</CardTitle>
             <CardDescription>
@@ -358,15 +269,7 @@ export function SourcesManager({ initialSources, catalogEntries }: Props) {
             <form onSubmit={onCreate} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="source-type">Type</Label>
-                <select
-                  id="source-type"
-                  className="border-input bg-background h-9 w-full rounded-md border px-2 text-sm disabled:opacity-60"
-                  value={sourceType}
-                  disabled={Boolean(editingId)}
-                  onChange={(e) =>
-                    setSourceType(e.target.value as SourceType)
-                  }
-                >
+                <select id="source-type" className="border-input bg-background h-9 w-full rounded-md border px-2 text-sm disabled:opacity-60" value={sourceType} disabled={Boolean(editingId)} onChange={(e) => setSourceType(e.target.value as SourceType)}>
                   <option value="rss">RSS</option>
                   <option value="api">REST API</option>
                   <option value="imap">IMAP email</option>
@@ -377,42 +280,17 @@ export function SourcesManager({ initialSources, catalogEntries }: Props) {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="source-name">Name</Label>
-                <Input
-                  id="source-name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                  placeholder="My job feed"
-                />
+                <Input id="source-name" value={name} onChange={(e) => setName(e.target.value)} required placeholder="My job feed"/>
               </div>
-              {sourceType === "rss" && (
-                <div className="space-y-2">
+              {sourceType === "rss" && (<div className="space-y-2">
                   <Label htmlFor="feed-url">Feed URL</Label>
-                  <Input
-                    id="feed-url"
-                    type="url"
-                    value={feedUrl}
-                    onChange={(e) => setFeedUrl(e.target.value)}
-                    required
-                    placeholder="https://example.com/jobs.rss"
-                  />
-                </div>
-              )}
-              {sourceType === "api" && (
-                <div className="space-y-2">
+                  <Input id="feed-url" type="url" value={feedUrl} onChange={(e) => setFeedUrl(e.target.value)} required placeholder="https://example.com/jobs.rss"/>
+                </div>)}
+              {sourceType === "api" && (<div className="space-y-2">
                   <Label htmlFor="base-url">Base URL</Label>
-                  <Input
-                    id="base-url"
-                    type="url"
-                    value={baseUrl}
-                    onChange={(e) => setBaseUrl(e.target.value)}
-                    required
-                    placeholder="https://api.example.com/jobs"
-                  />
-                </div>
-              )}
-              {sourceType === "imap" && (
-                <>
+                  <Input id="base-url" type="url" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} required placeholder="https://api.example.com/jobs"/>
+                </div>)}
+              {sourceType === "imap" && (<>
                   <p className="text-xs text-muted-foreground">
                     For Gmail, do not use your Google account password. Create an
                     App Password at myaccount.google.com/apppasswords (2-Step
@@ -421,202 +299,88 @@ export function SourcesManager({ initialSources, catalogEntries }: Props) {
                   </p>
                   <div className="space-y-2">
                     <Label htmlFor="imap-server">IMAP server</Label>
-                    <Input
-                      id="imap-server"
-                      value={imapServer}
-                      onChange={(e) => setImapServer(e.target.value)}
-                      required
-                      placeholder="imap.gmail.com"
-                    />
+                    <Input id="imap-server" value={imapServer} onChange={(e) => setImapServer(e.target.value)} required placeholder="imap.gmail.com"/>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="imap-user">Username</Label>
-                    <Input
-                      id="imap-user"
-                      value={imapUsername}
-                      onChange={(e) => setImapUsername(e.target.value)}
-                      required
-                      autoComplete="username"
-                    />
+                    <Input id="imap-user" value={imapUsername} onChange={(e) => setImapUsername(e.target.value)} required autoComplete="username"/>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="imap-pass">
                       Mailbox password or App Password
                     </Label>
-                    <Input
-                      id="imap-pass"
-                      type="password"
-                      value={imapPassword}
-                      onChange={(e) => setImapPassword(e.target.value)}
-                      required={!editingId}
-                      autoComplete="off"
-                      placeholder={
-                        editingId
-                          ? "Leave blank to keep current"
-                          : "Gmail: 16-character App Password"
-                      }
-                    />
+                    <Input id="imap-pass" type="password" value={imapPassword} onChange={(e) => setImapPassword(e.target.value)} required={!editingId} autoComplete="off" placeholder={editingId
+                    ? "Leave blank to keep current"
+                    : "Gmail: 16-character App Password"}/>
                   </div>
-                </>
-              )}
-              {sourceType === "playwright" && (
-                <>
+                </>)}
+              {sourceType === "playwright" && (<>
                   <div className="space-y-2">
                     <Label htmlFor="start-url">Start URL</Label>
-                    <Input
-                      id="start-url"
-                      type="url"
-                      value={startUrl}
-                      onChange={(e) => setStartUrl(e.target.value)}
-                      required
-                      placeholder="https://company.com/careers"
-                    />
+                    <Input id="start-url" type="url" value={startUrl} onChange={(e) => setStartUrl(e.target.value)} required placeholder="https://company.com/careers"/>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="card-sel">Job card selector</Label>
-                    <Input
-                      id="card-sel"
-                      value={jobCardSelector}
-                      onChange={(e) => setJobCardSelector(e.target.value)}
-                      required
-                      placeholder=".job-card"
-                    />
+                    <Input id="card-sel" value={jobCardSelector} onChange={(e) => setJobCardSelector(e.target.value)} required placeholder=".job-card"/>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="title-sel">Title selector</Label>
-                    <Input
-                      id="title-sel"
-                      value={titleSelector}
-                      onChange={(e) => setTitleSelector(e.target.value)}
-                      required
-                      placeholder=".job-title a"
-                    />
+                    <Input id="title-sel" value={titleSelector} onChange={(e) => setTitleSelector(e.target.value)} required placeholder=".job-title a"/>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="url-sel">URL selector (optional)</Label>
-                    <Input
-                      id="url-sel"
-                      value={urlSelector}
-                      onChange={(e) => setUrlSelector(e.target.value)}
-                      placeholder=".job-title a"
-                    />
+                    <Input id="url-sel" value={urlSelector} onChange={(e) => setUrlSelector(e.target.value)} placeholder=".job-title a"/>
                   </div>
-                </>
-              )}
-              {sourceType === "career_page" && (
-                <>
+                </>)}
+              {sourceType === "career_page" && (<>
                   <div className="space-y-2">
                     <Label htmlFor="career-base">Base URL</Label>
-                    <Input
-                      id="career-base"
-                      type="url"
-                      value={baseUrl}
-                      onChange={(e) => setBaseUrl(e.target.value)}
-                      required
-                      placeholder="https://company.com"
-                    />
+                    <Input id="career-base" type="url" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} required placeholder="https://company.com"/>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="list-path">Job list path</Label>
-                    <Input
-                      id="list-path"
-                      value={jobListPath}
-                      onChange={(e) => setJobListPath(e.target.value)}
-                      required
-                      placeholder="/careers"
-                    />
+                    <Input id="list-path" value={jobListPath} onChange={(e) => setJobListPath(e.target.value)} required placeholder="/careers"/>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="career-card">Job card selector</Label>
-                    <Input
-                      id="career-card"
-                      value={jobCardSelector}
-                      onChange={(e) => setJobCardSelector(e.target.value)}
-                      required
-                      placeholder=".job-card"
-                    />
+                    <Input id="career-card" value={jobCardSelector} onChange={(e) => setJobCardSelector(e.target.value)} required placeholder=".job-card"/>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="career-title">Title selector</Label>
-                    <Input
-                      id="career-title"
-                      value={titleSelector}
-                      onChange={(e) => setTitleSelector(e.target.value)}
-                      required
-                      placeholder=".job-title a"
-                    />
+                    <Input id="career-title" value={titleSelector} onChange={(e) => setTitleSelector(e.target.value)} required placeholder=".job-title a"/>
                   </div>
-                </>
-              )}
-              {sourceType === "telegram" && (
-                <>
+                </>)}
+              {sourceType === "telegram" && (<>
                   <div className="space-y-2">
                     <Label htmlFor="bot-token">Bot token</Label>
-                    <Input
-                      id="bot-token"
-                      type="password"
-                      value={botToken}
-                      onChange={(e) => setBotToken(e.target.value)}
-                      required={!editingId}
-                      autoComplete="off"
-                      placeholder={
-                        editingId
-                          ? "Leave blank to keep current"
-                          : "123456:ABC..."
-                      }
-                    />
+                    <Input id="bot-token" type="password" value={botToken} onChange={(e) => setBotToken(e.target.value)} required={!editingId} autoComplete="off" placeholder={editingId
+                    ? "Leave blank to keep current"
+                    : "123456:ABC..."}/>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="channel-id">Channel ID</Label>
-                    <Input
-                      id="channel-id"
-                      value={channelId}
-                      onChange={(e) => setChannelId(e.target.value)}
-                      required
-                      placeholder="@jobs_channel or -100..."
-                    />
+                    <Input id="channel-id" value={channelId} onChange={(e) => setChannelId(e.target.value)} required placeholder="@jobs_channel or -100..."/>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="msg-filter">Message filter (regex)</Label>
-                    <Input
-                      id="msg-filter"
-                      value={messageFilter}
-                      onChange={(e) => setMessageFilter(e.target.value)}
-                      placeholder="hiring|engineer|remote"
-                    />
+                    <Input id="msg-filter" value={messageFilter} onChange={(e) => setMessageFilter(e.target.value)} placeholder="hiring|engineer|remote"/>
                   </div>
-                </>
-              )}
+                </>)}
               <div className="flex flex-wrap gap-2">
-                <StatefulButton
-                  type="submit"
-                  className="cursor-pointer"
-                  disabled={isPending}
-                  onClick={onCreate}
-                >
+                <StatefulButton type="submit" className="cursor-pointer" disabled={isPending} onClick={onCreate}>
                   {editingId ? "Save changes" : "Save source"}
                 </StatefulButton>
-                {editingId && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="cursor-pointer"
-                    disabled={isPending}
-                    onClick={() => resetForm()}
-                  >
+                {editingId && (<Button type="button" variant="outline" className="cursor-pointer" disabled={isPending} onClick={() => resetForm()}>
                     Cancel
-                  </Button>
-                )}
+                  </Button>)}
               </div>
             </form>
           </CardContent>
-        </Card>
-      )}
+        </Card>)}
 
-      {initialSources.length === 0 && panel === "advanced" && !showForm ? (
-        <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+      {initialSources.length === 0 && panel === "advanced" && !showForm ? (<div className="flex flex-col items-center justify-center py-16 px-4 text-center">
           <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted text-muted-foreground">
-            <Radio className="h-8 w-8" aria-hidden />
+            <Radio className="h-8 w-8" aria-hidden/>
           </div>
           <h3 className="mb-2 text-lg font-semibold tracking-tight">
             No custom sources yet
@@ -625,152 +389,88 @@ export function SourcesManager({ initialSources, catalogEntries }: Props) {
             Use the catalog tab for common boards, or add a custom RSS feed,
             mailbox, or scraper here.
           </p>
-          <Button
-            type="button"
-            className="cursor-pointer"
-            onClick={() => setShowForm(true)}
-          >
-            <Plus className="mr-2 h-4 w-4" aria-hidden />
+          <Button type="button" className="cursor-pointer" onClick={() => setShowForm(true)}>
+            <Plus className="mr-2 h-4 w-4" aria-hidden/>
             Custom source
           </Button>
-        </div>
-      ) : initialSources.length > 0 ? (
-        <div className="space-y-3">
+        </div>) : initialSources.length > 0 ? (<div className="space-y-3">
           <h2 className="text-sm font-medium tracking-tight">Connected sources</h2>
         <ul aria-label="Your sources" className="space-y-2">
-          {initialSources.map((s) => (
-            <li key={s.id}>
+          {initialSources.map((s) => (<li key={s.id}>
               <Card>
                 <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="font-medium">{s.name}</h3>
                       <Badge variant="secondary">{s.sourceType}</Badge>
-                      {typeof s.config.catalogId === "string" && (
-                        <Badge variant="outline">Managed preset</Badge>
-                      )}
-                      {s.lastRunStatus && (
-                        <Badge variant="outline">{s.lastRunStatus}</Badge>
-                      )}
-                      {!s.isActive && (
-                        <Badge variant="outline">inactive</Badge>
-                      )}
+                      {typeof s.config.catalogId === "string" && (<Badge variant="outline">Managed preset</Badge>)}
+                      {s.lastRunStatus && (<Badge variant="outline">{s.lastRunStatus}</Badge>)}
+                      {!s.isActive && (<Badge variant="outline">inactive</Badge>)}
                     </div>
                     <p className="text-xs text-muted-foreground">
                       {s.sourceType === "rss" &&
-                        String(s.config.feedUrl ?? "")}
+                    String(s.config.feedUrl ?? "")}
                       {s.sourceType === "api" &&
-                        String(s.config.baseUrl ?? "")}
+                    String(s.config.baseUrl ?? "")}
                       {s.sourceType === "imap" &&
-                        String(s.config.imapServer ?? "")}
+                    String(s.config.imapServer ?? "")}
                       {s.sourceType === "playwright" &&
-                        String(s.config.startUrl ?? "")}
+                    String(s.config.startUrl ?? "")}
                       {s.sourceType === "career_page" &&
-                        String(s.config.baseUrl ?? "")}
+                    String(s.config.baseUrl ?? "")}
                       {s.sourceType === "telegram" &&
-                        String(s.config.channelId ?? "")}
+                    String(s.config.channelId ?? "")}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="cursor-pointer"
-                      disabled={isPending}
-                      onClick={() => beginEdit(s)}
-                    >
-                      <Pencil className="mr-1 h-4 w-4" aria-hidden />
+                    <Button type="button" size="sm" variant="outline" className="cursor-pointer" disabled={isPending} onClick={() => beginEdit(s)}>
+                      <Pencil className="mr-1 h-4 w-4" aria-hidden/>
                       Edit
                     </Button>
-                    <StatefulButton
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="cursor-pointer"
-                      disabled={isPending}
-                      onClick={() => onTest(s.id)}
-                    >
-                      <FlaskConical className="mr-1 h-4 w-4" aria-hidden />
+                    <StatefulButton type="button" size="sm" variant="outline" className="cursor-pointer" disabled={isPending} onClick={() => onTest(s.id)}>
+                      <FlaskConical className="mr-1 h-4 w-4" aria-hidden/>
                       Test
                     </StatefulButton>
-                    <StatefulButton
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="cursor-pointer"
-                      disabled={isPending}
-                      onClick={() => {
-                        startTransition(async () => {
-                          const res = await listSourceRunsAction(s.id);
-                          if (!res.ok) {
+                    <StatefulButton type="button" size="sm" variant="outline" className="cursor-pointer" disabled={isPending} onClick={() => {
+                    startTransition(async () => {
+                        const res = await listSourceRunsAction(s.id);
+                        if (!res.ok) {
                             toast.error(res.error);
                             return;
-                          }
-                          setRunsFor(s.id);
-                          setRuns(res.data?.runs ?? []);
-                        });
-                      }}
-                    >
-                      <History className="mr-1 h-4 w-4" aria-hidden />
+                        }
+                        setRunsFor(s.id);
+                        setRuns(res.data?.runs ?? []);
+                    });
+                }}>
+                      <History className="mr-1 h-4 w-4" aria-hidden/>
                       Runs
                     </StatefulButton>
-                    <StatefulButton
-                      type="button"
-                      size="sm"
-                      className="cursor-pointer"
-                      disabled={isPending || !s.isActive}
-                      onClick={() => onRun(s.id)}
-                    >
-                      <Play className="mr-1 h-4 w-4" aria-hidden />
+                    <StatefulButton type="button" size="sm" className="cursor-pointer" disabled={isPending || !s.isActive} onClick={() => onRun(s.id)}>
+                      <Play className="mr-1 h-4 w-4" aria-hidden/>
                       Run now
                     </StatefulButton>
-                    <StatefulButton
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      className="cursor-pointer"
-                      disabled={isPending}
-                      onClick={() => onDelete(s.id)}
-                      aria-label={`Delete ${s.name}`}
-                    >
-                      <Trash2 className="h-4 w-4" aria-hidden />
+                    <StatefulButton type="button" size="sm" variant="ghost" className="cursor-pointer" disabled={isPending} onClick={() => onDelete(s.id)} aria-label={`Delete ${s.name}`}>
+                      <Trash2 className="h-4 w-4" aria-hidden/>
                     </StatefulButton>
                   </div>
                 </CardContent>
               </Card>
-              {runsFor === s.id && (
-                <div className="mt-2 rounded-md border p-3 text-sm">
+              {runsFor === s.id && (<div className="mt-2 rounded-md border p-3 text-sm">
                   <p className="mb-2 font-medium">Recent runs</p>
-                  {runs.length === 0 ? (
-                    <p className="text-muted-foreground">No runs yet.</p>
-                  ) : (
- <div className="space-y-2">
-                       {runs.map((r) => (
-                        <div
-                          key={r.id}
-                          className="flex flex-wrap gap-2 text-muted-foreground"
-                        >
+                  {runs.length === 0 ? (<p className="text-muted-foreground">No runs yet.</p>) : (<div className="space-y-2">
+                       {runs.map((r) => (<div key={r.id} className="flex flex-wrap gap-2 text-muted-foreground">
                           <Badge variant="outline">{r.status}</Badge>
                           <span>
                             {new Date(r.startedAt).toLocaleString()}
                           </span>
                           <span>{r.jobsFound} jobs</span>
                           {r.durationMs != null && <span>{r.durationMs}ms</span>}
-                          {r.error && (
-                            <span className="text-destructive">{r.error}</span>
-                          )}
-                        </div>
-                      ))}
- </div>
-                   )}
-                 </div>
-               )}
-             </li>
-           ))}
+                          {r.error && (<span className="text-destructive">{r.error}</span>)}
+                        </div>))}
+ </div>)}
+                 </div>)}
+             </li>))}
          </ul>
-        </div>
-      ) : null}
-    </div>
-  );
+        </div>) : null}
+    </div>);
 }

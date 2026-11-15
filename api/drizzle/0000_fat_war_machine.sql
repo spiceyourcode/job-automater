@@ -29,7 +29,7 @@ CREATE TABLE "profiles" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
---> statement-breakpoint
+
 CREATE TABLE "user_sessions" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"user_id" uuid NOT NULL,
@@ -40,7 +40,7 @@ CREATE TABLE "user_sessions" (
 	"revoked_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
---> statement-breakpoint
+
 CREATE TABLE "users" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"email" varchar(255) NOT NULL,
@@ -60,14 +60,14 @@ CREATE TABLE "users" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"deleted_at" timestamp with time zone
 );
---> statement-breakpoint
-ALTER TABLE "profiles" ADD CONSTRAINT "profiles_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "user_sessions" ADD CONSTRAINT "user_sessions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-CREATE UNIQUE INDEX "idx_profiles_user" ON "profiles" USING btree ("user_id");--> statement-breakpoint
-CREATE INDEX "idx_sessions_user" ON "user_sessions" USING btree ("user_id");--> statement-breakpoint
-CREATE INDEX "idx_sessions_token" ON "user_sessions" USING btree ("token_hash");--> statement-breakpoint
-CREATE INDEX "idx_sessions_expires" ON "user_sessions" USING btree ("expires_at") WHERE "user_sessions"."revoked_at" IS NULL;--> statement-breakpoint
-CREATE UNIQUE INDEX "idx_users_email" ON "users" USING btree ("email");--> statement-breakpoint
-CREATE UNIQUE INDEX "idx_users_google_id" ON "users" USING btree ("google_id") WHERE "users"."google_id" IS NOT NULL;--> statement-breakpoint
-CREATE UNIQUE INDEX "idx_users_github_id" ON "users" USING btree ("github_id") WHERE "users"."github_id" IS NOT NULL;--> statement-breakpoint
+
+ALTER TABLE "profiles" ADD CONSTRAINT "profiles_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;
+ALTER TABLE "user_sessions" ADD CONSTRAINT "user_sessions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;
+CREATE UNIQUE INDEX "idx_profiles_user" ON "profiles" USING btree ("user_id");
+CREATE INDEX "idx_sessions_user" ON "user_sessions" USING btree ("user_id");
+CREATE INDEX "idx_sessions_token" ON "user_sessions" USING btree ("token_hash");
+CREATE INDEX "idx_sessions_expires" ON "user_sessions" USING btree ("expires_at") WHERE "user_sessions"."revoked_at" IS NULL;
+CREATE UNIQUE INDEX "idx_users_email" ON "users" USING btree ("email");
+CREATE UNIQUE INDEX "idx_users_google_id" ON "users" USING btree ("google_id") WHERE "users"."google_id" IS NOT NULL;
+CREATE UNIQUE INDEX "idx_users_github_id" ON "users" USING btree ("github_id") WHERE "users"."github_id" IS NOT NULL;
 CREATE UNIQUE INDEX "idx_users_linkedin_id" ON "users" USING btree ("linkedin_id") WHERE "users"."linkedin_id" IS NOT NULL;

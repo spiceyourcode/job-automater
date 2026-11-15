@@ -10,7 +10,7 @@ CREATE TABLE "gmail_connections" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
---> statement-breakpoint
-ALTER TABLE "gmail_connections" ADD CONSTRAINT "gmail_connections_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-CREATE UNIQUE INDEX "uq_gmail_connections_user" ON "gmail_connections" USING btree ("user_id");--> statement-breakpoint
+
+ALTER TABLE "gmail_connections" ADD CONSTRAINT "gmail_connections_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;
+CREATE UNIQUE INDEX "uq_gmail_connections_user" ON "gmail_connections" USING btree ("user_id");
 CREATE INDEX "idx_gmail_connections_email" ON "gmail_connections" USING btree ("gmail_email");

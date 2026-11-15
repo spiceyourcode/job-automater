@@ -33,7 +33,7 @@ def domain_from_url(url: str | None) -> str | None:
         return None
     try:
         host = urlparse(url).hostname
-    except Exception:  # noqa: BLE001
+    except Exception:                
         return None
     if not host:
         return None

@@ -64,8 +64,8 @@ class NormalizedJob(BaseModel):
     remote_type: RemoteType | None = None
     employment_type: EmploymentType | None = None
     experience_level: ExperienceLevel | None = None
-    salary_min: int | None = None  # cents
-    salary_max: int | None = None  # cents
+    salary_min: int | None = None         
+    salary_max: int | None = None         
     salary_currency: str = Field(default="USD", min_length=3, max_length=3)
     salary_period: SalaryPeriod = SalaryPeriod.YEARLY
     description: str | None = None

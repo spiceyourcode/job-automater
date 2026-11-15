@@ -59,7 +59,7 @@ def llm_classify_email(
     if not isinstance(codes, list):
         codes = ["llm"]
     return Classification(
-        category=cat,  # type: ignore[arg-type]
+        category=cat,                          
         confidence=max(0.0, min(1.0, conf)),
         reason_codes=[str(c)[:40] for c in codes[:5]],
     )

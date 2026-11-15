@@ -3,6 +3,6 @@ from celery_app import app
 
 
 @app.task(name="tasks.health.ping", bind=True, max_retries=0)
-def ping(self) -> str:  # noqa: ARG002
+def ping(self) -> str:                
     """Return 'pong' — the simplest alive signal."""
     return "pong"

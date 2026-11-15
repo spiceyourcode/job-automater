@@ -116,7 +116,7 @@ def _fetch_sync(config: dict[str, Any]) -> list[RawJob]:
     try:
         try:
             client.login(username, password)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:                
             raise public_imap_login_error(exc, server) from exc
         typ, _ = client.select(folder, readonly=True)
         if typ != "OK":
@@ -127,7 +127,7 @@ def _fetch_sync(config: dict[str, Any]) -> list[RawJob]:
             return []
 
         uids = data[0].split()
-        # Cap per run to avoid huge mailboxes
+                                             
         uids = uids[-50:]
         jobs: list[RawJob] = []
         for uid in uids:
@@ -143,7 +143,7 @@ def _fetch_sync(config: dict[str, Any]) -> list[RawJob]:
     finally:
         try:
             client.logout()
-        except Exception:  # noqa: BLE001
+        except Exception:                
             pass
 
 
@@ -152,7 +152,7 @@ class ImapCollector(BaseCollector):
 
     async def collect(self, config: dict[str, Any]) -> list[RawJob]:
         jobs = await asyncio.to_thread(_fetch_sync, config)
-        # Never log username/password (HG-8)
+                                            
         logger.info(
             "imap_collect_ok entries=%s server=%s",
             len(jobs),

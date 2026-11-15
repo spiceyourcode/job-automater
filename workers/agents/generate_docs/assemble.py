@@ -237,7 +237,7 @@ def assemble_sections(
     for text, cid, section, _score in candidates:
         add_line(text, cid, section)
 
-    # Summary: reuse top experience/project lines (already traced under source section)
+                                                                                       
     if want_section("summary") and not sections["summary"]:
         for sec in ("experience", "projects"):
             for line in sections.get(sec) or []:
@@ -249,7 +249,7 @@ def assemble_sections(
             if sections["summary"]:
                 break
 
-    # Skills: extract short skill tokens from skills-tagged clauses if empty
+                                                                            
     if want_section("skills") and not sections["skills"]:
         for ch in chunks:
             if resolve_chunk_section(ch) != "skills" and str(

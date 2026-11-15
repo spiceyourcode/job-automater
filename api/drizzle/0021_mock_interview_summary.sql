@@ -1,0 +1,1 @@
+ALTER TABLE "mock_interview_sessions" ADD COLUMN IF NOT EXISTS "summary" jsonb;

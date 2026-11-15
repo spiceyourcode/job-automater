@@ -1,45 +1,39 @@
 import { z } from "zod";
 import { salaryCentsSchema } from "../../db/schema/validation.js";
-
-/** Source types — Phase 2 + P8.1 playwright/career_page. */
 export const sourceTypeSchema = z.enum([
-  "rss",
-  "api",
-  "imap",
-  "playwright",
-  "career_page",
-  "telegram",
-  "whatsapp",
+    "rss",
+    "api",
+    "imap",
+    "playwright",
+    "career_page",
+    "telegram",
+    "whatsapp",
 ]);
-
 const catalogIdField = { catalogId: z.string().max(100).optional() };
-
 const rssConfigSchema = z
-  .object({
+    .object({
     feedUrl: z.string().url(),
     keywords: z.array(z.string()).optional(),
     pollIntervalMinutes: z.number().int().positive().optional(),
     ...catalogIdField,
-  })
-  .strict();
-
+})
+    .strict();
 const apiConfigSchema = z
-  .object({
+    .object({
     baseUrl: z.string().url(),
     auth: z
-      .object({
+        .object({
         type: z.enum(["none", "bearer", "basic", "api_key"]),
         credentials: z.record(z.string(), z.string()).optional(),
-      })
-      .optional(),
+    })
+        .optional(),
     endpoints: z.array(z.string()).optional(),
     fieldMapping: z.record(z.string(), z.string()).optional(),
     ...catalogIdField,
-  })
-  .strict();
-
+})
+    .strict();
 const imapConfigSchema = z
-  .object({
+    .object({
     imapServer: z.string().min(1),
     port: z.number().int().positive().default(993),
     username: z.string().min(1),
@@ -47,22 +41,20 @@ const imapConfigSchema = z
     folder: z.string().default("INBOX"),
     searchCriteria: z.string().optional(),
     ...catalogIdField,
-  })
-  .strict();
-
+})
+    .strict();
 const playwrightLoginSchema = z
-  .object({
+    .object({
     loginUrl: z.string().url().optional(),
     usernameSelector: z.string().min(1),
     passwordSelector: z.string().min(1),
     submitSelector: z.string().min(1),
     username: z.string().min(1),
     password: z.string().min(1),
-  })
-  .strict();
-
+})
+    .strict();
 const playwrightConfigSchema = z
-  .object({
+    .object({
     startUrl: z.string().url(),
     jobCardSelector: z.string().min(1).max(500),
     titleSelector: z.string().min(1).max(500),
@@ -75,11 +67,10 @@ const playwrightConfigSchema = z
     timeoutMs: z.number().int().positive().max(60000).optional(),
     login: playwrightLoginSchema.optional(),
     ...catalogIdField,
-  })
-  .strict();
-
+})
+    .strict();
 const careerPageConfigSchema = z
-  .object({
+    .object({
     baseUrl: z.string().url(),
     jobListPath: z.string().min(1).max(500).default("/careers"),
     jobCardSelector: z.string().min(1).max(500),
@@ -92,40 +83,36 @@ const careerPageConfigSchema = z
     maxPages: z.number().int().positive().max(20).default(1),
     timeoutMs: z.number().int().positive().max(60000).optional(),
     ...catalogIdField,
-  })
-  .strict();
-
+})
+    .strict();
 const telegramConfigSchema = z
-  .object({
+    .object({
     botToken: z.string().min(10).max(200),
     channelId: z.string().min(1).max(100),
     messageFilter: z.string().max(500).optional(),
     limit: z.number().int().positive().max(100).default(50),
     ...catalogIdField,
-  })
-  .strict();
-
+})
+    .strict();
 const whatsappConfigSchema = z
-  .object({
+    .object({
     exportPath: z.string().min(1).max(1000),
     messageFilter: z.string().max(500).optional(),
     sessionDir: z.string().max(1000).optional(),
     ...catalogIdField,
-  })
-  .strict();
-
+})
+    .strict();
 export const sourceConfigByType = {
-  rss: rssConfigSchema,
-  api: apiConfigSchema,
-  imap: imapConfigSchema,
-  playwright: playwrightConfigSchema,
-  career_page: careerPageConfigSchema,
-  telegram: telegramConfigSchema,
-  whatsapp: whatsappConfigSchema,
+    rss: rssConfigSchema,
+    api: apiConfigSchema,
+    imap: imapConfigSchema,
+    playwright: playwrightConfigSchema,
+    career_page: careerPageConfigSchema,
+    telegram: telegramConfigSchema,
+    whatsapp: whatsappConfigSchema,
 } as const;
-
 export const createSourceBodySchema = z
-  .object({
+    .object({
     sourceType: sourceTypeSchema,
     name: z.string().min(1).max(255),
     description: z.string().max(2000).nullable().optional(),
@@ -140,26 +127,23 @@ export const createSourceBodySchema = z
     companyFilters: z.array(z.unknown()).optional(),
     salaryMin: salaryCentsSchema.nullable().optional(),
     experienceLevels: z.array(z.unknown()).optional(),
-  })
-  .strict()
-  .transform((data, ctx) => {
+})
+    .strict()
+    .transform((data, ctx) => {
     const schema = sourceConfigByType[data.sourceType];
     const parsed = schema.safeParse(data.config);
     if (!parsed.success) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["config"],
-        message:
-          parsed.error.issues[0]?.message ?? "Invalid config for source type",
-      });
-      return z.NEVER;
+        ctx.addIssue({
+            code: "custom",
+            path: ["config"],
+            message: parsed.error.issues[0]?.message ?? "Invalid config for source type",
+        });
+        return z.NEVER;
     }
-    // Persist Zod defaults (e.g. IMAP port/folder), not the raw request body
     return { ...data, config: parsed.data as Record<string, unknown> };
-  });
-
+});
 export const patchSourceBodySchema = z
-  .object({
+    .object({
     name: z.string().min(1).max(255).optional(),
     description: z.string().max(2000).nullable().optional(),
     config: z.record(z.string(), z.unknown()).optional(),
@@ -173,27 +157,23 @@ export const patchSourceBodySchema = z
     companyFilters: z.array(z.unknown()).optional(),
     salaryMin: salaryCentsSchema.nullable().optional(),
     experienceLevels: z.array(z.unknown()).optional(),
-  })
-  .strict();
-
+})
+    .strict();
 export const sourceIdParamSchema = z.object({
-  id: z.string().uuid(),
+    id: z.string().uuid(),
 });
-
 export const sourceRunsQuerySchema = z
-  .object({
+    .object({
     limit: z.coerce.number().int().min(1).max(100).default(20),
     offset: z.coerce.number().int().min(0).default(0),
-  })
-  .strict();
-
+})
+    .strict();
 export const installCatalogBodySchema = z
-  .object({
+    .object({
     catalogIds: z.array(z.string().min(1).max(100)).min(1).max(50),
     overrides: z.record(z.string(), z.record(z.string(), z.unknown())).optional(),
-  })
-  .strict();
-
+})
+    .strict();
 export type CreateSourceBody = z.infer<typeof createSourceBodySchema>;
 export type InstallCatalogBody = z.infer<typeof installCatalogBodySchema>;
 export type PatchSourceBody = z.infer<typeof patchSourceBodySchema>;

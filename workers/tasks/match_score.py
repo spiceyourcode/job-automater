@@ -51,7 +51,7 @@ def process_match_score(payload: dict[str, Any]) -> dict[str, Any]:
                 "error": "profile_missing",
             }
 
-        # Ownership: only this user's jobs (IDOR)
+                                                 
         targets = load_jobs_for_user(
             conn, user_id=job.user_id, job_ids=job.job_ids
         )
@@ -63,14 +63,14 @@ def process_match_score(payload: dict[str, Any]) -> dict[str, Any]:
 
         peers = load_jobs_for_user(conn, user_id=job.user_id, job_ids=None)
 
-        # Jobs flagged as duplicates during this batch. `peers` is loaded once
-        # and never refreshed, so without this a pair processed in the same run
-        # would match each other and BOTH get archived (no canonical kept).
+                                                                              
+                                                                               
+                                                                           
         flagged_ids: set[str] = set()
 
         for row in targets:
             jid = str(row["id"])
-            # Exclude self and already-flagged jobs from the peer list for dedup
+                                                                                
             existing = [
                 p
                 for p in peers
@@ -105,7 +105,7 @@ def process_match_score(payload: dict[str, Any]) -> dict[str, Any]:
                 )
                 mark_job_scored(conn, job_id=jid, user_id=job.user_id)
                 scored += 1
-            except Exception:  # noqa: BLE001
+            except Exception:                
                 failed += 1
                 logger.exception("match_score_persist_failed job_id=%s", jid)
                 continue
@@ -127,7 +127,7 @@ def process_match_score(payload: dict[str, Any]) -> dict[str, Any]:
                         data={"job_id": jid, "overall_score": overall},
                         priority=1,
                     )
-                except Exception:  # noqa: BLE001
+                except Exception:                
                     logger.exception("match_score_notify_failed job_id=%s", jid)
 
     logger.info(
@@ -151,7 +151,7 @@ def process_match_score(payload: dict[str, Any]) -> dict[str, Any]:
                 "message": f"Scoring {scored}/{total} jobs",
             },
         )
-    except Exception:  # noqa: BLE001
+    except Exception:                
         pass
     return {
         "status": "ok",

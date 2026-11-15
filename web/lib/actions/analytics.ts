@@ -1,141 +1,150 @@
 "use server";
-
 import { getAccessToken } from "@/lib/auth-token";
-
-const API_URL =
-  process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4001";
-
-export type ActionResult<T = undefined> =
-  | { ok: true; data?: T }
-  | { ok: false; error: string };
-
+const API_URL = process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4001";
+export type ActionResult<T = undefined> = {
+    ok: true;
+    data?: T;
+} | {
+    ok: false;
+    error: string;
+};
 async function authHeaders(): Promise<HeadersInit | null> {
-  const token = await getAccessToken();
-  if (!token) return null;
-  return { authorization: `Bearer ${token}` };
+    const token = await getAccessToken();
+    if (!token)
+        return null;
+    return { authorization: `Bearer ${token}` };
 }
-
 export type DashboardSummary = {
-  range: { from: string; to: string };
-  jobsCollected: number;
-  applicationsCreated: number;
-  applicationsSubmitted: number;
-  interviewing: number;
-  offered: number;
-  avgMatchScore: number | null;
-  highMatches: number;
+    range: {
+        from: string;
+        to: string;
+    };
+    jobsCollected: number;
+    applicationsCreated: number;
+    applicationsSubmitted: number;
+    interviewing: number;
+    offered: number;
+    avgMatchScore: number | null;
+    highMatches: number;
 };
-
-export type FunnelStage = { stage: string; label: string; count: number };
-
-export type MatchPoint = { day: string; avgScore: number; count: number };
-
+export type FunnelStage = {
+    stage: string;
+    label: string;
+    count: number;
+};
+export type MatchPoint = {
+    day: string;
+    avgScore: number;
+    count: number;
+};
 export type SourceRow = {
-  id: string;
-  name: string;
-  type: string;
-  lastRunStatus: string | null;
-  jobsCollected: number;
+    id: string;
+    name: string;
+    type: string;
+    lastRunStatus: string | null;
+    jobsCollected: number;
 };
-
 async function getJson<T>(path: string): Promise<ActionResult<T>> {
-  const headers = await authHeaders();
-  if (!headers) return { ok: false, error: "Unauthorized" };
-  try {
-    const res = await fetch(`${API_URL}${path}`, {
-      headers,
-      cache: "no-store",
-    });
-    if (!res.ok) return { ok: false, error: "Failed to load analytics" };
-    return { ok: true, data: (await res.json()) as T };
-  } catch {
-    return { ok: false, error: "Network error — is the API running?" };
-  }
+    const headers = await authHeaders();
+    if (!headers)
+        return { ok: false, error: "Unauthorized" };
+    try {
+        const res = await fetch(`${API_URL}${path}`, {
+            headers,
+            cache: "no-store",
+        });
+        if (!res.ok)
+            return { ok: false, error: "Failed to load analytics" };
+        return { ok: true, data: (await res.json()) as T };
+    }
+    catch {
+        return { ok: false, error: "Network error — is the API running?" };
+    }
 }
-
 export async function getAnalyticsDashboardAction(range?: {
-  from?: string;
-  to?: string;
+    from?: string;
+    to?: string;
 }) {
-  const qs = new URLSearchParams();
-  if (range?.from) qs.set("from", range.from);
-  if (range?.to) qs.set("to", range.to);
-  const q = qs.toString();
-  return getJson<DashboardSummary>(
-    `/api/v1/analytics/dashboard${q ? `?${q}` : ""}`,
-  );
+    const qs = new URLSearchParams();
+    if (range?.from)
+        qs.set("from", range.from);
+    if (range?.to)
+        qs.set("to", range.to);
+    const q = qs.toString();
+    return getJson<DashboardSummary>(`/api/v1/analytics/dashboard${q ? `?${q}` : ""}`);
 }
-
 export async function getPipelineFunnelAction() {
-  return getJson<{ funnel: FunnelStage[] }>("/api/v1/analytics/pipeline");
+    return getJson<{
+        funnel: FunnelStage[];
+    }>("/api/v1/analytics/pipeline");
 }
-
 export async function getMatchQualityAction(range?: {
-  from?: string;
-  to?: string;
+    from?: string;
+    to?: string;
 }) {
-  const qs = new URLSearchParams();
-  if (range?.from) qs.set("from", range.from);
-  if (range?.to) qs.set("to", range.to);
-  const q = qs.toString();
-  return getJson<{ series: MatchPoint[] }>(
-    `/api/v1/analytics/matches${q ? `?${q}` : ""}`,
-  );
+    const qs = new URLSearchParams();
+    if (range?.from)
+        qs.set("from", range.from);
+    if (range?.to)
+        qs.set("to", range.to);
+    const q = qs.toString();
+    return getJson<{
+        series: MatchPoint[];
+    }>(`/api/v1/analytics/matches${q ? `?${q}` : ""}`);
 }
-
 export async function getSourcePerformanceAction() {
-  return getJson<{ sources: SourceRow[] }>("/api/v1/analytics/sources");
+    return getJson<{
+        sources: SourceRow[];
+    }>("/api/v1/analytics/sources");
 }
-
 export type SkillDemand = {
-  skill: string;
-  count: number;
-  avgSalaryCents: number | null;
+    skill: string;
+    count: number;
+    avgSalaryCents: number | null;
 };
-
 export type CourseSuggestion = {
-  title: string;
-  provider: string;
-  url: string;
+    title: string;
+    provider: string;
+    url: string;
 };
-
 export type SkillGap = SkillDemand & {
-  course: CourseSuggestion;
+    course: CourseSuggestion;
 };
-
 export type SkillGapReport = {
-  range: { from: string; to: string };
-  inDemand: SkillDemand[];
-  mySkills: string[];
-  mySkillsCoverage: {
-    totalProfileSkills: number;
-    inDemandCovered: number;
-    coveragePct: number;
-  };
-  gaps: SkillGap[];
+    range: {
+        from: string;
+        to: string;
+    };
+    inDemand: SkillDemand[];
+    mySkills: string[];
+    mySkillsCoverage: {
+        totalProfileSkills: number;
+        inDemandCovered: number;
+        coveragePct: number;
+    };
+    gaps: SkillGap[];
 };
-
 export async function getSkillGapsAction(range?: {
-  from?: string;
-  to?: string;
+    from?: string;
+    to?: string;
 }) {
-  const qs = new URLSearchParams();
-  if (range?.from) qs.set("from", range.from);
-  if (range?.to) qs.set("to", range.to);
-  const q = qs.toString();
-  return getJson<SkillGapReport>(
-    `/api/v1/analytics/skills${q ? `?${q}` : ""}`,
-  );
+    const qs = new URLSearchParams();
+    if (range?.from)
+        qs.set("from", range.from);
+    if (range?.to)
+        qs.set("to", range.to);
+    const q = qs.toString();
+    return getJson<SkillGapReport>(`/api/v1/analytics/skills${q ? `?${q}` : ""}`);
 }
-
 export type CvAbVariant = {
-  cvVersion: number;
-  applications: number;
-  submitted: number;
-  responses: number;
-  responseRatePct: number;
+    cvVersion: number;
+    applications: number;
+    submitted: number;
+    responses: number;
+    responseRatePct: number;
 };
-
 export async function getCvAbAction() {
-  return getJson<{ variants: CvAbVariant[] }>("/api/v1/analytics/cv-ab");
+    return getJson<{
+        variants: CvAbVariant[];
+    }>("/api/v1/analytics/cv-ab");
 }

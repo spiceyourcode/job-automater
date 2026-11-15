@@ -82,7 +82,7 @@ def process_monitor_email(payload: dict[str, Any]) -> dict[str, Any]:
                 provider=job.provider,
             )
 
-            # Classifier gets subject/snippet only — never log body (HG-8)
+                                                                          
             result = run_email_classifier(
                 subject=msg.subject,
                 snippet=msg.snippet,
@@ -147,7 +147,7 @@ def process_monitor_email(payload: dict[str, Any]) -> dict[str, Any]:
                 )
 
             processed += 1
-            # Log counts only — never subject/body (HG-8)
+                                                         
             logger.info(
                 "email_processed category=%s auto=%s",
                 category,

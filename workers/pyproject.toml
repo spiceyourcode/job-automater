@@ -32,13 +32,23 @@ playwright = [
 ocr = [
     "indra-ocr>=1.1.2",
 ]
+voice = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "faster-whisper>=1.0",
+    "piper-tts>=1.2",
+    "numpy>=1.26",
+]
+
+[project.scripts]
+voice-gateway = "voice_gateway.server:main"
 
 [tool.setuptools]
 py-modules = ["celery_app", "config", "db", "storage"]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["tasks*", "agents*", "collectors*", "lib*"]
+include = ["tasks*", "agents*", "collectors*", "lib*", "voice_gateway*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

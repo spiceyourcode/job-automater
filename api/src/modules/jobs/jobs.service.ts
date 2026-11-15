@@ -5,480 +5,366 @@ import { jobs, jobScores, savedJobs } from "../../db/schema/index.js";
 import { enqueueMatchScore } from "../../lib/queue.js";
 import { assertPublicHttpUrl } from "../../lib/safe-url.js";
 import type { ImportJobBody, ListJobsQuery, SalaryBenchmarkQuery } from "./jobs.schema.js";
-
-
-/**
- * Jobs are only surfaced for the last N days (by `collectedAt`). Older rows are
- * also hard-deleted by the `purge_old_jobs` worker task; this filter keeps the
- * listing correct even before a purge run.
- */
 export const JOB_LISTING_MAX_AGE_DAYS = 5;
-
 export class JobError extends Error {
-  constructor(
-    message: string,
-    readonly statusCode: 400 | 403 | 404,
-  ) {
-    super(message);
-    this.name = "JobError";
-  }
+    constructor(message: string, readonly statusCode: 400 | 403 | 404) {
+        super(message);
+        this.name = "JobError";
+    }
 }
-
-function toPublicJob(
-  job: typeof jobs.$inferSelect,
-  score: typeof jobScores.$inferSelect | null,
-  isSaved = false,
-) {
-  return {
-    id: job.id,
-    title: job.title,
-    company: job.company,
-    location: job.location,
-    isRemote: job.isRemote,
-    remoteType: job.remoteType,
-    employmentType: job.employmentType,
-    experienceLevel: job.experienceLevel,
-    salaryMin: job.salaryMin,
-    salaryMax: job.salaryMax,
-    salaryCurrency: job.salaryCurrency,
-    salaryPeriod: job.salaryPeriod,
-    description: job.description,
-    requirements: job.requirements,
-    applicationUrl: job.applicationUrl,
-    source: job.source,
-    sourceUrl: job.sourceUrl,
-    tags: job.tags,
-    status: job.status,
-    isDuplicate: job.isDuplicate,
-    collectedAt: job.collectedAt,
-    postedAt: job.postedAt,
-    isSaved,
-    score: score
-      ? {
-          overall: Number(score.overallScore),
-          skillMatch: score.skillMatch != null ? Number(score.skillMatch) : null,
-          experienceMatch:
-            score.experienceMatch != null
-              ? Number(score.experienceMatch)
-              : null,
-          locationMatch:
-            score.locationMatch != null ? Number(score.locationMatch) : null,
-          salaryMatch:
-            score.salaryMatch != null ? Number(score.salaryMatch) : null,
-          cultureMatch:
-            score.cultureMatch != null ? Number(score.cultureMatch) : null,
-          reasoning: score.reasoning,
-          matchedSkills: score.matchedSkills,
-          missingSkills: score.missingSkills,
-          weights: score.weights,
-          scoredAt: score.scoredAt,
-        }
-      : null,
-  };
+function toPublicJob(job: typeof jobs.$inferSelect, score: typeof jobScores.$inferSelect | null, isSaved = false) {
+    return {
+        id: job.id,
+        title: job.title,
+        company: job.company,
+        location: job.location,
+        isRemote: job.isRemote,
+        remoteType: job.remoteType,
+        employmentType: job.employmentType,
+        experienceLevel: job.experienceLevel,
+        salaryMin: job.salaryMin,
+        salaryMax: job.salaryMax,
+        salaryCurrency: job.salaryCurrency,
+        salaryPeriod: job.salaryPeriod,
+        description: job.description,
+        requirements: job.requirements,
+        applicationUrl: job.applicationUrl,
+        source: job.source,
+        sourceUrl: job.sourceUrl,
+        tags: job.tags,
+        status: job.status,
+        isDuplicate: job.isDuplicate,
+        collectedAt: job.collectedAt,
+        postedAt: job.postedAt,
+        isSaved,
+        score: score
+            ? {
+                overall: Number(score.overallScore),
+                skillMatch: score.skillMatch != null ? Number(score.skillMatch) : null,
+                experienceMatch: score.experienceMatch != null
+                    ? Number(score.experienceMatch)
+                    : null,
+                locationMatch: score.locationMatch != null ? Number(score.locationMatch) : null,
+                salaryMatch: score.salaryMatch != null ? Number(score.salaryMatch) : null,
+                cultureMatch: score.cultureMatch != null ? Number(score.cultureMatch) : null,
+                reasoning: score.reasoning,
+                matchedSkills: score.matchedSkills,
+                missingSkills: score.missingSkills,
+                weights: score.weights,
+                scoredAt: score.scoredAt,
+            }
+            : null,
+    };
 }
-
-/**
- * List jobs for the authenticated user only (IDOR-safe).
- * Owns jobs + job_scores (HG-6 job domain).
- */
 export async function listJobs(userId: string, query: ListJobsQuery) {
-  const conditions = [eq(jobs.userId, userId)];
-
-  const cutoff = new Date(
-    Date.now() - JOB_LISTING_MAX_AGE_DAYS * 24 * 60 * 60 * 1000,
-  );
-  conditions.push(gte(jobs.collectedAt, cutoff));
-
-  if (!query.includeDuplicates) {
-    conditions.push(eq(jobs.isDuplicate, false));
-  }
-  if (query.remoteOnly) {
-    conditions.push(eq(jobs.isRemote, true));
-  }
-  if (query.q) {
-    const term = `%${query.q}%`;
-    conditions.push(
-      or(ilike(jobs.title, term), ilike(jobs.company, term))!,
-    );
-  }
-  if (query.source) {
-    conditions.push(eq(jobs.source, query.source));
-  }
-  if (query.location) {
-    conditions.push(ilike(jobs.location, `%${query.location}%`));
-  }
-  if (query.salaryMin != null) {
-    conditions.push(
-      or(
-        gte(jobs.salaryMin, query.salaryMin),
-        gte(jobs.salaryMax, query.salaryMin),
-      )!,
-    );
-  }
-  if (query.salaryMax != null) {
-    conditions.push(
-      or(
-        lte(jobs.salaryMin, query.salaryMax),
-        lte(jobs.salaryMax, query.salaryMax),
-      )!,
-    );
-  }
-  if (query.status) {
-    conditions.push(eq(jobs.status, query.status));
-  }
-  if (query.employmentType) {
-    conditions.push(eq(jobs.employmentType, query.employmentType));
-  }
-  if (query.experienceLevel) {
-    conditions.push(eq(jobs.experienceLevel, query.experienceLevel));
-  }
-  if (query.postedAfter) {
-    conditions.push(
-      or(
-        gte(jobs.postedAt, new Date(query.postedAfter)),
-        sql`${jobs.postedAt} IS NULL`,
-      )!,
-    );
-  }
-
-  const rows = await db
-    .select({
-      job: jobs,
-      score: jobScores,
-      savedId: savedJobs.id,
+    const conditions = [eq(jobs.userId, userId)];
+    const cutoff = new Date(Date.now() - JOB_LISTING_MAX_AGE_DAYS * 24 * 60 * 60 * 1000);
+    conditions.push(gte(jobs.collectedAt, cutoff));
+    if (!query.includeDuplicates) {
+        conditions.push(eq(jobs.isDuplicate, false));
+    }
+    if (query.remoteOnly) {
+        conditions.push(eq(jobs.isRemote, true));
+    }
+    if (query.q) {
+        const term = `%${query.q}%`;
+        conditions.push(or(ilike(jobs.title, term), ilike(jobs.company, term))!);
+    }
+    if (query.source) {
+        conditions.push(eq(jobs.source, query.source));
+    }
+    if (query.location) {
+        conditions.push(ilike(jobs.location, `%${query.location}%`));
+    }
+    if (query.salaryMin != null) {
+        conditions.push(or(gte(jobs.salaryMin, query.salaryMin), gte(jobs.salaryMax, query.salaryMin))!);
+    }
+    if (query.salaryMax != null) {
+        conditions.push(or(lte(jobs.salaryMin, query.salaryMax), lte(jobs.salaryMax, query.salaryMax))!);
+    }
+    if (query.status) {
+        conditions.push(eq(jobs.status, query.status));
+    }
+    if (query.employmentType) {
+        conditions.push(eq(jobs.employmentType, query.employmentType));
+    }
+    if (query.experienceLevel) {
+        conditions.push(eq(jobs.experienceLevel, query.experienceLevel));
+    }
+    if (query.postedAfter) {
+        conditions.push(or(gte(jobs.postedAt, new Date(query.postedAfter)), sql `${jobs.postedAt} IS NULL`)!);
+    }
+    const rows = await db
+        .select({
+        job: jobs,
+        score: jobScores,
+        savedId: savedJobs.id,
     })
-    .from(jobs)
-    .leftJoin(
-      jobScores,
-      and(eq(jobScores.jobId, jobs.id), eq(jobScores.userId, userId)),
-    )
-    .leftJoin(
-      savedJobs,
-      and(eq(savedJobs.jobId, jobs.id), eq(savedJobs.userId, userId)),
-    )
-    .where(
-      query.savedOnly
+        .from(jobs)
+        .leftJoin(jobScores, and(eq(jobScores.jobId, jobs.id), eq(jobScores.userId, userId)))
+        .leftJoin(savedJobs, and(eq(savedJobs.jobId, jobs.id), eq(savedJobs.userId, userId)))
+        .where(query.savedOnly
         ? and(...conditions, isNotNull(savedJobs.id))
-        : and(...conditions),
-    )
-    .orderBy(
-      query.sort === "date"
+        : and(...conditions))
+        .orderBy(query.sort === "date"
         ? desc(jobs.collectedAt)
-        : sql`COALESCE(${jobScores.overallScore}, 0) DESC`,
-    )
-    .limit(query.limit);
-
-  let items = rows.map((r) =>
-    toPublicJob(r.job, r.score, Boolean(r.savedId)),
-  );
-  if (query.minScore != null) {
-    items = items.filter(
-      (j) => j.score != null && j.score.overall >= query.minScore!,
-    );
-  }
-
-  return { jobs: items, total: items.length };
+        : sql `COALESCE(${jobScores.overallScore}, 0) DESC`)
+        .limit(query.limit);
+    let items = rows.map((r) => toPublicJob(r.job, r.score, Boolean(r.savedId)));
+    if (query.minScore != null) {
+        items = items.filter((j) => j.score != null && j.score.overall >= query.minScore!);
+    }
+    return { jobs: items, total: items.length };
 }
-
-/** Aggregate stats for the authenticated user only (IDOR-safe). */
 export async function getJobStats(userId: string) {
-  const [totals] = await db
-    .select({
-      total: sql<number>`count(*)::int`,
-      remote: sql<number>`count(*) filter (where ${jobs.isRemote})::int`,
-      scored: sql<number>`count(*) filter (where ${jobs.status} = 'scored')::int`,
-      saved: sql<number>`(
+    const [totals] = await db
+        .select({
+        total: sql<number> `count(*)::int`,
+        remote: sql<number> `count(*) filter (where ${jobs.isRemote})::int`,
+        scored: sql<number> `count(*) filter (where ${jobs.status} = 'scored')::int`,
+        saved: sql<number> `(
         select count(*)::int from ${savedJobs}
         where ${savedJobs.userId} = ${userId}
       )`,
     })
-    .from(jobs)
-    .where(and(eq(jobs.userId, userId), eq(jobs.isDuplicate, false)));
-
-  const bySource = await db
-    .select({
-      source: jobs.source,
-      count: sql<number>`count(*)::int`,
+        .from(jobs)
+        .where(and(eq(jobs.userId, userId), eq(jobs.isDuplicate, false)));
+    const bySource = await db
+        .select({
+        source: jobs.source,
+        count: sql<number> `count(*)::int`,
     })
-    .from(jobs)
-    .where(and(eq(jobs.userId, userId), eq(jobs.isDuplicate, false)))
-    .groupBy(jobs.source)
-    .orderBy(sql`count(*) DESC`);
-
-  const byStatus = await db
-    .select({
-      status: jobs.status,
-      count: sql<number>`count(*)::int`,
+        .from(jobs)
+        .where(and(eq(jobs.userId, userId), eq(jobs.isDuplicate, false)))
+        .groupBy(jobs.source)
+        .orderBy(sql `count(*) DESC`);
+    const byStatus = await db
+        .select({
+        status: jobs.status,
+        count: sql<number> `count(*)::int`,
     })
-    .from(jobs)
-    .where(and(eq(jobs.userId, userId), eq(jobs.isDuplicate, false)))
-    .groupBy(jobs.status);
-
-  return {
-    total: totals?.total ?? 0,
-    remote: totals?.remote ?? 0,
-    scored: totals?.scored ?? 0,
-    saved: totals?.saved ?? 0,
-    bySource,
-    byStatus,
-  };
-}
-
-export async function getJob(userId: string, id: string) {
-  const [row] = await db
-    .select({
-      job: jobs,
-      score: jobScores,
-    })
-    .from(jobs)
-    .leftJoin(
-      jobScores,
-      and(eq(jobScores.jobId, jobs.id), eq(jobScores.userId, userId)),
-    )
-    .where(and(eq(jobs.id, id), eq(jobs.userId, userId)))
-    .limit(1);
-
-  if (!row) throw new JobError("Job not found", 404);
-  const [saved] = await db
-    .select({ id: savedJobs.id })
-    .from(savedJobs)
-    .where(and(eq(savedJobs.userId, userId), eq(savedJobs.jobId, id)))
-    .limit(1);
-  return { job: toPublicJob(row.job, row.score, Boolean(saved)) };
-}
-
-function titleFromUrl(url: URL): { title: string; company: string } {
-  const host = url.hostname.replace(/^www\./, "");
-  const path = url.pathname.replace(/\/+/g, " ").trim();
-  const title =
-    path.length > 1
-      ? path.slice(0, 200).replace(/[-_]/g, " ").trim()
-      : `Job at ${host}`;
-  return { title: title || `Job at ${host}`, company: host };
-}
-
-/**
- * Manual URL import — user-scoped only (IDOR: never visible to others).
- * Fetches public URL metadata when possible; always inserts owned job row.
- */
-export async function importJob(userId: string, body: ImportJobBody) {
-  const parsedUrl = await assertPublicHttpUrl(body.url);
-  const href = parsedUrl.toString();
-  const sourceId = createHash("sha256").update(href).digest("hex").slice(0, 64);
-  const source = body.sourceType?.trim() || "manual";
-
-  const [existing] = await db
-    .select()
-    .from(jobs)
-    .where(
-      and(
-        eq(jobs.userId, userId),
-        eq(jobs.source, source),
-        eq(jobs.sourceId, sourceId),
-      ),
-    )
-    .limit(1);
-  if (existing) {
+        .from(jobs)
+        .where(and(eq(jobs.userId, userId), eq(jobs.isDuplicate, false)))
+        .groupBy(jobs.status);
     return {
-      job: toPublicJob(existing, null, false),
-      taskId: null as string | null,
-      deduped: true,
+        total: totals?.total ?? 0,
+        remote: totals?.remote ?? 0,
+        scored: totals?.scored ?? 0,
+        saved: totals?.saved ?? 0,
+        bySource,
+        byStatus,
     };
-  }
-
-  let title: string;
-  let company: string;
-  let description: string | null = null;
-  try {
-    const res = await fetch(href, {
-      method: "GET",
-      redirect: "follow",
-      signal: AbortSignal.timeout(10000),
-      headers: { "user-agent": "JobAutomater/1.0 job-import" },
-    });
-    if (res.ok) {
-      const html = await res.text();
-      const m = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-      const pageTitle = m?.[1]?.replace(/\s+/g, " ").trim().slice(0, 500);
-      const derived = titleFromUrl(parsedUrl);
-      title = pageTitle || derived.title;
-      company = derived.company;
-      description = pageTitle ? `Imported from ${href}` : null;
-    } else {
-      const derived = titleFromUrl(parsedUrl);
-      title = derived.title;
-      company = derived.company;
+}
+export async function getJob(userId: string, id: string) {
+    const [row] = await db
+        .select({
+        job: jobs,
+        score: jobScores,
+    })
+        .from(jobs)
+        .leftJoin(jobScores, and(eq(jobScores.jobId, jobs.id), eq(jobScores.userId, userId)))
+        .where(and(eq(jobs.id, id), eq(jobs.userId, userId)))
+        .limit(1);
+    if (!row)
+        throw new JobError("Job not found", 404);
+    const [saved] = await db
+        .select({ id: savedJobs.id })
+        .from(savedJobs)
+        .where(and(eq(savedJobs.userId, userId), eq(savedJobs.jobId, id)))
+        .limit(1);
+    return { job: toPublicJob(row.job, row.score, Boolean(saved)) };
+}
+function titleFromUrl(url: URL): {
+    title: string;
+    company: string;
+} {
+    const host = url.hostname.replace(/^www\./, "");
+    const path = url.pathname.replace(/\/+/g, " ").trim();
+    const title = path.length > 1
+        ? path.slice(0, 200).replace(/[-_]/g, " ").trim()
+        : `Job at ${host}`;
+    return { title: title || `Job at ${host}`, company: host };
+}
+export async function importJob(userId: string, body: ImportJobBody) {
+    const parsedUrl = await assertPublicHttpUrl(body.url);
+    const href = parsedUrl.toString();
+    const sourceId = createHash("sha256").update(href).digest("hex").slice(0, 64);
+    const source = body.sourceType?.trim() || "manual";
+    const [existing] = await db
+        .select()
+        .from(jobs)
+        .where(and(eq(jobs.userId, userId), eq(jobs.source, source), eq(jobs.sourceId, sourceId)))
+        .limit(1);
+    if (existing) {
+        return {
+            job: toPublicJob(existing, null, false),
+            taskId: null as string | null,
+            deduped: true,
+        };
     }
-  } catch {
-    const derived = titleFromUrl(parsedUrl);
-    title = derived.title;
-    company = derived.company;
-  }
-
-  const [created] = await db
-    .insert(jobs)
-    .values({
-      userId,
-      source,
-      sourceId,
-      sourceUrl: href,
-      applicationUrl: href,
-      company,
-      title,
-      description,
-      status: "new",
+    let title: string;
+    let company: string;
+    let description: string | null = null;
+    try {
+        const res = await fetch(href, {
+            method: "GET",
+            redirect: "follow",
+            signal: AbortSignal.timeout(10000),
+            headers: { "user-agent": "JobAutomater/1.0 job-import" },
+        });
+        if (res.ok) {
+            const html = await res.text();
+            const m = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+            const pageTitle = m?.[1]?.replace(/\s+/g, " ").trim().slice(0, 500);
+            const derived = titleFromUrl(parsedUrl);
+            title = pageTitle || derived.title;
+            company = derived.company;
+            description = pageTitle ? `Imported from ${href}` : null;
+        }
+        else {
+            const derived = titleFromUrl(parsedUrl);
+            title = derived.title;
+            company = derived.company;
+        }
+    }
+    catch {
+        const derived = titleFromUrl(parsedUrl);
+        title = derived.title;
+        company = derived.company;
+    }
+    const [created] = await db
+        .insert(jobs)
+        .values({
+        userId,
+        source,
+        sourceId,
+        sourceUrl: href,
+        applicationUrl: href,
+        company,
+        title,
+        description,
+        status: "new",
     })
-    .returning();
-
-  if (!created) throw new JobError("Failed to import job", 400);
-
-  const taskId = randomUUID();
-  try {
-    await enqueueMatchScore({
-      job_ids: [created.id],
-      user_id: userId,
-    });
-  } catch {
-    // Job row exists; scoring can be retried via POST /jobs/:id/score later
-  }
-
-  return {
-    job: toPublicJob(created, null, false),
-    taskId,
-    deduped: false,
-  };
+        .returning();
+    if (!created)
+        throw new JobError("Failed to import job", 400);
+    const taskId = randomUUID();
+    try {
+        await enqueueMatchScore({
+            job_ids: [created.id],
+            user_id: userId,
+        });
+    }
+    catch {
+    }
+    return {
+        job: toPublicJob(created, null, false),
+        taskId,
+        deduped: false,
+    };
 }
-
-/** Similar jobs for the same user only — never cross-user (IDOR). */
-export async function listSimilarJobs(
-  userId: string,
-  jobId: string,
-  limit: number,
-) {
-  const [seed] = await db
-    .select()
-    .from(jobs)
-    .where(and(eq(jobs.id, jobId), eq(jobs.userId, userId)))
-    .limit(1);
-  if (!seed) throw new JobError("Job not found", 404);
-
-  const titleTerm = `%${seed.title.split(/\s+/).slice(0, 3).join("%")}%`;
-  const rows = await db
-    .select({
-      job: jobs,
-      score: jobScores,
+export async function listSimilarJobs(userId: string, jobId: string, limit: number) {
+    const [seed] = await db
+        .select()
+        .from(jobs)
+        .where(and(eq(jobs.id, jobId), eq(jobs.userId, userId)))
+        .limit(1);
+    if (!seed)
+        throw new JobError("Job not found", 404);
+    const titleTerm = `%${seed.title.split(/\s+/).slice(0, 3).join("%")}%`;
+    const rows = await db
+        .select({
+        job: jobs,
+        score: jobScores,
     })
-    .from(jobs)
-    .leftJoin(
-      jobScores,
-      and(eq(jobScores.jobId, jobs.id), eq(jobScores.userId, userId)),
-    )
-    .where(
-      and(
-        eq(jobs.userId, userId),
-        ne(jobs.id, jobId),
-        eq(jobs.isDuplicate, false),
-        or(eq(jobs.company, seed.company), ilike(jobs.title, titleTerm)),
-      ),
-    )
-    .orderBy(sql`COALESCE(${jobScores.overallScore}, 0) DESC`)
-    .limit(limit);
-
-  return {
-    jobs: rows.map((r) => toPublicJob(r.job, r.score)),
-  };
+        .from(jobs)
+        .leftJoin(jobScores, and(eq(jobScores.jobId, jobs.id), eq(jobScores.userId, userId)))
+        .where(and(eq(jobs.userId, userId), ne(jobs.id, jobId), eq(jobs.isDuplicate, false), or(eq(jobs.company, seed.company), ilike(jobs.title, titleTerm))))
+        .orderBy(sql `COALESCE(${jobScores.overallScore}, 0) DESC`)
+        .limit(limit);
+    return {
+        jobs: rows.map((r) => toPublicJob(r.job, r.score)),
+    };
 }
-
 export async function saveJob(userId: string, jobId: string) {
-  const [owned] = await db
-    .select({ id: jobs.id })
-    .from(jobs)
-    .where(and(eq(jobs.id, jobId), eq(jobs.userId, userId)))
-    .limit(1);
-  if (!owned) throw new JobError("Job not found", 404);
-
-  await db
-    .insert(savedJobs)
-    .values({ userId, jobId })
-    .onConflictDoNothing();
-
-  return { success: true as const };
-}
-
-export async function unsaveJob(userId: string, jobId: string) {
-  const result = await db
-    .delete(savedJobs)
-    .where(and(eq(savedJobs.userId, userId), eq(savedJobs.jobId, jobId)))
-    .returning({ id: savedJobs.id });
-  if (result.length === 0) {
-    // Confirm ownership of job for consistent 404 (no IDOR leak)
     const [owned] = await db
-      .select({ id: jobs.id })
-      .from(jobs)
-      .where(and(eq(jobs.id, jobId), eq(jobs.userId, userId)))
-      .limit(1);
-    if (!owned) throw new JobError("Job not found", 404);
-  }
-  return { success: true as const };
+        .select({ id: jobs.id })
+        .from(jobs)
+        .where(and(eq(jobs.id, jobId), eq(jobs.userId, userId)))
+        .limit(1);
+    if (!owned)
+        throw new JobError("Job not found", 404);
+    await db
+        .insert(savedJobs)
+        .values({ userId, jobId })
+        .onConflictDoNothing();
+    return { success: true as const };
 }
-
-function percentileCents(sorted: number[], p: number): number | null {
-  if (sorted.length === 0) return null;
-  const idx = Math.min(
-    sorted.length - 1,
-    Math.max(0, Math.round((p / 100) * (sorted.length - 1))),
-  );
-  return sorted[idx] ?? null;
-}
-
-/** Owner-scoped market from collected jobs. Values are integer cents (HG-3). */
-export async function getSalaryBenchmark(
-  userId: string,
-  query: SalaryBenchmarkQuery,
-) {
-  const filters = [eq(jobs.userId, userId), isNotNull(jobs.salaryMin)];
-  if (query.title) {
-    filters.push(ilike(jobs.title, `%${query.title}%`));
-  }
-  if (query.location) {
-    filters.push(ilike(jobs.location, `%${query.location}%`));
-  }
-  const rows = await db
-    .select({
-      salaryMin: jobs.salaryMin,
-      salaryMax: jobs.salaryMax,
-      salaryCurrency: jobs.salaryCurrency,
-      userId: jobs.userId,
-    })
-    .from(jobs)
-    .where(and(...filters));
-
-  for (const row of rows) {
-    if (row.userId !== userId) {
-      throw new JobError("Forbidden", 403);
+export async function unsaveJob(userId: string, jobId: string) {
+    const result = await db
+        .delete(savedJobs)
+        .where(and(eq(savedJobs.userId, userId), eq(savedJobs.jobId, jobId)))
+        .returning({ id: savedJobs.id });
+    if (result.length === 0) {
+        const [owned] = await db
+            .select({ id: jobs.id })
+            .from(jobs)
+            .where(and(eq(jobs.id, jobId), eq(jobs.userId, userId)))
+            .limit(1);
+        if (!owned)
+            throw new JobError("Job not found", 404);
     }
-  }
-
-  const mids: number[] = [];
-  for (const row of rows) {
-    const min = row.salaryMin;
-    const max = row.salaryMax;
-    if (typeof min !== "number") continue;
-    const mid =
-      typeof max === "number" ? Math.round((min + max) / 2) : min;
-    if (Number.isInteger(mid) && mid >= 0) mids.push(mid);
-  }
-  mids.sort((a, b) => a - b);
-  const currency = rows[0]?.salaryCurrency ?? "USD";
-  return {
-    sampleSize: mids.length,
-    currency,
-    p25Cents: percentileCents(mids, 25),
-    p50Cents: percentileCents(mids, 50),
-    p75Cents: percentileCents(mids, 75),
-    minCents: mids[0] ?? null,
-    maxCents: mids.length ? mids[mids.length - 1]! : null,
-    title: query.title ?? null,
-    location: query.location ?? null,
-  };
+    return { success: true as const };
+}
+function percentileCents(sorted: number[], p: number): number | null {
+    if (sorted.length === 0)
+        return null;
+    const idx = Math.min(sorted.length - 1, Math.max(0, Math.round((p / 100) * (sorted.length - 1))));
+    return sorted[idx] ?? null;
+}
+export async function getSalaryBenchmark(userId: string, query: SalaryBenchmarkQuery) {
+    const filters = [eq(jobs.userId, userId), isNotNull(jobs.salaryMin)];
+    if (query.title) {
+        filters.push(ilike(jobs.title, `%${query.title}%`));
+    }
+    if (query.location) {
+        filters.push(ilike(jobs.location, `%${query.location}%`));
+    }
+    const rows = await db
+        .select({
+        salaryMin: jobs.salaryMin,
+        salaryMax: jobs.salaryMax,
+        salaryCurrency: jobs.salaryCurrency,
+        userId: jobs.userId,
+    })
+        .from(jobs)
+        .where(and(...filters));
+    for (const row of rows) {
+        if (row.userId !== userId) {
+            throw new JobError("Forbidden", 403);
+        }
+    }
+    const mids: number[] = [];
+    for (const row of rows) {
+        const min = row.salaryMin;
+        const max = row.salaryMax;
+        if (typeof min !== "number")
+            continue;
+        const mid = typeof max === "number" ? Math.round((min + max) / 2) : min;
+        if (Number.isInteger(mid) && mid >= 0)
+            mids.push(mid);
+    }
+    mids.sort((a, b) => a - b);
+    const currency = rows[0]?.salaryCurrency ?? "USD";
+    return {
+        sampleSize: mids.length,
+        currency,
+        p25Cents: percentileCents(mids, 25),
+        p50Cents: percentileCents(mids, 50),
+        p75Cents: percentileCents(mids, 75),
+        minCents: mids[0] ?? null,
+        maxCents: mids.length ? mids[mids.length - 1]! : null,
+        title: query.title ?? null,
+        location: query.location ?? null,
+    };
 }

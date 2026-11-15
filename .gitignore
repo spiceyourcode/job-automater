@@ -67,11 +67,23 @@ blob-report/
 data/
 *.sql.gz
 
-# --- Agent / editor local ---
+# --- Agent / editor local (not published — keep on disk for Cursor) ---
 .agent-settings/
 .agents/
 .cursor/
 active/
+AGENTS.md
+CLAUDE.md
+CONVENTIONS.md
+project-backlog.md
+docs/agent/
+docs/contracts/
+docs/Implementation_Plan.md
+scripts/
+web/AGENTS.md
+web/CLAUDE.md
+Frankline_Omari_*.txt
+.github/Frankline_*.txt
 
 # --- Workers Python artifacts ---
 workers/.venv/

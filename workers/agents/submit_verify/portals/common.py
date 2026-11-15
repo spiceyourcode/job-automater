@@ -30,7 +30,7 @@ def click_first(page: Any, selectors: Sequence[str], timeout_ms: int = 5_000) ->
             try:
                 loc.first.click(timeout=timeout_ms)
                 return True
-            except Exception:  # noqa: BLE001
+            except Exception:                
                 continue
     return False
 
@@ -59,7 +59,7 @@ def fill_common_fields(page: Any, profile: dict[str, Any] | None) -> None:
         if loc.count() > 0:
             try:
                 loc.first.fill(str(value), timeout=2_000)
-            except Exception:  # noqa: BLE001
+            except Exception:                
                 continue
 
 
@@ -130,7 +130,7 @@ def run_playwright_flow(
                 external_application_id=conf,
                 screenshot_bytes=shot,
             )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:                
         logger.exception(
             "submit_portal_error via=%s type=%s",
             via_label,

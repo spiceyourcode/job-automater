@@ -1,0 +1,278 @@
+/** Local voice gateway WebSocket client (127.0.0.1 sidecar — no secrets). */
+
+export type VoiceGatewayPhase = "idle" | "listening" | "thinking" | "speaking";
+
+export type VoiceGatewayContext = {
+  jobTitle: string;
+  company: string;
+  sampleQuestions: string[];
+  starTitles: string[];
+};
+
+export type VoiceGatewayHandlers = {
+  onPhase?: (phase: VoiceGatewayPhase) => void;
+  onError?: (code: string) => void;
+  onUserText?: (text: string) => void;
+  onAssistantText?: (text: string) => void;
+  onAudioLevel?: (level: number) => void;
+  onOpen?: () => void;
+  onClose?: () => void;
+};
+
+export function defaultVoiceGatewayWsUrl(): string {
+  return (
+    process.env.NEXT_PUBLIC_VOICE_GATEWAY_WS?.trim() ||
+    "ws://127.0.0.1:8765/ws"
+  );
+}
+
+export function voiceGatewayHttpBase(wsUrl: string): string {
+  const u = wsUrl.replace(/\/ws\/?$/, "").replace(/^ws:/, "http:");
+  return u.endsWith("/") ? u.slice(0, -1) : u;
+}
+
+export async function probeVoiceGateway(wsUrl?: string): Promise<boolean> {
+  const base = voiceGatewayHttpBase(wsUrl ?? defaultVoiceGatewayWsUrl());
+  try {
+    const res = await fetch(`${base}/health`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(2500),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+type WsIncoming =
+  | { type: "phase"; phase: VoiceGatewayPhase }
+  | { type: "text"; role: "user" | "assistant"; content: string }
+  | { type: "audio"; format: string; data: string }
+  | { type: "error"; code: string };
+
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const raw = String(reader.result ?? "");
+      const idx = raw.indexOf(",");
+      resolve(idx >= 0 ? raw.slice(idx + 1) : raw);
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+export class VoiceGatewayClient {
+  private ws: WebSocket | null = null;
+  private audioCtx: AudioContext | null = null;
+  private analyser: AnalyserNode | null = null;
+  private levelStop: (() => void) | null = null;
+  private recorder: MediaRecorder | null = null;
+  private recordChunks: Blob[] = [];
+  private stream: MediaStream | null = null;
+  private closed = false;
+
+  constructor(
+    private readonly wsUrl: string,
+    private readonly handlers: VoiceGatewayHandlers = {},
+  ) {}
+
+  get connected(): boolean {
+    return this.ws?.readyState === WebSocket.OPEN;
+  }
+
+  async connect(): Promise<void> {
+    if (this.connected) return;
+    this.closed = false;
+    await new Promise<void>((resolve, reject) => {
+      const ws = new WebSocket(this.wsUrl);
+      this.ws = ws;
+      ws.onopen = () => {
+        this.handlers.onOpen?.();
+        resolve();
+      };
+      ws.onerror = () => reject(new Error("ws_failed"));
+      ws.onclose = () => {
+        this.handlers.onClose?.();
+        if (!this.closed) this.ws = null;
+      };
+      ws.onmessage = (ev) => {
+        void this.onMessage(String(ev.data));
+      };
+    });
+  }
+
+  disconnect(): void {
+    this.closed = true;
+    this.stopLevelMeter();
+    this.ws?.close();
+    this.ws = null;
+    this.stream?.getTracks().forEach((t) => t.stop());
+    this.stream = null;
+    void this.audioCtx?.close();
+    this.audioCtx = null;
+  }
+
+  sendHello(
+    sessionId: string,
+    ctx: VoiceGatewayContext,
+    opts?: { requestOpening?: boolean },
+  ): void {
+    this.send({
+      type: "hello",
+      sessionId,
+      jobTitle: ctx.jobTitle,
+      company: ctx.company,
+      sampleQuestions: ctx.sampleQuestions,
+      starTitles: ctx.starTitles,
+      requestOpening: Boolean(opts?.requestOpening),
+    });
+  }
+
+  speakText(text: string): void {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    this.send({ type: "tts", text: trimmed });
+  }
+
+  async sendUtteranceBlob(blob: Blob, format = "webm"): Promise<void> {
+    const data = await blobToBase64(blob);
+    this.send({ type: "utterance", format, data });
+  }
+
+  sendEnd(): void {
+    this.send({ type: "end" });
+  }
+
+  async startMic(): Promise<void> {
+    if (!this.stream) {
+      this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    }
+    this.recordChunks = [];
+    const mime =
+      MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : "audio/webm";
+    const rec = new MediaRecorder(this.stream, { mimeType: mime });
+    this.recorder = rec;
+    rec.ondataavailable = (e) => {
+      if (e.data.size > 0) this.recordChunks.push(e.data);
+    };
+    rec.start(250);
+    this.handlers.onPhase?.("listening");
+  }
+
+  async stopMicAndSend(): Promise<void> {
+    const rec = this.recorder;
+    if (!rec || rec.state === "inactive") return;
+    await new Promise<void>((resolve) => {
+      rec.onstop = () => resolve();
+      rec.stop();
+    });
+    this.recorder = null;
+    const blob = new Blob(this.recordChunks, {
+      type: rec.mimeType || "audio/webm",
+    });
+    this.recordChunks = [];
+    if (blob.size < 32) {
+      this.handlers.onError?.("empty_audio");
+      this.handlers.onPhase?.("idle");
+      return;
+    }
+    await this.sendUtteranceBlob(blob, "webm");
+  }
+
+  private send(payload: Record<string, unknown>): void {
+    if (!this.connected) {
+      this.handlers.onError?.("not_connected");
+      return;
+    }
+    this.ws!.send(JSON.stringify(payload));
+  }
+
+  private async ensurePlaybackGraph(): Promise<void> {
+    if (!this.audioCtx) {
+      this.audioCtx = new AudioContext();
+      this.analyser = this.audioCtx.createAnalyser();
+      this.analyser.fftSize = 256;
+      this.analyser.connect(this.audioCtx.destination);
+    }
+    if (this.audioCtx.state === "suspended") {
+      await this.audioCtx.resume();
+    }
+  }
+
+  private startLevelMeter(): void {
+    if (!this.analyser || !this.handlers.onAudioLevel) return;
+    this.stopLevelMeter();
+    const analyser = this.analyser;
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    let raf = 0;
+    const tick = () => {
+      analyser.getByteFrequencyData(data);
+      let sum = 0;
+      for (let i = 0; i < data.length; i++) sum += data[i] ?? 0;
+      this.handlers.onAudioLevel?.(sum / data.length / 255);
+      raf = requestAnimationFrame(tick);
+    };
+    tick();
+    this.levelStop = () => cancelAnimationFrame(raf);
+  }
+
+  private stopLevelMeter(): void {
+    this.levelStop?.();
+    this.levelStop = null;
+    this.handlers.onAudioLevel?.(0);
+  }
+
+  private async playWavBase64(b64: string): Promise<void> {
+    await this.ensurePlaybackGraph();
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const buffer = await this.audioCtx!.decodeAudioData(bytes.buffer.slice(0));
+    const source = this.audioCtx!.createBufferSource();
+    source.buffer = buffer;
+    source.connect(this.analyser!);
+    this.startLevelMeter();
+    await new Promise<void>((resolve) => {
+      source.onended = () => {
+        this.stopLevelMeter();
+        resolve();
+      };
+      source.start(0);
+    });
+  }
+
+  private async onMessage(raw: string): Promise<void> {
+    let msg: WsIncoming;
+    try {
+      msg = JSON.parse(raw) as WsIncoming;
+    } catch {
+      this.handlers.onError?.("bad_json");
+      return;
+    }
+    if (msg.type === "phase") {
+      this.handlers.onPhase?.(msg.phase);
+      return;
+    }
+    if (msg.type === "error") {
+      this.handlers.onError?.(msg.code);
+      return;
+    }
+    if (msg.type === "text") {
+      if (msg.role === "user") this.handlers.onUserText?.(msg.content);
+      else this.handlers.onAssistantText?.(msg.content);
+      return;
+    }
+    if (msg.type === "audio" && msg.data) {
+      try {
+        await this.playWavBase64(msg.data);
+      } catch {
+        this.handlers.onError?.("audio_playback");
+        this.handlers.onPhase?.("idle");
+      }
+    }
+  }
+}

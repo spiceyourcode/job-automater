@@ -174,6 +174,7 @@ This document defines the technical specifications, architecture decisions, and 
 |----|-------------|----------|---------|
 | FR-IP-01 | Interview prep pack | P0 | Q&A, STAR, negotiation grounded in `cv_chunks` (workers) |
 | FR-IP-02 | Voice mock interview | P1 | Browser Web Speech + `speechSynthesis`; sync API turns in `mock_interview_sessions`; requires ready prep; replaces deprecated video cover script |
+| FR-IP-03 | Local voice gateway | P1 | Optional `workers/voice_gateway` sidecar (`127.0.0.1:8765`): Whisper STT, Ollama chat, Piper TTS over WebSocket; Orb UI; post-session `evaluate` debrief in `summary` JSONB; browser fallback when gateway unreachable |
 
 ---
 

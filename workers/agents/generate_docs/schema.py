@@ -33,11 +33,11 @@ class GeneratedDocuments(BaseModel):
     def every_bullet_in_docs(self) -> GeneratedDocuments:
         blob = f"{self.tailored_cv}\n{self.cover_letter}".lower()
         for t in self.bullet_traces:
-            # Allow whitespace-normalized containment
+                                                     
             needle = " ".join(t.text.lower().split())
             hay = " ".join(blob.split())
             if needle not in hay and t.text.lower() not in self.tailored_cv.lower():
-                # Cover letter bullets may only appear in CL
+                                                            
                 if t.text.lower() not in self.cover_letter.lower():
                     raise ValueError(
                         f"bullet text not found in generated docs (chunk={t.chunk_id})"
@@ -63,7 +63,7 @@ def assert_grounded_in_chunks(
         if source is None:
             raise ValueError(f"unknown chunk_id={t.chunk_id}")
         src_l = source.lower()
-        # Require substantial token overlap with the source chunk
+                                                                 
         tokens = [w for w in t.text.lower().split() if len(w) > 3]
         if not tokens:
             raise ValueError("bullet has no substantive tokens")

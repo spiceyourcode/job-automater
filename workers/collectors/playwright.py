@@ -26,7 +26,7 @@ class PlaywrightCollector(BaseCollector):
         login_cfg = config.get("login")
         login: dict[str, str] | None = None
         if isinstance(login_cfg, dict) and login_cfg:
-            # Copy only known keys — never pass through unexpected blobs to logs
+                                                                                
             login = {
                 k: str(login_cfg[k])
                 for k in (

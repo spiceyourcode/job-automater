@@ -159,20 +159,20 @@ def _ensure_grounded(field_text: str, chunk_content: str) -> str:
 def _classify_sentence(sentence: str) -> str:
     """Classify sentence as situation/task/action/result based on keywords."""
     s = sentence.lower()
-    # Result keywords (metrics, outcomes)
+                                         
     if re.search(
         r"\b(improved|reduced|increased|optimized|optimised|achieved|delivered|"
         r"saved|cut|boosted|grew|lowered|decreased|~?\d+%|approximately \d+%|\d+x|x \d+)\b",
         s,
     ):
         return "result"
-    # Action keywords (what you did)
+                                    
     if re.search(r"\b(built|designed|implemented|developed|created|engineered|architected|automated|refactored|migrated|deployed|configured|integrated|optimized|debugged|troubleshot|solved|fixed|maintained|monitored|established|defined|documented)\b", s):
         return "action"
-    # Task keywords (responsibility, challenge)
+                                               
     if re.search(r"\b(responsible for|tasked with|challenge|goal|objective|required to|needed to|had to|must|ensure|manage|lead|oversee|coordinate|collaborate)\b", s):
         return "task"
-    # Situation keywords (context, role, company, domain)
+                                                         
     if re.search(r"\b(as a|in my role|at |working|joined|position|company|team|project|platform|system|service|application)\b", s):
         return "situation"
     return "situation"
@@ -192,13 +192,13 @@ def _parse_star_from_chunk(c: dict[str, Any]) -> dict[str, str] | None:
     if len(sentences) < 3:
         return None
 
-    # Classify each sentence
+                            
     classified = {k: [] for k in ("situation", "task", "action", "result")}
     for sent in sentences:
         cat = _classify_sentence(sent)
         classified[cat].append(sent)
 
-    # Build each STAR field — at most one clause each to avoid bullet dumps
+                                                                           
     situation = sentences[0]
     for cand in sentences:
         if _classify_sentence(cand) == "situation" and not re.search(
@@ -224,7 +224,7 @@ def _parse_star_from_chunk(c: dict[str, Any]) -> dict[str, str] | None:
         else sentences[-1]
     )
 
-    # Ensure each field is grounded in chunk content
+                                                    
     grounded = {}
     for field in ("situation", "task", "action", "result"):
         grounded[field] = _ensure_grounded(locals()[field], content)
@@ -260,10 +260,10 @@ def _requirement_phrases(job: dict[str, Any]) -> list[str]:
         str(job.get(k) or "")
         for k in ("requirements", "description", "responsibilities", "tech_stack", "keywords")
     )
-    # Filter to meaningful technical terms (3+ chars, not generic)
+                                                                  
     generic = {"the", "and", "for", "with", "you", "your", "our", "will", "can", "are", "have", "has", "been", "from", "this", "that", "they", "will", "would", "could", "should", "must", "need", "work", "working", "experience", "years", "strong", "good", "great", "excellent", "knowledge", "skills", "ability", "abilities", "proficient", "familiar", "understanding", "deep", "solid", "expert", "senior", "junior", "mid", "level", "role", "position", "job", "company", "team", "project", "projects", "environment", "development", "software", "engineer", "developer", "engineering", "build", "building", "develop", "developing", "create", "creating", "implement", "implementing", "design", "designing", "architect", "architecting", "optimize", "optimizing", "improve", "improving", "maintain", "maintaining", "support", "supporting", "deliver", "delivering", "drive", "driving", "lead", "leading", "manage", "managing", "own", "owning", "take", "taking", "ensure", "ensuring", "collaborate", "collaborating", "communicate", "communicating", "software", "engineer", "trainer", "python", "web", "full", "stack", "code", "coding", "programming", "programmer", "technical", "technology", "tech", "system", "systems", "application", "applications", "platform", "platforms", "service", "services", "solution", "solutions", "product", "products", "feature", "features", "tool", "tools", "framework", "frameworks", "library", "libraries", "api", "apis", "database", "databases", "cloud", "aws", "azure", "gcp", "docker", "kubernetes", "k8s", "ci", "cd", "cicd", "git", "agile", "scrum", "kanban", "jira", "confluence", "test", "testing", "unit", "integration", "e2e", "qa", "quality", "assurance", "security", "performance", "scalability", "reliability", "monitoring", "logging", "observability", "devops", "sre", "infrastructure", "automation", "scripting", "bash", "shell", "linux", "windows", "macos", "unix"}
 
-    # Also extract multi-word tech terms from tech_stack/keywords if available
+                                                                              
     tech_terms = []
     for k in ("tech_stack", "keywords", "tags"):
         val = job.get(k)
@@ -343,23 +343,23 @@ def generate_prep_heuristic(
     job: dict[str, Any],
     profile: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    # Better company/title extraction with fallbacks
+                                                    
     company = (
         str(job.get("company") or "")
         .strip()
     )
     if not company:
-        # Try to extract from source_url or application_url
+                                                           
         for url_key in ("source_url", "application_url"):
             url = job.get(url_key)
             if url:
                 try:
                     domain = urlparse(str(url)).netloc
                     if domain:
-                        # Remove www. and get the main domain (not subdomain)
+                                                                             
                         domain = domain.replace("www.", "")
                         parts = domain.split(".")
-                        # Use the second-level domain (e.g., "company-example" from "jobs.company-example.com")
+                                                                                                               
                         if len(parts) >= 2:
                             company = parts[-2].title()
                         else:
@@ -396,7 +396,7 @@ def generate_prep_heuristic(
             }
         )
 
-    # Fallback
+              
     if not stories and chunks:
         for c in chunks:
             cid = str(c["id"])
@@ -512,5 +512,5 @@ def generate_prep_heuristic(
     return pack
 
 
-# keep import used for type checkers / tests
+                                            
 _ = _overlap_tokens

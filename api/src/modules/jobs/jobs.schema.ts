@@ -1,18 +1,17 @@
 import { z } from "zod";
-
 export const listJobsQuerySchema = z
-  .object({
+    .object({
     sort: z.enum(["score", "date"]).default("score"),
     minScore: z.coerce.number().min(0).max(100).optional(),
     q: z.string().max(200).optional(),
     remoteOnly: z
-      .enum(["true", "false"])
-      .optional()
-      .transform((v) => v === "true"),
+        .enum(["true", "false"])
+        .optional()
+        .transform((v) => v === "true"),
     includeDuplicates: z
-      .enum(["true", "false"])
-      .optional()
-      .transform((v) => v === "true"),
+        .enum(["true", "false"])
+        .optional()
+        .transform((v) => v === "true"),
     source: z.string().max(50).optional(),
     location: z.string().max(255).optional(),
     salaryMin: z.coerce.number().int().nonnegative().optional(),
@@ -21,38 +20,33 @@ export const listJobsQuerySchema = z
     employmentType: z.string().max(50).optional(),
     experienceLevel: z.string().max(30).optional(),
     savedOnly: z
-      .enum(["true", "false"])
-      .optional()
-      .transform((v) => v === "true"),
+        .enum(["true", "false"])
+        .optional()
+        .transform((v) => v === "true"),
     postedAfter: z.string().datetime().optional(),
     limit: z.coerce.number().int().min(1).max(100).default(50),
-  })
-  .strict();
-
+})
+    .strict();
 export const jobIdParamSchema = z.object({
-  id: z.string().uuid(),
+    id: z.string().uuid(),
 });
-
 export const importJobBodySchema = z
-  .object({
+    .object({
     url: z.string().url().max(2048),
     sourceType: z.string().max(50).optional(),
-  })
-  .strict();
-
+})
+    .strict();
 export const similarJobsQuerySchema = z
-  .object({
+    .object({
     limit: z.coerce.number().int().min(1).max(50).default(10),
-  })
-  .strict();
-
+})
+    .strict();
 export const salaryBenchmarkQuerySchema = z
-  .object({
+    .object({
     title: z.string().min(1).max(200).optional(),
     location: z.string().max(255).optional(),
-  })
-  .strict();
-
+})
+    .strict();
 export type ListJobsQuery = z.infer<typeof listJobsQuerySchema>;
 export type ImportJobBody = z.infer<typeof importJobBodySchema>;
 export type SalaryBenchmarkQuery = z.infer<typeof salaryBenchmarkQuerySchema>;

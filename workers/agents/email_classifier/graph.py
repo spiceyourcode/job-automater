@@ -45,7 +45,7 @@ def _classify_node(state: EmailState) -> dict[str, Any]:
         )
         if llm is not None:
             result = llm
-    except Exception:  # noqa: BLE001
+    except Exception:                
         pass
     return {"classification": result.model_dump(mode="json")}
 
@@ -64,7 +64,7 @@ def _gate_node(state: EmailState) -> dict[str, Any]:
     classification = Classification.model_validate(raw)
     auto = meets_auto_threshold(classification.category, classification.confidence)
     new_status = CATEGORY_STATUS.get(classification.category) if auto else None
-    # follow_up / spam / other never change status even if above threshold
+                                                                          
     if classification.category in ("follow_up_request", "spam", "other"):
         new_status = None
     notify = auto and classification.category in (

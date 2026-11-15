@@ -1,90 +1,58 @@
 "use client";
-
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { BlurText } from "@/components/ui/blur-text";
 import { StatefulButton } from "@/components/ui/stateful-button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  generateVideoCoverAction,
-  type VideoCoverPublic,
-} from "@/lib/actions/applications";
-
-export function VideoCoverPanel({
-  applicationId,
-  initial,
-  status,
-}: {
-  applicationId: string;
-  initial: VideoCoverPublic | null;
-  status: string;
+import { Card, CardContent, CardHeader, CardTitle, } from "@/components/ui/card";
+import { generateVideoCoverAction, type VideoCoverPublic, } from "@/lib/actions/applications";
+export function VideoCoverPanel({ applicationId, initial, status, }: {
+    applicationId: string;
+    initial: VideoCoverPublic | null;
+    status: string;
 }) {
-  const router = useRouter();
-  const [pending, start] = useTransition();
-  const [busy, setBusy] = useState(false);
-  const pack = initial;
-  const generating = status === "pending" || status === "generating" || busy;
-
-  function generate() {
-    setBusy(true);
-    start(async () => {
-      const res = await generateVideoCoverAction(applicationId);
-      setBusy(false);
-      if (!res.ok) {
-        toast.error(res.error);
-        return;
-      }
-      toast.success("Video script queued");
-      router.refresh();
-    });
-  }
-
-  return (
-    <div className="space-y-6">
+    const router = useRouter();
+    const [pending, start] = useTransition();
+    const [busy, setBusy] = useState(false);
+    const pack = initial;
+    const generating = status === "pending" || status === "generating" || busy;
+    function generate() {
+        setBusy(true);
+        start(async () => {
+            const res = await generateVideoCoverAction(applicationId);
+            setBusy(false);
+            if (!res.ok) {
+                toast.error(res.error);
+                return;
+            }
+            toast.success("Video script queued");
+            router.refresh();
+        });
+    }
+    return (<div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <BlurText
-            text="Video cover letter"
-            className="text-2xl font-semibold tracking-tight text-foreground"
-            animateBy="words"
-            delay={40}
-          />
+          <BlurText text="Video cover letter" className="text-2xl font-semibold tracking-tight text-foreground" animateBy="words" delay={40}/>
           <p className="mt-1 text-sm text-muted-foreground">
             Spoken script from your CV chunks only. Company names come from the
             job listing.
           </p>
         </div>
-        <StatefulButton
-          type="button"
-          className="cursor-pointer"
-          disabled={pending || generating}
-          onClick={generate}
-        >
+        <StatefulButton type="button" className="cursor-pointer" disabled={pending || generating} onClick={generate}>
           {generating ? "Generating…" : pack ? "Regenerate" : "Generate script"}
         </StatefulButton>
       </div>
 
-      {!pack && (
-        <p className="text-sm text-muted-foreground">
+      {!pack && (<p className="text-sm text-muted-foreground">
           Generate after you have indexed your CV. The script will not invent
           employers or achievements.
-        </p>
-      )}
+        </p>)}
 
-      {pack?.errorCode ? (
-        <p className="text-sm text-destructive">
+      {pack?.errorCode ? (<p className="text-sm text-destructive">
           Script failed. Try again after re-indexing your CV.
-        </p>
-      ) : null}
+        </p>) : null}
 
-      {pack && pack.status === "ready" && pack.script ? (
-        <Card className="border-border/60 bg-card/80 shadow-sm backdrop-blur-sm">
+      {pack && pack.status === "ready" && pack.script ? (<Card className="border-border/60 bg-card/80 shadow-sm backdrop-blur-sm">
           <CardHeader>
             <CardTitle className="text-base">
               About {pack.estimatedSeconds ?? "—"} seconds
@@ -93,8 +61,6 @@ export function VideoCoverPanel({
           <CardContent className="rounded-lg border border-border/40 bg-muted/15 p-4 text-sm leading-relaxed whitespace-pre-wrap">
             {pack.script}
           </CardContent>
-        </Card>
-      ) : null}
-    </div>
-  );
+        </Card>) : null}
+    </div>);
 }

@@ -69,9 +69,9 @@ def _validate_node(state: MatchState) -> dict[str, Any]:
         return {"validated": None, "error": "missing draft"}
     try:
         scored = validate_match_score(draft)
-        # FAILURE gate: reasoning must be present (schema enforces)
+                                                                   
         return {"validated": scored.model_dump(mode="json"), "error": None}
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:                
         logger.warning("match_validate_failed err=%s", type(exc).__name__)
         return {"validated": None, "error": f"{type(exc).__name__}: validation failed"}
 

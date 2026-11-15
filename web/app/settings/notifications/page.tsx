@@ -1,8 +1,6 @@
 import { NotificationPreferencesForm } from "@/components/notification-preferences-form";
-
 export default function NotificationSettingsPage() {
-  return (
-    <div className="mx-auto max-w-3xl px-4 py-8">
+    return (<div className="mx-auto max-w-3xl px-4 py-8">
       <div className="mb-6 space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">Notifications</h1>
         <p className="text-sm text-muted-foreground">
@@ -11,6 +9,5 @@ export default function NotificationSettingsPage() {
         </p>
       </div>
       <NotificationPreferencesForm />
-    </div>
-  );
+    </div>);
 }

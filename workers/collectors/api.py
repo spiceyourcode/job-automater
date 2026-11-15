@@ -129,7 +129,7 @@ class ApiCollector(BaseCollector):
                 if creds.get("key"):
                     headers[str(header_name)] = str(creds["key"])
             elif auth_type == "basic" and creds.get("username"):
-                # httpx handles basic via auth= tuple
+                                                     
                 pass
 
         basic: tuple[str, str] | None = None
@@ -157,7 +157,7 @@ class ApiCollector(BaseCollector):
                 items = _as_list(payload, list_path)
                 all_jobs.extend(map_api_items(items, field_mapping, base_url))
 
-        # Never log auth headers or credentials
+                                               
         logger.info(
             "api_collect_ok entries=%s host=%s",
             len(all_jobs),

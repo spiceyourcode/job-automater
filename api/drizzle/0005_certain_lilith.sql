@@ -1,5 +1,5 @@
 CREATE EXTENSION IF NOT EXISTS vector;
---> statement-breakpoint
+
 CREATE TABLE "cv_chunks" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"cv_document_id" uuid NOT NULL,
@@ -12,7 +12,7 @@ CREATE TABLE "cv_chunks" (
 	"embedding" vector(1536),
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
---> statement-breakpoint
+
 CREATE TABLE "job_scores" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"job_id" uuid NOT NULL,
@@ -35,14 +35,14 @@ CREATE TABLE "job_scores" (
 	"prompt_version" varchar(20),
 	"scored_at" timestamp with time zone DEFAULT now() NOT NULL
 );
---> statement-breakpoint
-ALTER TABLE "cv_chunks" ADD CONSTRAINT "cv_chunks_cv_document_id_cv_documents_id_fk" FOREIGN KEY ("cv_document_id") REFERENCES "public"."cv_documents"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "cv_chunks" ADD CONSTRAINT "cv_chunks_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "job_scores" ADD CONSTRAINT "job_scores_job_id_jobs_id_fk" FOREIGN KEY ("job_id") REFERENCES "public"."jobs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "job_scores" ADD CONSTRAINT "job_scores_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-CREATE UNIQUE INDEX "uq_cv_chunks_doc_index" ON "cv_chunks" USING btree ("cv_document_id","chunk_index");--> statement-breakpoint
-CREATE INDEX "idx_cv_chunks_user" ON "cv_chunks" USING btree ("user_id");--> statement-breakpoint
-CREATE INDEX "idx_cv_chunks_doc" ON "cv_chunks" USING btree ("cv_document_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "uq_job_scores_job_user" ON "job_scores" USING btree ("job_id","user_id");--> statement-breakpoint
-CREATE INDEX "idx_scores_user_score" ON "job_scores" USING btree ("user_id","overall_score");--> statement-breakpoint
+
+ALTER TABLE "cv_chunks" ADD CONSTRAINT "cv_chunks_cv_document_id_cv_documents_id_fk" FOREIGN KEY ("cv_document_id") REFERENCES "public"."cv_documents"("id") ON DELETE cascade ON UPDATE no action;
+ALTER TABLE "cv_chunks" ADD CONSTRAINT "cv_chunks_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;
+ALTER TABLE "job_scores" ADD CONSTRAINT "job_scores_job_id_jobs_id_fk" FOREIGN KEY ("job_id") REFERENCES "public"."jobs"("id") ON DELETE cascade ON UPDATE no action;
+ALTER TABLE "job_scores" ADD CONSTRAINT "job_scores_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;
+CREATE UNIQUE INDEX "uq_cv_chunks_doc_index" ON "cv_chunks" USING btree ("cv_document_id","chunk_index");
+CREATE INDEX "idx_cv_chunks_user" ON "cv_chunks" USING btree ("user_id");
+CREATE INDEX "idx_cv_chunks_doc" ON "cv_chunks" USING btree ("cv_document_id");
+CREATE UNIQUE INDEX "uq_job_scores_job_user" ON "job_scores" USING btree ("job_id","user_id");
+CREATE INDEX "idx_scores_user_score" ON "job_scores" USING btree ("user_id","overall_score");
 CREATE INDEX "idx_scores_job_user" ON "job_scores" USING btree ("job_id","user_id");

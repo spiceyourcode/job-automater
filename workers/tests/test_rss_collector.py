@@ -23,7 +23,7 @@ def test_parse_feed_matches_golden_set():
         assert actual.title == expected["title"]
         assert actual.source_url == expected["source_url"]
         assert actual.raw_data == expected["raw_data"]
-        assert actual.source_external_id  # stable hash present
+        assert actual.source_external_id                       
 
 
 @pytest.mark.asyncio

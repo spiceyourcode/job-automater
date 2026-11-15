@@ -72,7 +72,7 @@ def search_cv_chunks(
             rows = _keyword_search(cur, user_id=user_id, query_text=query_text, limit=limit)
             logger.info("cv_search_hits mode=keyword user_scoped=%s count=%s", True, len(rows))
             return rows
-    except Exception:  # noqa: BLE001
+    except Exception:                
         logger.warning("cv_search_unavailable")
         return []
 

@@ -11,7 +11,7 @@ from agents.match_score.schema import validate_match_score
 from agents.match_score.scoring import compute_match_score
 from tasks.match_score import process_match_score
 
-# Known strong pair — verify overall > 85
+                                         
 STRONG_PROFILE = {
     "years_experience": 7,
     "technical_skills": [
@@ -23,7 +23,7 @@ STRONG_PROFILE = {
     ],
     "soft_skills": ["collaboration"],
     "preferred_locations": ["Remote", "Berlin"],
-    "salary_min": 12_000_000,  # $120k in cents
+    "salary_min": 12_000_000,                  
     "salary_max": 18_000_000,
     "salary_currency": "USD",
     "employment_types": ["full-time"],
@@ -160,7 +160,7 @@ def test_process_skips_other_users_jobs_idor():
             "tasks.match_score.load_profile_for_user",
             return_value=STRONG_PROFILE,
         ),
-        # Owned jobs empty → IDOR / missing
+                                           
         patch("tasks.match_score.load_jobs_for_user", return_value=[]),
         patch("tasks.match_score.upsert_job_score") as upsert,
         patch("tasks.match_score.mark_job_duplicate") as dup,

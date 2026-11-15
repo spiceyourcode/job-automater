@@ -92,7 +92,7 @@ def try_ashby_submit(
                 or body.get("results", {}).get("applicationId")
                 or ""
             ) or None
-        except Exception:  # noqa: BLE001
+        except Exception:                
             conf = f"ashby-{posting_id[:12]}"
         logger.info("ats_ashby_ok posting=%s", posting_id[:12])
         return SubmitResult(
@@ -101,7 +101,7 @@ def try_ashby_submit(
             external_application_id=conf or f"ashby-{posting_id[:12]}",
             screenshot_bytes=_MINI_PNG,
         )
-    except Exception:  # noqa: BLE001
+    except Exception:                
         logger.warning("ats_ashby_error")
         return None
     finally:

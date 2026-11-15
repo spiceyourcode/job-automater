@@ -26,7 +26,7 @@ SECTION_ORDER: tuple[CvSection, ...] = (
     "languages",
 )
 
-# Heading keywords → section. Longer / more specific patterns first where needed.
+                                                                                 
 _HEADING_MAP: list[tuple[re.Pattern[str], CvSection]] = [
     (re.compile(r"^(professional\s+)?summary|about(\s+me)?|objective|profile$", re.I), "summary"),
     (
@@ -96,12 +96,12 @@ def classify_cv_section(
     """
     stored = (stored_section_type or "").strip().lower()
     if stored in _KNOWN_SECTION_TYPES and stored != "body":
-        return stored  # type: ignore[return-value]
+        return stored                              
 
     heading = _first_line(text)
-    # Short heading-only lines, or first line of a titled block
+                                                               
     candidates = [heading]
-    # Also try if the whole chunk is a short heading
+                                                    
     stripped = text.strip()
     if stripped and stripped != heading:
         first_only = heading
@@ -109,7 +109,7 @@ def classify_cv_section(
             candidates = [first_only]
 
     for candidate in candidates:
-        # Normalize "Education:" / "SKILLS -"
+                                             
         norm = re.sub(r"[:\-–—|]+$", "", candidate).strip()
         if len(norm) > 80:
             continue
@@ -117,7 +117,7 @@ def classify_cv_section(
             if pattern.match(norm):
                 return section
 
-    # Content heuristics when no heading matched
+                                                
     lower = text.lower()
     if re.search(
         r"\b(bachelor|master|phd|b\.?s\.?|m\.?s\.?|university|college|gpa)\b",
@@ -153,7 +153,7 @@ def resolve_chunk_section(chunk: dict) -> CvSection:
         return section
     lower = content.lower()
     if re.search(r"fundamentals of|certification|certificate|cohort", lower):
-        return "certifications"  # type: ignore[return-value]
+        return "certifications"                              
     if re.search(
         r"\b(built|designed|implemented|developed|engineered|led|managed)\b",
         lower,

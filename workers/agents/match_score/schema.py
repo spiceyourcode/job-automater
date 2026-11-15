@@ -6,7 +6,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-# TRD FR-JM-01
+              
 DEFAULT_WEIGHTS: dict[str, float] = {
     "skills": 0.40,
     "experience": 0.25,

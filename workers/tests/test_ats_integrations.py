@@ -87,7 +87,7 @@ def test_parse_ashby() -> None:
     ) == ("acme", "posting-uuid")
 
 
-def test_greenhouse_submit_success(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+def test_greenhouse_submit_success(monkeypatch) -> None:                                
     monkeypatch.setattr(settings, "greenhouse_job_board_api_key", "test-key")
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -109,7 +109,7 @@ def test_greenhouse_submit_success(monkeypatch) -> None:  # type: ignore[no-unty
     assert result.external_application_id == "999"
 
 
-def test_lever_submit_success(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+def test_lever_submit_success(monkeypatch) -> None:                                
     monkeypatch.setattr(settings, "lever_api_key", "lever-key")
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -128,7 +128,7 @@ def test_lever_submit_success(monkeypatch) -> None:  # type: ignore[no-untyped-d
     assert result.external_application_id == "lev-1"
 
 
-def test_ashby_submit_success(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+def test_ashby_submit_success(monkeypatch) -> None:                                
     from agents.submit_verify.ats.ashby import try_ashby_submit
 
     monkeypatch.setattr(settings, "ashby_api_key", "ashby-key")
@@ -177,7 +177,7 @@ def test_workday_submit_success() -> None:
     assert result.screenshot_bytes
 
 
-def test_ashby_without_key_falls_back(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+def test_ashby_without_key_falls_back(monkeypatch) -> None:                                
     from agents.submit_verify.ats.ashby import try_ashby_submit
 
     monkeypatch.setattr(settings, "ashby_api_key", "")
@@ -189,21 +189,21 @@ def test_ashby_without_key_falls_back(monkeypatch) -> None:  # type: ignore[no-u
     assert result is None
 
 
-def test_ats_then_skips_portal(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+def test_ats_then_skips_portal(monkeypatch) -> None:                                
     monkeypatch.setattr(settings, "greenhouse_job_board_api_key", "test-key")
 
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json={"id": 1})
 
-    # Patch try_ats path by ensuring greenhouse works; portal would fail if called
+                                                                                  
     portal = MagicMock(side_effect=AssertionError("portal should not run"))
-    # Inject via monkeypatch on try_ats_submit's httpx is hard — use run with real ATS
-    # and portal mock as submit_fn; ATS node runs first.
+                                                                                      
+                                                        
     from agents.submit_verify import ats as ats_mod
 
     real_try = ats_mod.try_ats_submit
 
-    def wrapped(**kwargs):  # type: ignore[no-untyped-def]
+    def wrapped(**kwargs):                                
         kwargs["client"] = httpx.Client(transport=httpx.MockTransport(handler))
         return real_try(**kwargs)
 

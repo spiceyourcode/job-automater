@@ -50,7 +50,7 @@ def test_process_enrich_company_user_scoped() -> None:
 
     assert result["status"] == "ok"
     assert result["enriched"] == 1
-    # UPDATE must include user_id (IDOR)
+                                        
     update_call = mock_cur.execute.call_args_list[-1]
     assert "user_id" in update_call[0][0]
     assert user_id in update_call[0][1]

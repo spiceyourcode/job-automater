@@ -101,7 +101,7 @@ def process_followup_reminders(
                 )
                 advance_followup(conn, application_id, due_at or now)
                 notified += 1
-            except Exception:  # noqa: BLE001
+            except Exception:                
                 logger.exception(
                     "followup_reminder_notify_failed application_id=%s",
                     application_id,

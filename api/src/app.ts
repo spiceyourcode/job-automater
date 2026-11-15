@@ -20,55 +20,44 @@ import { registerRoutes as registerAutomationRoutes } from "./modules/automation
 import { registerRoutes as registerRealtimeRoutes } from "./modules/realtime/index.js";
 import { registerRoutes as registerRecruitersRoutes } from "./modules/recruiters/index.js";
 import { registerRoutes as registerBillingRoutes } from "./modules/billing/index.js";
-
 export const createApp = (): Hono => {
-  const app = new Hono();
-
-  // CORS middleware - must be before other middleware
-  app.use("*", cors({
-    origin: [env.appUrl, "http://localhost:3000", "http://127.0.0.1:3000", "http://192.168.0.105:3000"],
-    allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
-    exposeHeaders: ["Content-Length", "X-Request-Id"],
-    credentials: true,
-    maxAge: 86400,
-  }));
-
-  app.onError((err, c) => {
-    if (err instanceof HTTPException) {
-      return err.getResponse();
-    }
-    log.error("unhandled_error", {
-      path: c.req.path,
-      method: c.req.method,
-      ...publicErrorFields(err),
+    const app = new Hono();
+    app.use("*", cors({
+        origin: [env.appUrl, "http://localhost:3000", "http://127.0.0.1:3000", "http://192.168.0.105:3000"],
+        allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allowHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+        exposeHeaders: ["Content-Length", "X-Request-Id"],
+        credentials: true,
+        maxAge: 86400,
+    }));
+    app.onError((err, c) => {
+        if (err instanceof HTTPException) {
+            return err.getResponse();
+        }
+        log.error("unhandled_error", {
+            path: c.req.path,
+            method: c.req.method,
+            ...publicErrorFields(err),
+        });
+        captureUnhandled(err);
+        return c.json({ error: "internal_error" }, 500);
     });
-    captureUnhandled(err);
-    return c.json({ error: "internal_error" }, 500);
-  });
-
-  app.use("*", requestLog);
-  // Schema §2.1 — before routes so anonymous floods cannot skip limits
-  app.use("*", apiRateLimit);
-
-  registerHealthRoutes(app);
-  registerAuthRoutes(app);
-  registerProfileRoutes(app);
-  registerSourcesRoutes(app);
-  registerJobsRoutes(app);
-  registerApplicationsRoutes(app);
-  registerEmailsRoutes(app);
-  registerAnalyticsRoutes(app);
-  registerTeamRoutes(app);
-  registerAutomationRoutes(app);
-  registerRealtimeRoutes(app);
-  registerRecruitersRoutes(app);
-  registerBillingRoutes(app);
-
-  // OpenAPI from registered Hono routes (P12.2)
-  app.get("/api/v1/openapi.json", (c) => c.json(buildOpenApiDocument(app)));
-
-  app.notFound((c) => c.json({ error: "not_found" }, 404));
-
-  return app;
+    app.use("*", requestLog);
+    app.use("*", apiRateLimit);
+    registerHealthRoutes(app);
+    registerAuthRoutes(app);
+    registerProfileRoutes(app);
+    registerSourcesRoutes(app);
+    registerJobsRoutes(app);
+    registerApplicationsRoutes(app);
+    registerEmailsRoutes(app);
+    registerAnalyticsRoutes(app);
+    registerTeamRoutes(app);
+    registerAutomationRoutes(app);
+    registerRealtimeRoutes(app);
+    registerRecruitersRoutes(app);
+    registerBillingRoutes(app);
+    app.get("/api/v1/openapi.json", (c) => c.json(buildOpenApiDocument(app)));
+    app.notFound((c) => c.json({ error: "not_found" }, 404));
+    return app;
 };

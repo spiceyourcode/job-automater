@@ -58,11 +58,11 @@ def _ats_node(state: SubmitState) -> dict[str, Any]:
 def _submit_node(state: SubmitState, submit_fn: SubmitFn) -> dict[str, Any]:
     if state.get("error"):
         return {}
-    # Skip portal when ATS already succeeded
+                                            
     if state.get("result") and state["result"].get("status") == "submitted":
         return {}
     app = dict(state["application"])
-    # Portal appliers read profile for form fill (not persisted)
+                                                                
     if state.get("profile") is not None:
         app["_profile"] = state["profile"]
     result = submit_fn(app, state["job"])

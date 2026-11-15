@@ -86,7 +86,7 @@ def try_lever_submit(
                 or body.get("application_id")
                 or ""
             ) or None
-        except Exception:  # noqa: BLE001
+        except Exception:                
             conf = f"lever-{posting_id[:12]}"
         logger.info("ats_lever_ok site=%s", site)
         return SubmitResult(
@@ -95,7 +95,7 @@ def try_lever_submit(
             external_application_id=conf or f"lever-{posting_id[:12]}",
             screenshot_bytes=_MINI_PNG,
         )
-    except Exception:  # noqa: BLE001
+    except Exception:                
         logger.warning("ats_lever_error")
         return None
     finally:

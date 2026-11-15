@@ -80,11 +80,11 @@ async def extract_cards_with_playwright(
             if await title_el.count() > 0:
                 title = (await title_el.inner_text()).strip()
                 if url_selector is None:
-                    # Prefer href on the title element itself
+                                                             
                     href = await title_el.get_attribute("href")
                     if href:
                         url = href
-        except Exception:  # noqa: BLE001
+        except Exception:                
             title = None
         if url_selector:
             try:
@@ -92,30 +92,30 @@ async def extract_cards_with_playwright(
                 if await url_el.count() > 0:
                     href = await url_el.get_attribute("href")
                     url = href or (await url_el.inner_text()).strip()
-            except Exception:  # noqa: BLE001
+            except Exception:                
                 pass
         if location_selector:
             try:
                 loc_el = card.locator(location_selector).first
                 if await loc_el.count() > 0:
                     location = (await loc_el.inner_text()).strip()
-            except Exception:  # noqa: BLE001
+            except Exception:                
                 pass
         if department_selector:
             try:
                 dept_el = card.locator(department_selector).first
                 if await dept_el.count() > 0:
                     department = (await dept_el.inner_text()).strip()
-            except Exception:  # noqa: BLE001
+            except Exception:                
                 pass
         if title or url:
-            # Card text fills JD when list pages have no dedicated description node.
+                                                                                    
             snippet = None
             try:
                 raw_text = (await card.inner_text()).strip()
                 if raw_text:
                     snippet = raw_text[:2000]
-            except Exception:  # noqa: BLE001
+            except Exception:                
                 snippet = None
             out.append(
                 {
@@ -169,7 +169,7 @@ async def scrape_paginated_list(
                 user_sel = login.get("usernameSelector")
                 pass_sel = login.get("passwordSelector")
                 submit_sel = login.get("submitSelector")
-                # Never log username/password values
+                                                    
                 if user_sel and login.get("username"):
                     await page.fill(user_sel, login["username"])
                 if pass_sel and login.get("password"):
@@ -210,7 +210,7 @@ async def scrape_paginated_list(
                         await page.wait_for_selector(
                             wait_for_selector, timeout=timeout_ms
                         )
-                except Exception as exc:  # noqa: BLE001
+                except Exception as exc:                
                     logger.warning(
                         "playwright_pagination_stop reason=%s",
                         type(exc).__name__,

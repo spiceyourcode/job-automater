@@ -99,23 +99,23 @@ def classify_email(
         hits = [p for p in patterns if re.search(p, text, re.I)]
         if not hits:
             continue
-        # More hits → slightly higher confidence (capped)
+                                                         
         conf = min(0.99, score + 0.01 * (len(hits) - 1))
         if conf > best.confidence:
             best = Classification(
-                category=category,  # type: ignore[arg-type]
+                category=category,                          
                 confidence=round(conf, 2),
                 reason_codes=[f"pat:{h[:40]}" for h in hits[:3]],
             )
 
-    # Never log subject/snippet content at info — ids only
+                                                          
     logger.info(
         "email_classified category=%s confidence=%s version=%s",
         best.category,
         best.confidence,
         CLASSIFIER_VERSION,
     )
-    _ = from_email  # reserved for sender-domain signals later
+    _ = from_email                                            
     return best
 
 

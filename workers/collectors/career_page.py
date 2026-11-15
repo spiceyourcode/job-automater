@@ -33,7 +33,7 @@ class CareerPageCollector(BaseCollector):
             )
 
         start_url = build_career_start_url(base_url, list_path)
-        logger.info("career_page_collect_start")  # no URL with query secrets
+        logger.info("career_page_collect_start")                             
 
         jobs = await scrape_paginated_list(
             start_url=start_url,
@@ -62,7 +62,7 @@ class CareerPageCollector(BaseCollector):
             login=None,
             timeout_ms=int(config.get("timeoutMs") or 15000),
         )
-        # Tag format for downstream normalize
+                                             
         for job in jobs:
             job.raw_data["format"] = "career_page"
         logger.info("career_page_collect_done jobs=%s", len(jobs))

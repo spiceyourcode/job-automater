@@ -39,10 +39,10 @@ CREATE TABLE "jobs" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
---> statement-breakpoint
-ALTER TABLE "jobs" ADD CONSTRAINT "jobs_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "jobs" ADD CONSTRAINT "jobs_source_config_id_source_configs_id_fk" FOREIGN KEY ("source_config_id") REFERENCES "public"."source_configs"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-CREATE INDEX "idx_jobs_user_status" ON "jobs" USING btree ("user_id","status");--> statement-breakpoint
-CREATE INDEX "idx_jobs_source_collected" ON "jobs" USING btree ("source","collected_at");--> statement-breakpoint
-CREATE INDEX "idx_jobs_location_remote" ON "jobs" USING btree ("location","is_remote");--> statement-breakpoint
+
+ALTER TABLE "jobs" ADD CONSTRAINT "jobs_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;
+ALTER TABLE "jobs" ADD CONSTRAINT "jobs_source_config_id_source_configs_id_fk" FOREIGN KEY ("source_config_id") REFERENCES "public"."source_configs"("id") ON DELETE set null ON UPDATE no action;
+CREATE INDEX "idx_jobs_user_status" ON "jobs" USING btree ("user_id","status");
+CREATE INDEX "idx_jobs_source_collected" ON "jobs" USING btree ("source","collected_at");
+CREATE INDEX "idx_jobs_location_remote" ON "jobs" USING btree ("location","is_remote");
 CREATE UNIQUE INDEX "uq_jobs_user_source_external" ON "jobs" USING btree ("user_id","source","source_id");

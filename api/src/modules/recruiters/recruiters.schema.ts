@@ -1,15 +1,12 @@
 import { z } from "zod";
-
 export const contactKindSchema = z.enum(["recruiter", "referral"]);
-
 export const listContactsQuerySchema = z
-  .object({
+    .object({
     kind: contactKindSchema.optional(),
-  })
-  .strict();
-
+})
+    .strict();
 export const createContactBodySchema = z
-  .object({
+    .object({
     name: z.string().min(1).max(200),
     company: z.string().max(255).optional(),
     email: z.string().email().max(255).optional(),
@@ -17,11 +14,10 @@ export const createContactBodySchema = z
     linkedinUrl: z.string().url().max(2048).optional(),
     notes: z.string().max(5000).optional(),
     kind: contactKindSchema.optional().default("recruiter"),
-  })
-  .strict();
-
+})
+    .strict();
 export const patchContactBodySchema = z
-  .object({
+    .object({
     name: z.string().min(1).max(200).optional(),
     company: z.string().max(255).optional(),
     email: z.string().email().max(255).optional(),
@@ -29,22 +25,19 @@ export const patchContactBodySchema = z
     linkedinUrl: z.string().url().max(2048).optional(),
     notes: z.string().max(5000).optional(),
     kind: contactKindSchema.optional(),
-  })
-  .strict();
-
+})
+    .strict();
 export const contactIdParamSchema = z.object({
-  id: z.string().uuid(),
+    id: z.string().uuid(),
 });
-
 export const createInteractionBodySchema = z
-  .object({
+    .object({
     kind: z.enum(["note", "email", "call", "meeting"]).default("note"),
     summary: z.string().min(1).max(4000),
     applicationId: z.string().uuid().optional(),
     happenedAt: z.string().datetime().optional(),
-  })
-  .strict();
-
+})
+    .strict();
 export type ContactKind = z.infer<typeof contactKindSchema>;
 export type ListContactsQuery = z.infer<typeof listContactsQuerySchema>;
 export type CreateContactBody = z.infer<typeof createContactBodySchema>;

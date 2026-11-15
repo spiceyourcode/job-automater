@@ -22,9 +22,9 @@ CREATE TABLE "applications" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
---> statement-breakpoint
-ALTER TABLE "applications" ADD CONSTRAINT "applications_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "applications" ADD CONSTRAINT "applications_job_id_jobs_id_fk" FOREIGN KEY ("job_id") REFERENCES "public"."jobs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-CREATE INDEX "idx_apps_user_status" ON "applications" USING btree ("user_id","status");--> statement-breakpoint
-CREATE INDEX "idx_apps_job_user" ON "applications" USING btree ("job_id","user_id");--> statement-breakpoint
+
+ALTER TABLE "applications" ADD CONSTRAINT "applications_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;
+ALTER TABLE "applications" ADD CONSTRAINT "applications_job_id_jobs_id_fk" FOREIGN KEY ("job_id") REFERENCES "public"."jobs"("id") ON DELETE cascade ON UPDATE no action;
+CREATE INDEX "idx_apps_user_status" ON "applications" USING btree ("user_id","status");
+CREATE INDEX "idx_apps_job_user" ON "applications" USING btree ("job_id","user_id");
 CREATE UNIQUE INDEX "uq_apps_user_job_draft" ON "applications" USING btree ("user_id","job_id");

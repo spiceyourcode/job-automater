@@ -74,7 +74,7 @@ def test_process_rejects_without_approved_at() -> None:
     assert out["error"] == "missing_approved_at"
 
 
-def test_process_rejects_emergency_stop(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+def test_process_rejects_emergency_stop(monkeypatch) -> None:                                
     monkeypatch.setattr(
         "tasks.submit_application._is_emergency_stopped",
         lambda _uid: True,

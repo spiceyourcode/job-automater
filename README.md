@@ -106,13 +106,3 @@ GitHub Actions runs those three jobs on `main` (see `.github/workflows/ci.yml`).
 | Database | `docs/Backend_Schema.md` |
 | UI | `docs/UIUX_Design.md` |
 | Ops | `docs/runbooks/` |
-
-## AI / agent development
-
-| Doc | Path |
-|-----|------|
-| Entry | `AGENTS.md` → `CLAUDE.md` |
-| Backlog | `project-backlog.md` |
-| Workflow | `docs/agent/README.md` |
-| Domain skills | `docs/agent/skills/` |
-| Phase contracts | `docs/contracts/phase-*.md` |

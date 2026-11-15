@@ -54,7 +54,7 @@ class DigestStats:
 def is_digest_hour(now_utc: datetime, tz_name: str) -> bool:
     try:
         tz = ZoneInfo(tz_name or "UTC")
-    except Exception:  # noqa: BLE001
+    except Exception:                
         tz = ZoneInfo("UTC")
     local = now_utc.astimezone(tz)
     return local.weekday() == 0 and local.hour == 8
@@ -67,7 +67,7 @@ def week_start_utc(now_utc: datetime) -> datetime:
 def iso_week_key(now_utc: datetime, tz_name: str) -> str:
     try:
         tz = ZoneInfo(tz_name or "UTC")
-    except Exception:  # noqa: BLE001
+    except Exception:                
         tz = ZoneInfo("UTC")
     iso = now_utc.astimezone(tz).isocalendar()
     return f"{iso.year}-W{iso.week:02d}"
@@ -108,7 +108,7 @@ def _claim_week(user_id: str, week_key: str) -> bool:
         )
         key = f"jobautomater:digest:weekly:{user_id}:{week_key}"
         return bool(client.set(key, "1", nx=True, ex=8 * 24 * 3600))
-    except Exception:  # noqa: BLE001
+    except Exception:                
         logger.warning("digest_claim_failed")
         return False
 
@@ -126,7 +126,7 @@ def _send_mail(to: str, subject: str, text: str) -> None:
                 },
                 timeout=5.0,
             )
-        except Exception:  # noqa: BLE001
+        except Exception:                
             logger.warning("digest_mail_webhook_failed")
             return
     logger.info("digest_sent subject_len=%s text_len=%s", len(subject), len(text))
@@ -259,7 +259,7 @@ def process_weekly_digest(
                     data={"week": week_key},
                     priority=0,
                 )
-            except Exception:  # noqa: BLE001
+            except Exception:                
                 logger.exception("digest_notify_failed user_id=%s", user_id)
             sent += 1
 

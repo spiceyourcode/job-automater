@@ -57,7 +57,7 @@ def test_due_row_notified_and_advanced():
     assert kwargs["priority"] == 1
     assert kwargs["data"]["application_id"] == UUID
     assert kwargs["data"]["job_id"] == JOB_ID
-    # An UPDATE ran to advance the next_followup_at.
+                                                    
     assert any(
         "UPDATE applications" in str(c.args[0])
         for c in _cur(conn).execute.call_args_list

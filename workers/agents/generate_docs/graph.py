@@ -58,10 +58,10 @@ def _generate_node(state: DocsState) -> dict[str, Any]:
             docs = validate_generated(llm_draft)
             assert_grounded_in_chunks(docs, state["chunks"])
             draft = docs.model_dump(mode="json")
-        except Exception:  # noqa: BLE001
+        except Exception:                
             logger.warning("generate_docs_llm_ungrounded_fallback")
             draft = heuristic
-    # Never log document bodies (HG-8)
+                                      
     logger.info(
         "generate_docs_draft traces=%s model=%s",
         len(draft.get("bullet_traces") or []),
@@ -78,7 +78,7 @@ def _validate_node(state: DocsState) -> dict[str, Any]:
         docs = validate_generated(draft)
         assert_grounded_in_chunks(docs, state["chunks"])
         return {"validated": docs.model_dump(mode="json"), "error": None}
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:                
         logger.warning("generate_docs_validate_failed err=%s", type(exc).__name__)
         return {"validated": None, "error": f"{type(exc).__name__}: grounding failed"}
 

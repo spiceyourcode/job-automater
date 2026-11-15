@@ -9,8 +9,8 @@ CREATE TABLE "source_runs" (
 	"started_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"completed_at" timestamp with time zone
 );
---> statement-breakpoint
-ALTER TABLE "source_runs" ADD CONSTRAINT "source_runs_source_config_id_source_configs_id_fk" FOREIGN KEY ("source_config_id") REFERENCES "public"."source_configs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "source_runs" ADD CONSTRAINT "source_runs_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-CREATE INDEX "idx_source_runs_source" ON "source_runs" USING btree ("source_config_id","started_at");--> statement-breakpoint
+
+ALTER TABLE "source_runs" ADD CONSTRAINT "source_runs_source_config_id_source_configs_id_fk" FOREIGN KEY ("source_config_id") REFERENCES "public"."source_configs"("id") ON DELETE cascade ON UPDATE no action;
+ALTER TABLE "source_runs" ADD CONSTRAINT "source_runs_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;
+CREATE INDEX "idx_source_runs_source" ON "source_runs" USING btree ("source_config_id","started_at");
 CREATE INDEX "idx_source_runs_user" ON "source_runs" USING btree ("user_id","started_at");

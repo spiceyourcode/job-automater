@@ -30,7 +30,7 @@ def normalize_cv_text(text: str) -> str:
 
 
 def _get_converter():
-    global _converter  # noqa: PLW0603
+    global _converter                 
     if _converter is not None:
         return _converter
     import indra_ocr
@@ -88,5 +88,5 @@ def extract_pdf_with_indra(
 
 
 def reset_converter_for_tests() -> None:
-    global _converter  # noqa: PLW0603
+    global _converter                 
     _converter = None

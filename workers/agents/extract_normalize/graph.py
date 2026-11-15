@@ -35,14 +35,14 @@ def _extract_node(state: ExtractState) -> dict[str, Any]:
         source_url=state.get("source_url"),
     )
     if use_llm:
-        # LLM path is opt-in; invalid JSON/schema falls back to heuristic (never persist unvalidated).
+                                                                                                      
         try:
             from agents.extract_normalize.llm import llm_refine
 
             refined = llm_refine(state["raw_data"], draft)
             validate_normalized(refined)
             draft = refined
-        except Exception:  # noqa: BLE001
+        except Exception:                
             logger.warning("extract_llm_fallback source_type=%s", state.get("source_type"))
     return {"draft": draft, "error": None}
 
@@ -52,7 +52,7 @@ def _validate_node(state: ExtractState) -> dict[str, Any]:
     try:
         job = validate_normalized(draft)
         return {"validated": job.model_dump(mode="json"), "error": None}
-    except Exception as exc:  # noqa: BLE001 — surface as graph error, never persist
+    except Exception as exc:                                                        
         logger.warning("extract_validate_failed err=%s", type(exc).__name__)
         return {"validated": None, "error": f"{type(exc).__name__}: validation failed"}
 

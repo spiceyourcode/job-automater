@@ -46,7 +46,7 @@ def _openai_embed(texts: list[str], timeout: float) -> list[list[float]]:
 
 
 def _google_embed(texts: list[str], timeout: float) -> list[list[float]]:
-    # One request per text — batchEmbedContents also works; keep simple.
+                                                                        
     out: list[list[float]] = []
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
@@ -82,7 +82,7 @@ def embed_texts(texts: list[str], *, timeout: float = 60.0) -> list[list[float] 
         if settings.google_api_key:
             try:
                 vectors = _google_embed(clipped, timeout)
-            except Exception:  # noqa: BLE001
+            except Exception:                
                 logger.warning("embed_google_failed_trying_openai")
                 if not settings.openai_api_key:
                     raise
@@ -98,7 +98,7 @@ def embed_texts(texts: list[str], *, timeout: float = 60.0) -> list[list[float] 
             logger.warning("embed_count_mismatch")
             return [None] * len(texts)
         return [v if len(v) == EMBED_DIM else None for v in vectors]
-    except Exception:  # noqa: BLE001
+    except Exception:                
         logger.warning("embed_failed")
         return [None] * len(texts)
 

@@ -107,7 +107,7 @@ class TelegramCollector(BaseCollector):
             raise ValueError("telegram config requires botToken and channelId")
 
         limit = max(1, min(int(config.get("limit") or 50), 100))
-        # Never log bot_token (HG-8 / FAILURE clause)
+                                                     
         logger.info(
             "telegram_collect_start channel_configured=%s limit=%s",
             bool(channel_id),
@@ -128,7 +128,7 @@ class TelegramCollector(BaseCollector):
                     raise RuntimeError(f"telegram_http_{res.status_code}")
                 payload = res.json()
         except httpx.HTTPError:
-            # Never re-raise with URL containing bot token
+                                                          
             raise RuntimeError("telegram_http_error") from None
 
         if not payload.get("ok"):

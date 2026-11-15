@@ -16,18 +16,18 @@ EmailCategory = Literal[
     "other",
 ]
 
-# Auto-update only when confidence STRICTLY exceeds threshold (AppFlow §2.5).
+                                                                             
 AUTO_UPDATE_THRESHOLDS: dict[str, float] = {
     "application_confirmation": 0.9,
     "interview_invitation": 0.85,
     "rejection": 0.9,
     "offer": 0.95,
-    "follow_up_request": 0.8,  # flag only — no status change
-    "spam": 0.95,  # ignore
-    "other": 1.01,  # never auto
+    "follow_up_request": 0.8,                                
+    "spam": 0.95,          
+    "other": 1.01,              
 }
 
-# Category → application status when auto-applied
+                                                 
 CATEGORY_STATUS: dict[str, str | None] = {
     "application_confirmation": "acknowledged",
     "interview_invitation": "interviewing",

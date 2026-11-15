@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 @app.task(name="tasks.reindex_cv", bind=True, max_retries=2)
-def reindex_cv(self, payload: dict[str, Any]) -> dict[str, Any]:  # noqa: ARG002
+def reindex_cv(self, payload: dict[str, Any]) -> dict[str, Any]:                
     user_id = payload.get("user_id")
     cv_document_id = payload.get("cv_document_id")
     task_id = payload.get("task_id")
@@ -21,7 +21,7 @@ def reindex_cv(self, payload: dict[str, Any]) -> dict[str, Any]:  # noqa: ARG002
         logger.warning("reindex_cv_missing_ids")
         return {"status": "error", "error": "missing_ids"}
 
-    # Never log parsed text / filenames (HG-8)
+                                              
     logger.info(
         "reindex_cv_start task_id=%s cv_document_id=%s",
         task_id,

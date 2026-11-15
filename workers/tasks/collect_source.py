@@ -184,7 +184,7 @@ def process_collect_source(payload: dict[str, Any]) -> dict[str, Any]:
                         "message": f"Collected {len(raw_jobs)} jobs",
                     },
                 )
-            except Exception:  # noqa: BLE001
+            except Exception:                
                 pass
             result = {
                 "status": "success",
@@ -193,9 +193,9 @@ def process_collect_source(payload: dict[str, Any]) -> dict[str, Any]:
                 "job_ids": inserted_ids,
                 "duration_ms": duration_ms,
             }
-            # Normalize every raw row still pending for this source, not just the
-            # rows inserted this run — recovers progress after a failed/partial
-            # normalize (e.g. jobs-table reset) even when nothing new arrived.
+                                                                                 
+                                                                               
+                                                                              
             pending_ids = list_unprocessed_jobs_raw_ids(
                 conn,
                 user_id=job.user_id,
@@ -203,7 +203,7 @@ def process_collect_source(payload: dict[str, Any]) -> dict[str, Any]:
             )
             queue_ids = list(dict.fromkeys([*inserted_ids, *pending_ids]))
             if queue_ids:
-                # Late import avoids circular deps at module load
+                                                                 
                 from tasks.normalize_jobs import normalize_jobs
 
                 normalize_jobs.delay(
@@ -235,8 +235,8 @@ def collect_source(
     try:
         return process_collect_source(data)
     except (ValidationError, ValueError, CollectFailed):
-        # Already recorded or not retryable (missing source / bad payload)
+                                                                          
         raise
     except Exception as exc:
-        # Unexpected infrastructure errors only
+                                               
         raise self.retry(exc=exc) from exc

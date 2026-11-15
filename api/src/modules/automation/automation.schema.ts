@@ -1,10 +1,7 @@
 import { z } from "zod";
-
 export const emergencyStopBodySchema = z
-  .object({
-    /** When true (default), activate stop + drain. When false, clear stop. */
+    .object({
     active: z.boolean().default(true),
-  })
-  .strict();
-
+})
+    .strict();
 export type EmergencyStopBody = z.infer<typeof emergencyStopBodySchema>;

@@ -34,7 +34,7 @@ def parse_feed_xml(xml_text: str, feed_url: str) -> list[RawJob]:
     root = ET.fromstring(xml_text)
     jobs: list[RawJob] = []
 
-    # RSS 2.0: channel/item
+                           
     for item in root.iter():
         if _local(item.tag) != "item":
             continue
@@ -54,7 +54,7 @@ def parse_feed_xml(xml_text: str, feed_url: str) -> list[RawJob]:
             elif name == "description":
                 description = _text(child) or description
             elif name in ("encoded", "content"):
-                # content:encoded / media body often holds the full JD
+                                                                      
                 richer = "".join(child.itertext()).strip() or _text(child)
                 if len(richer) > len(description):
                     description = richer
@@ -85,7 +85,7 @@ def parse_feed_xml(xml_text: str, feed_url: str) -> list[RawJob]:
     if jobs:
         return jobs
 
-    # Atom: entry
+                 
     for entry in root.iter():
         if _local(entry.tag) != "entry":
             continue

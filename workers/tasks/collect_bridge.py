@@ -53,7 +53,7 @@ def _dispatch(key: str, payload: dict[str, Any]) -> None:
     elif key == SUBMIT_APPLICATION_KEY:
         from tasks.submit_application import submit_application
 
-        # HG-4: only dispatch when approved_at present
+                                                      
         if not payload.get("approved_at"):
             logger.warning("bridge_submit_rejected reason=missing_approved_at")
             return
@@ -154,7 +154,7 @@ def _loop() -> None:
                 logger.warning("bridge_bad_json key=%s", key)
                 continue
             _dispatch(key, payload)
-        except Exception:  # noqa: BLE001
+        except Exception:                
             logger.exception("bridge_error")
             _stop.wait(1)
     logger.info("queue_bridge_stopped")
@@ -173,7 +173,7 @@ def start_queue_bridge() -> None:
 @worker_init.connect
 @worker_ready.connect
 def _on_worker_up(**_kwargs: Any) -> None:
-    # Windows --pool=solo sometimes skips worker_ready; worker_init still runs.
+                                                                               
     start_queue_bridge()
 
 

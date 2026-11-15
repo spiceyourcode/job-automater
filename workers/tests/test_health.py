@@ -22,5 +22,5 @@ def test_ping_no_pii_in_result():
     """Result must not contain personal data — it is a plain constant."""
     result = ping.apply().get()
     assert isinstance(result, str)
-    assert "@" not in result  # no email
-    assert len(result) < 32  # not a token or hash
+    assert "@" not in result            
+    assert len(result) < 32                       

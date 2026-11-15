@@ -30,7 +30,7 @@ def _load_cv_doc(conn, user_id: str, cv_document_id: str) -> dict[str, Any] | No
 
 
 @app.task(name="tasks.parse_cv", bind=True, max_retries=1)
-def parse_cv(self, payload: dict[str, Any]) -> dict[str, Any]:  # noqa: ARG002
+def parse_cv(self, payload: dict[str, Any]) -> dict[str, Any]:                
     user_id = payload.get("user_id")
     cv_document_id = payload.get("cv_document_id")
     task_id = payload.get("task_id")

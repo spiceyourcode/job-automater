@@ -2,18 +2,14 @@ import { config } from "dotenv";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
-
 const apiRoot = fileURLToPath(new URL("..", import.meta.url));
 const repoRoot = resolve(apiRoot, "..");
-
 config({ path: resolve(repoRoot, ".env") });
 config({ path: resolve(apiRoot, ".env"), override: true });
-
 const nodeEnv = process.env.NODE_ENV ?? "development";
 const isProd = nodeEnv === "production";
-
 const envSchema = z
-  .object({
+    .object({
     DATABASE_URL: z.string().min(1),
     API_PORT: z.coerce.number().int().min(1).max(65535).default(4001),
     NODE_ENV: z.string().default("development"),
@@ -45,90 +41,79 @@ const envSchema = z
     STRIPE_WEBHOOK_SECRET: z.string().optional(),
     STRIPE_PRICE_ID: z.string().optional(),
     RESEND_API_KEY: z.string().optional(),
-  })
-  .strict();
-
+})
+    .strict();
 const parsed = envSchema.safeParse({
-  DATABASE_URL: process.env.DATABASE_URL,
-  API_PORT: process.env.API_PORT ?? "4001",
-  NODE_ENV: nodeEnv,
-  JWT_SECRET: process.env.JWT_SECRET ?? "",
-  JWT_ACCESS_TTL: process.env.JWT_ACCESS_TTL ?? "1h",
-  JWT_REFRESH_TTL: process.env.JWT_REFRESH_TTL ?? "7d",
-  // Dev-only defaults for local MinIO; production must set explicitly (fail closed)
-  S3_ENDPOINT:
-    process.env.S3_ENDPOINT ??
-    (isProd ? undefined : "http://localhost:9000"),
-  S3_ACCESS_KEY:
-    process.env.S3_ACCESS_KEY ?? (isProd ? undefined : "minioadmin"),
-  S3_SECRET_KEY:
-    process.env.S3_SECRET_KEY ?? (isProd ? undefined : "minioadmin"),
-  S3_BUCKET: process.env.S3_BUCKET ?? (isProd ? undefined : "jobautomater"),
-  S3_REGION: process.env.S3_REGION ?? "us-east-1",
-  REDIS_URL: process.env.REDIS_URL ?? process.env.CELERY_BROKER_URL,
-  APP_URL: process.env.APP_URL ?? "http://localhost:3000",
-  EMAIL_FROM: process.env.EMAIL_FROM ?? "noreply@jobautomater.local",
-  SMTP_WEBHOOK_URL: process.env.SMTP_WEBHOOK_URL || undefined,
-  EMAIL_VERIFY_TTL: process.env.EMAIL_VERIFY_TTL ?? "24h",
-  PASSWORD_RESET_TTL: process.env.PASSWORD_RESET_TTL ?? "1h",
-  OAUTH_GOOGLE_CLIENT_ID: process.env.OAUTH_GOOGLE_CLIENT_ID || undefined,
-  OAUTH_GOOGLE_CLIENT_SECRET:
-    process.env.OAUTH_GOOGLE_CLIENT_SECRET || undefined,
-  OAUTH_GITHUB_CLIENT_ID: process.env.OAUTH_GITHUB_CLIENT_ID || undefined,
-  OAUTH_GITHUB_CLIENT_SECRET:
-    process.env.OAUTH_GITHUB_CLIENT_SECRET || undefined,
-  OAUTH_LINKEDIN_CLIENT_ID: process.env.OAUTH_LINKEDIN_CLIENT_ID || undefined,
-  OAUTH_LINKEDIN_CLIENT_SECRET:
-    process.env.OAUTH_LINKEDIN_CLIENT_SECRET || undefined,
-  API_PUBLIC_URL:
-    process.env.API_PUBLIC_URL ??
-    `http://localhost:${process.env.API_PORT ?? "4001"}`,
-  GMAIL_PUBSUB_TOPIC: process.env.GMAIL_PUBSUB_TOPIC || undefined,
-  GMAIL_PUSH_TOKEN: process.env.GMAIL_PUSH_TOKEN || undefined,
-  SENTRY_DSN: process.env.SENTRY_DSN || undefined,
-  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || undefined,
-  STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET || undefined,
-STRIPE_PRICE_ID: process.env.STRIPE_PRICE_ID || undefined,
+    DATABASE_URL: process.env.DATABASE_URL,
+    API_PORT: process.env.API_PORT ?? "4001",
+    NODE_ENV: nodeEnv,
+    JWT_SECRET: process.env.JWT_SECRET ?? "",
+    JWT_ACCESS_TTL: process.env.JWT_ACCESS_TTL ?? "1h",
+    JWT_REFRESH_TTL: process.env.JWT_REFRESH_TTL ?? "7d",
+    S3_ENDPOINT: process.env.S3_ENDPOINT ??
+        (isProd ? undefined : "http://localhost:9000"),
+    S3_ACCESS_KEY: process.env.S3_ACCESS_KEY ?? (isProd ? undefined : "minioadmin"),
+    S3_SECRET_KEY: process.env.S3_SECRET_KEY ?? (isProd ? undefined : "minioadmin"),
+    S3_BUCKET: process.env.S3_BUCKET ?? (isProd ? undefined : "jobautomater"),
+    S3_REGION: process.env.S3_REGION ?? "us-east-1",
+    REDIS_URL: process.env.REDIS_URL ?? process.env.CELERY_BROKER_URL,
+    APP_URL: process.env.APP_URL ?? "http://localhost:3000",
+    EMAIL_FROM: process.env.EMAIL_FROM ?? "noreply@jobautomater.local",
+    SMTP_WEBHOOK_URL: process.env.SMTP_WEBHOOK_URL || undefined,
+    EMAIL_VERIFY_TTL: process.env.EMAIL_VERIFY_TTL ?? "24h",
+    PASSWORD_RESET_TTL: process.env.PASSWORD_RESET_TTL ?? "1h",
+    OAUTH_GOOGLE_CLIENT_ID: process.env.OAUTH_GOOGLE_CLIENT_ID || undefined,
+    OAUTH_GOOGLE_CLIENT_SECRET: process.env.OAUTH_GOOGLE_CLIENT_SECRET || undefined,
+    OAUTH_GITHUB_CLIENT_ID: process.env.OAUTH_GITHUB_CLIENT_ID || undefined,
+    OAUTH_GITHUB_CLIENT_SECRET: process.env.OAUTH_GITHUB_CLIENT_SECRET || undefined,
+    OAUTH_LINKEDIN_CLIENT_ID: process.env.OAUTH_LINKEDIN_CLIENT_ID || undefined,
+    OAUTH_LINKEDIN_CLIENT_SECRET: process.env.OAUTH_LINKEDIN_CLIENT_SECRET || undefined,
+    API_PUBLIC_URL: process.env.API_PUBLIC_URL ??
+        `http://localhost:${process.env.API_PORT ?? "4001"}`,
+    GMAIL_PUBSUB_TOPIC: process.env.GMAIL_PUBSUB_TOPIC || undefined,
+    GMAIL_PUSH_TOKEN: process.env.GMAIL_PUSH_TOKEN || undefined,
+    SENTRY_DSN: process.env.SENTRY_DSN || undefined,
+    STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || undefined,
+    STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET || undefined,
+    STRIPE_PRICE_ID: process.env.STRIPE_PRICE_ID || undefined,
     RESEND_API_KEY: process.env.RESEND_API_KEY || undefined,
-  });
-
+});
 if (!parsed.success) {
-  const details = parsed.error.issues
-    .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
-    .join("; ");
-  throw new Error(`Invalid environment: ${details}`);
+    const details = parsed.error.issues
+        .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+        .join("; ");
+    throw new Error(`Invalid environment: ${details}`);
 }
-
 export const env = {
-  databaseUrl: parsed.data.DATABASE_URL,
-  apiPort: parsed.data.API_PORT,
-  nodeEnv: parsed.data.NODE_ENV,
-  jwtSecret: parsed.data.JWT_SECRET,
-  jwtAccessTtl: parsed.data.JWT_ACCESS_TTL,
-  jwtRefreshTtl: parsed.data.JWT_REFRESH_TTL,
-  s3Endpoint: parsed.data.S3_ENDPOINT,
-  s3AccessKey: parsed.data.S3_ACCESS_KEY,
-  s3SecretKey: parsed.data.S3_SECRET_KEY,
-  s3Bucket: parsed.data.S3_BUCKET,
-  s3Region: parsed.data.S3_REGION,
-  redisUrl: parsed.data.REDIS_URL,
-  appUrl: parsed.data.APP_URL,
-  emailFrom: parsed.data.EMAIL_FROM,
-  smtpWebhookUrl: parsed.data.SMTP_WEBHOOK_URL,
-  emailVerifyTtl: parsed.data.EMAIL_VERIFY_TTL,
-  passwordResetTtl: parsed.data.PASSWORD_RESET_TTL,
-  oauthGoogleClientId: parsed.data.OAUTH_GOOGLE_CLIENT_ID,
-  oauthGoogleClientSecret: parsed.data.OAUTH_GOOGLE_CLIENT_SECRET,
-  oauthGithubClientId: parsed.data.OAUTH_GITHUB_CLIENT_ID,
-  oauthGithubClientSecret: parsed.data.OAUTH_GITHUB_CLIENT_SECRET,
-  oauthLinkedinClientId: parsed.data.OAUTH_LINKEDIN_CLIENT_ID,
-  oauthLinkedinClientSecret: parsed.data.OAUTH_LINKEDIN_CLIENT_SECRET,
-  apiPublicUrl: parsed.data.API_PUBLIC_URL,
-  gmailPubsubTopic: parsed.data.GMAIL_PUBSUB_TOPIC,
-  gmailPushToken: parsed.data.GMAIL_PUSH_TOKEN,
-  sentryDsn: parsed.data.SENTRY_DSN,
-  stripeSecretKey: parsed.data.STRIPE_SECRET_KEY,
-  stripeWebhookSecret: parsed.data.STRIPE_WEBHOOK_SECRET,
-stripePriceId: parsed.data.STRIPE_PRICE_ID,
+    databaseUrl: parsed.data.DATABASE_URL,
+    apiPort: parsed.data.API_PORT,
+    nodeEnv: parsed.data.NODE_ENV,
+    jwtSecret: parsed.data.JWT_SECRET,
+    jwtAccessTtl: parsed.data.JWT_ACCESS_TTL,
+    jwtRefreshTtl: parsed.data.JWT_REFRESH_TTL,
+    s3Endpoint: parsed.data.S3_ENDPOINT,
+    s3AccessKey: parsed.data.S3_ACCESS_KEY,
+    s3SecretKey: parsed.data.S3_SECRET_KEY,
+    s3Bucket: parsed.data.S3_BUCKET,
+    s3Region: parsed.data.S3_REGION,
+    redisUrl: parsed.data.REDIS_URL,
+    appUrl: parsed.data.APP_URL,
+    emailFrom: parsed.data.EMAIL_FROM,
+    smtpWebhookUrl: parsed.data.SMTP_WEBHOOK_URL,
+    emailVerifyTtl: parsed.data.EMAIL_VERIFY_TTL,
+    passwordResetTtl: parsed.data.PASSWORD_RESET_TTL,
+    oauthGoogleClientId: parsed.data.OAUTH_GOOGLE_CLIENT_ID,
+    oauthGoogleClientSecret: parsed.data.OAUTH_GOOGLE_CLIENT_SECRET,
+    oauthGithubClientId: parsed.data.OAUTH_GITHUB_CLIENT_ID,
+    oauthGithubClientSecret: parsed.data.OAUTH_GITHUB_CLIENT_SECRET,
+    oauthLinkedinClientId: parsed.data.OAUTH_LINKEDIN_CLIENT_ID,
+    oauthLinkedinClientSecret: parsed.data.OAUTH_LINKEDIN_CLIENT_SECRET,
+    apiPublicUrl: parsed.data.API_PUBLIC_URL,
+    gmailPubsubTopic: parsed.data.GMAIL_PUBSUB_TOPIC,
+    gmailPushToken: parsed.data.GMAIL_PUSH_TOKEN,
+    sentryDsn: parsed.data.SENTRY_DSN,
+    stripeSecretKey: parsed.data.STRIPE_SECRET_KEY,
+    stripeWebhookSecret: parsed.data.STRIPE_WEBHOOK_SECRET,
+    stripePriceId: parsed.data.STRIPE_PRICE_ID,
     resendApiKey: parsed.data.RESEND_API_KEY,
-  } as const;
+} as const;

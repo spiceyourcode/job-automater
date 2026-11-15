@@ -1,231 +1,270 @@
 import { and, desc, eq, gte, inArray, notInArray, sql } from "drizzle-orm";
 import { db } from "../../db/index.js";
-import {
-  applications,
-  interviewPreps,
-  jobScores,
-  jobs,
-  mockInterviewSessions,
-  profiles,
-  videoCoverScripts,
-  type Application,
-  type MockInterviewTurn,
-} from "../../db/schema/index.js";
-import {
-  generateMockInterviewReply,
-  isInterviewEndPhrase,
-  openingLine,
-  shouldEndSession,
-  type MockInterviewTurnForLlm,
-} from "../../lib/mock-interview-llm.js";
-import {
-  enqueueGenerateDocs,
-  enqueueInterviewPrep,
-  enqueueSubmitApplication,
-  enqueueVideoCover,
-} from "../../lib/queue.js";
+import { applications, interviewPreps, jobScores, jobs, mockInterviewSessions, profiles, videoCoverScripts, type Application, type MockInterviewTurn, } from "../../db/schema/index.js";
+import { generateMockInterviewReply, isInterviewEndPhrase, openingLine, shouldEndSession, type MockInterviewTurnForLlm, } from "../../lib/mock-interview-llm.js";
+import { buildMockInterviewSummary, voiceGatewayWsUrl, } from "../../lib/mock-interview-evaluate.js";
+import { enqueueGenerateDocs, enqueueInterviewPrep, enqueueSubmitApplication, enqueueVideoCover, } from "../../lib/queue.js";
 import { getPresignedGetUrl, uploadObject } from "../../lib/s3.js";
 import { buildApplicationZip, textToAtsPdf } from "../../lib/ats-pdf.js";
-import {
-  siteKeyFromUrl,
-  SubmitLimitError,
-} from "../../lib/submit-limits.js";
-import type {
-  BulkActionBody,
-  BulkGenerateBody,
-  CreateApplicationBody,
-  CreateInterviewBody,
-  PatchApplicationMetaBody,
-  PatchInterviewBody,
-  PipelineStage,
-  RegenerateSectionBody,
-  SetTemplateBody,
-  UpdateBulletsBody,
-  UpdateStageBody,
-} from "./applications.schema.js";
-import {
-  STAGE_TO_STATUS,
-  statusToStage,
-} from "./applications.schema.js";
-
-/** Contract state machine: draft → pending_approval → approved → submitted */
+import { siteKeyFromUrl, SubmitLimitError, } from "../../lib/submit-limits.js";
+import type { BulkActionBody, BulkGenerateBody, CreateApplicationBody, CreateInterviewBody, PatchApplicationMetaBody, PatchInterviewBody, PipelineStage, RegenerateSectionBody, SetTemplateBody, UpdateBulletsBody, UpdateStageBody, } from "./applications.schema.js";
+import { STAGE_TO_STATUS, statusToStage, } from "./applications.schema.js";
 const APPROVABLE_STATUSES = new Set(["draft"]);
-
 export type BulletTracePublic = {
-  text: string;
-  chunkId: string;
-  section: string;
-  status: "accepted" | "rejected" | "pending";
+    text: string;
+    chunkId: string;
+    section: string;
+    status: "accepted" | "rejected" | "pending";
 };
-
 export class ApplicationError extends Error {
-  constructor(
-    message: string,
-    readonly statusCode: 400 | 403 | 404 | 409 | 429 | 503,
-  ) {
-    super(message);
-    this.name = "ApplicationError";
-  }
+    constructor(message: string, readonly statusCode: 400 | 403 | 404 | 409 | 429 | 503) {
+        super(message);
+        this.name = "ApplicationError";
+    }
 }
-
-/** Normalize worker snake_case / API camelCase; drop untraced (HG-9). */
 export function normalizeBulletTraces(raw: unknown): BulletTracePublic[] {
-  if (!Array.isArray(raw)) return [];
-  const out: BulletTracePublic[] = [];
-  for (const item of raw) {
-    if (!item || typeof item !== "object") continue;
-    const t = item as Record<string, unknown>;
-    const text = String(t.text ?? "").trim();
-    const chunkId = String(t.chunkId ?? t.chunk_id ?? "").trim();
-    const section = String(t.section ?? "").trim() || "experience";
-    if (text.length < 8 || !chunkId) continue;
-    const status =
-      t.status === "rejected"
-        ? "rejected"
-        : t.status === "accepted" || t.status === "pending" || t.status == null
-          ? "accepted"
-          : "accepted";
-    out.push({ text, chunkId, section, status });
-  }
-  return out;
+    if (!Array.isArray(raw))
+        return [];
+    const out: BulletTracePublic[] = [];
+    for (const item of raw) {
+        if (!item || typeof item !== "object")
+            continue;
+        const t = item as Record<string, unknown>;
+        const text = String(t.text ?? "").trim();
+        const chunkId = String(t.chunkId ?? t.chunk_id ?? "").trim();
+        const section = String(t.section ?? "").trim() || "experience";
+        if (text.length < 8 || !chunkId)
+            continue;
+        const status = t.status === "rejected"
+            ? "rejected"
+            : t.status === "accepted" || t.status === "pending" || t.status == null
+                ? "accepted"
+                : "accepted";
+        out.push({ text, chunkId, section, status });
+    }
+    return out;
 }
-
 function toPublic(app: Application) {
-  const reviewed = app.documentsReviewedAt != null;
-  const canApprove =
-    reviewed &&
-    APPROVABLE_STATUSES.has(app.status) &&
-    Boolean(app.tailoredCvContent && app.coverLetterContent);
-  const model = app.generationModel ?? null;
-  const generationError =
-    model?.startsWith("error:") ? model.slice("error:".length) : null;
-  const documentsStatus = app.tailoredCvContent && app.coverLetterContent
-    ? ("ready" as const)
-    : generationError
-      ? ("failed" as const)
-      : model === "pending"
-        ? ("pending" as const)
-        : ("idle" as const);
-  return {
-    id: app.id,
-    jobId: app.jobId,
-    status: app.status,
-    cvVersion: app.cvVersion,
-    tailoredCvContent: app.tailoredCvContent,
-    coverLetterContent: app.coverLetterContent,
-    tailoredCvUrl: app.tailoredCvUrl,
-    coverLetterUrl: app.coverLetterUrl,
-    bulletTraces: normalizeBulletTraces(app.bulletTraces),
-    documentsReviewedAt: app.documentsReviewedAt,
-    approvedAt: app.approvedAt,
-    submittedAt: app.submittedAt,
-    submittedVia: app.submittedVia,
-    submitError: app.submitError,
-    pipelineStage: statusToStage(app.status),
-    generationModel: app.generationModel,
-    generationError,
-    documentsStatus,
-    generationDurationMs: app.generationDurationMs,
-    cvTemplate: app.cvTemplate,
-    clTemplate: app.clTemplate,
-    userNotes: app.userNotes,
-    interviewStages: app.interviewStages ?? [],
-    nextFollowupAt: app.nextFollowupAt,
-    followupCount: app.followupCount ?? 0,
-    createdAt: app.createdAt,
-    updatedAt: app.updatedAt,
-    /** Approve/Apply blocked until review (P3.2); submit only after approve (HG-4). */
-    canApply: canApprove,
-    canApprove,
-  };
+    const reviewed = app.documentsReviewedAt != null;
+    const canApprove = reviewed &&
+        APPROVABLE_STATUSES.has(app.status) &&
+        Boolean(app.tailoredCvContent && app.coverLetterContent);
+    const model = app.generationModel ?? null;
+    const generationError = model?.startsWith("error:") ? model.slice("error:".length) : null;
+    const documentsStatus = app.tailoredCvContent && app.coverLetterContent
+        ? ("ready" as const)
+        : generationError
+            ? ("failed" as const)
+            : model === "pending"
+                ? ("pending" as const)
+                : ("idle" as const);
+    return {
+        id: app.id,
+        jobId: app.jobId,
+        status: app.status,
+        cvVersion: app.cvVersion,
+        tailoredCvContent: app.tailoredCvContent,
+        coverLetterContent: app.coverLetterContent,
+        tailoredCvUrl: app.tailoredCvUrl,
+        coverLetterUrl: app.coverLetterUrl,
+        bulletTraces: normalizeBulletTraces(app.bulletTraces),
+        documentsReviewedAt: app.documentsReviewedAt,
+        approvedAt: app.approvedAt,
+        submittedAt: app.submittedAt,
+        submittedVia: app.submittedVia,
+        submitError: app.submitError,
+        pipelineStage: statusToStage(app.status),
+        generationModel: app.generationModel,
+        generationError,
+        documentsStatus,
+        generationDurationMs: app.generationDurationMs,
+        cvTemplate: app.cvTemplate,
+        clTemplate: app.clTemplate,
+        userNotes: app.userNotes,
+        interviewStages: app.interviewStages ?? [],
+        nextFollowupAt: app.nextFollowupAt,
+        followupCount: app.followupCount ?? 0,
+        createdAt: app.createdAt,
+        updatedAt: app.updatedAt,
+        canApply: canApprove,
+        canApprove,
+    };
 }
-
-async function getOwned(
-  userId: string,
-  id: string,
-): Promise<Application> {
-  const [row] = await db
-    .select()
-    .from(applications)
-    .where(and(eq(applications.id, id), eq(applications.userId, userId)))
-    .limit(1);
-  if (!row) throw new ApplicationError("Application not found", 404);
-  return row;
+async function getOwned(userId: string, id: string): Promise<Application> {
+    const [row] = await db
+        .select()
+        .from(applications)
+        .where(and(eq(applications.id, id), eq(applications.userId, userId)))
+        .limit(1);
+    if (!row)
+        throw new ApplicationError("Application not found", 404);
+    return row;
 }
-
 export async function listApplications(userId: string) {
-  const rows = await db
-    .select({
-      app: applications,
-      jobTitle: jobs.title,
-      jobCompany: jobs.company,
+    const rows = await db
+        .select({
+        app: applications,
+        jobTitle: jobs.title,
+        jobCompany: jobs.company,
     })
-    .from(applications)
-    .leftJoin(jobs, eq(applications.jobId, jobs.id))
-    .where(eq(applications.userId, userId))
-    .orderBy(desc(applications.updatedAt));
-
-  return {
-    applications: rows.map(({ app, jobTitle, jobCompany }) => ({
-      ...toPublic(app),
-      jobTitle: jobTitle ?? "Unknown role",
-      jobCompany: jobCompany ?? "Unknown company",
-    })),
-  };
+        .from(applications)
+        .leftJoin(jobs, eq(applications.jobId, jobs.id))
+        .where(eq(applications.userId, userId))
+        .orderBy(desc(applications.updatedAt));
+    return {
+        applications: rows.map(({ app, jobTitle, jobCompany }) => ({
+            ...toPublic(app),
+            jobTitle: jobTitle ?? "Unknown role",
+            jobCompany: jobCompany ?? "Unknown company",
+        })),
+    };
 }
-
 export async function getApplication(userId: string, id: string) {
-  const app = await getOwned(userId, id);
-  const [job] = await db
-    .select({
-      id: jobs.id,
-      title: jobs.title,
-      company: jobs.company,
+    const app = await getOwned(userId, id);
+    const [job] = await db
+        .select({
+        id: jobs.id,
+        title: jobs.title,
+        company: jobs.company,
     })
-    .from(jobs)
-    .where(and(eq(jobs.id, app.jobId), eq(jobs.userId, userId)))
-    .limit(1);
-  return { application: toPublic(app), job: job ?? null };
+        .from(jobs)
+        .where(and(eq(jobs.id, app.jobId), eq(jobs.userId, userId)))
+        .limit(1);
+    return { application: toPublic(app), job: job ?? null };
 }
-
-/**
- * Create draft application for a job and enqueue GenerateDocs.
- * Status remains `draft` (P3.3).
- */
-export async function createApplication(
-  userId: string,
-  body: CreateApplicationBody,
-) {
-  const [job] = await db
-    .select({ id: jobs.id })
-    .from(jobs)
-    .where(and(eq(jobs.id, body.jobId), eq(jobs.userId, userId)))
-    .limit(1);
-  if (!job) throw new ApplicationError("Job not found", 404);
-
-  const [profile] = await db
-    .select({ cvVersion: profiles.cvVersion })
-    .from(profiles)
-    .where(eq(profiles.userId, userId))
-    .limit(1);
-
-  const [existing] = await db
-    .select()
-    .from(applications)
-    .where(
-      and(
-        eq(applications.userId, userId),
-        eq(applications.jobId, body.jobId),
-      ),
-    )
-    .limit(1);
-
-  let app: Application;
-  if (existing) {
-    const [updated] = await db
-      .update(applications)
-      .set({
-        status: "draft",
+export async function createApplication(userId: string, body: CreateApplicationBody) {
+    const [job] = await db
+        .select({ id: jobs.id })
+        .from(jobs)
+        .where(and(eq(jobs.id, body.jobId), eq(jobs.userId, userId)))
+        .limit(1);
+    if (!job)
+        throw new ApplicationError("Job not found", 404);
+    const [profile] = await db
+        .select({ cvVersion: profiles.cvVersion })
+        .from(profiles)
+        .where(eq(profiles.userId, userId))
+        .limit(1);
+    const [existing] = await db
+        .select()
+        .from(applications)
+        .where(and(eq(applications.userId, userId), eq(applications.jobId, body.jobId)))
+        .limit(1);
+    let app: Application;
+    if (existing) {
+        const [updated] = await db
+            .update(applications)
+            .set({
+            status: "draft",
+            documentsReviewedAt: null,
+            approvedAt: null,
+            tailoredCvContent: null,
+            coverLetterContent: null,
+            bulletTraces: [],
+            generationModel: "pending",
+            generationDurationMs: null,
+            updatedAt: new Date(),
+        })
+            .where(eq(applications.id, existing.id))
+            .returning();
+        if (!updated)
+            throw new ApplicationError("Failed to reset application", 400);
+        app = updated;
+    }
+    else {
+        const [created] = await db
+            .insert(applications)
+            .values({
+            userId,
+            jobId: body.jobId,
+            cvVersion: profile?.cvVersion ?? 1,
+            status: "draft",
+            generationModel: "pending",
+        })
+            .returning();
+        if (!created)
+            throw new ApplicationError("Failed to create application", 400);
+        app = created;
+    }
+    try {
+        await enqueueGenerateDocs({
+            application_id: app.id,
+            user_id: userId,
+            job_id: body.jobId,
+        });
+    }
+    catch {
+        throw new ApplicationError("Failed to enqueue document generation", 503);
+    }
+    return { application: toPublic(app), status: "generating" as const };
+}
+export async function bulkGenerateDocuments(userId: string, body: BulkGenerateBody) {
+    const existing = await db
+        .select({ jobId: applications.jobId })
+        .from(applications)
+        .where(eq(applications.userId, userId));
+    const existingIds = existing.map((r) => r.jobId);
+    const scoreFilter = body.minScore != null
+        ? gte(jobScores.overallScore, String(body.minScore))
+        : undefined;
+    const candidates = await db
+        .select({
+        jobId: jobs.id,
+        overall: jobScores.overallScore,
+    })
+        .from(jobs)
+        .innerJoin(jobScores, and(eq(jobScores.jobId, jobs.id), eq(jobScores.userId, userId)))
+        .where(and(eq(jobs.userId, userId), eq(jobs.isDuplicate, false), existingIds.length > 0 ? notInArray(jobs.id, existingIds) : undefined, scoreFilter))
+        .orderBy(sql `${jobScores.overallScore} DESC NULLS LAST`)
+        .limit(body.limit);
+    const [profile] = await db
+        .select({ cvVersion: profiles.cvVersion })
+        .from(profiles)
+        .where(eq(profiles.userId, userId))
+        .limit(1);
+    const queued: Array<{
+        applicationId: string;
+        jobId: string;
+    }> = [];
+    for (const row of candidates) {
+        const [created] = await db
+            .insert(applications)
+            .values({
+            userId,
+            jobId: row.jobId,
+            cvVersion: profile?.cvVersion ?? 1,
+            status: "draft",
+            generationModel: "pending",
+        })
+            .returning({ id: applications.id, jobId: applications.jobId });
+        if (!created)
+            continue;
+        try {
+            await enqueueGenerateDocs({
+                application_id: created.id,
+                user_id: userId,
+                job_id: created.jobId,
+            });
+            queued.push({ applicationId: created.id, jobId: created.jobId });
+        }
+        catch {
+            await db
+                .delete(applications)
+                .where(eq(applications.id, created.id));
+        }
+    }
+    return {
+        queued,
+        count: queued.length,
+        status: "generating" as const,
+        submitEnqueued: false as const,
+    };
+}
+export async function regenerateDocuments(userId: string, id: string) {
+    const app = await getOwned(userId, id);
+    await db
+        .update(applications)
+        .set({
         documentsReviewedAt: null,
         approvedAt: null,
         tailoredCvContent: null,
@@ -233,1211 +272,939 @@ export async function createApplication(
         bulletTraces: [],
         generationModel: "pending",
         generationDurationMs: null,
+        status: "draft",
         updatedAt: new Date(),
-      })
-      .where(eq(applications.id, existing.id))
-      .returning();
-    if (!updated) throw new ApplicationError("Failed to reset application", 400);
-    app = updated;
-  } else {
-    const [created] = await db
-      .insert(applications)
-      .values({
-        userId,
-        jobId: body.jobId,
-        cvVersion: profile?.cvVersion ?? 1,
-        status: "draft",
-        generationModel: "pending",
-      })
-      .returning();
-    if (!created) throw new ApplicationError("Failed to create application", 400);
-    app = created;
-  }
-
-  try {
-    await enqueueGenerateDocs({
-      application_id: app.id,
-      user_id: userId,
-      job_id: body.jobId,
-    });
-  } catch {
-    throw new ApplicationError("Failed to enqueue document generation", 503);
-  }
-
-  return { application: toPublic(app), status: "generating" as const };
-}
-
-/**
- * P9.3 / FR-DG-06: queue GenerateDocs for top N scored matches.
- * Creates draft applications only — never enqueues submit (HG-4).
- */
-export async function bulkGenerateDocuments(
-  userId: string,
-  body: BulkGenerateBody,
-) {
-  const existing = await db
-    .select({ jobId: applications.jobId })
-    .from(applications)
-    .where(eq(applications.userId, userId));
-  const existingIds = existing.map((r) => r.jobId);
-
-  const scoreFilter =
-    body.minScore != null
-      ? gte(jobScores.overallScore, String(body.minScore))
-      : undefined;
-
-  const candidates = await db
-    .select({
-      jobId: jobs.id,
-      overall: jobScores.overallScore,
     })
-    .from(jobs)
-    .innerJoin(
-      jobScores,
-      and(eq(jobScores.jobId, jobs.id), eq(jobScores.userId, userId)),
-    )
-    .where(
-      and(
-        eq(jobs.userId, userId),
-        eq(jobs.isDuplicate, false),
-        existingIds.length > 0 ? notInArray(jobs.id, existingIds) : undefined,
-        scoreFilter,
-      ),
-    )
-    .orderBy(sql`${jobScores.overallScore} DESC NULLS LAST`)
-    .limit(body.limit);
-
-  const [profile] = await db
-    .select({ cvVersion: profiles.cvVersion })
-    .from(profiles)
-    .where(eq(profiles.userId, userId))
-    .limit(1);
-
-  const queued: Array<{ applicationId: string; jobId: string }> = [];
-  for (const row of candidates) {
-    const [created] = await db
-      .insert(applications)
-      .values({
-        userId,
-        jobId: row.jobId,
-        cvVersion: profile?.cvVersion ?? 1,
-        status: "draft",
-        generationModel: "pending",
-      })
-      .returning({ id: applications.id, jobId: applications.jobId });
-    if (!created) continue;
+        .where(and(eq(applications.id, id), eq(applications.userId, userId)));
     try {
-      await enqueueGenerateDocs({
-        application_id: created.id,
-        user_id: userId,
-        job_id: created.jobId,
-      });
-      queued.push({ applicationId: created.id, jobId: created.jobId });
-    } catch {
-      await db
-        .delete(applications)
-        .where(eq(applications.id, created.id));
+        await enqueueGenerateDocs({
+            application_id: app.id,
+            user_id: userId,
+            job_id: app.jobId,
+        });
     }
-  }
-
-  return {
-    queued,
-    count: queued.length,
-    status: "generating" as const,
-    /** Explicit HG-4 signal for tests/clients */
-    submitEnqueued: false as const,
-  };
+    catch {
+        throw new ApplicationError("Failed to enqueue document generation", 503);
+    }
+    return { status: "generating" as const };
 }
-
-export async function regenerateDocuments(userId: string, id: string) {
-  const app = await getOwned(userId, id);
-  await db
-    .update(applications)
-    .set({
-      documentsReviewedAt: null,
-      approvedAt: null,
-      tailoredCvContent: null,
-      coverLetterContent: null,
-      bulletTraces: [],
-      generationModel: "pending",
-      generationDurationMs: null,
-      status: "draft",
-      updatedAt: new Date(),
+export async function setApplicationTemplate(userId: string, id: string, body: SetTemplateBody) {
+    const app = await getOwned(userId, id);
+    const clTemplate = body.clTemplate ?? body.cvTemplate;
+    const [updated] = await db
+        .update(applications)
+        .set({
+        cvTemplate: body.cvTemplate,
+        clTemplate,
+        documentsReviewedAt: null,
+        approvedAt: null,
+        tailoredCvContent: null,
+        coverLetterContent: null,
+        bulletTraces: [],
+        generationModel: "pending",
+        generationDurationMs: null,
+        status: "draft",
+        updatedAt: new Date(),
     })
-    .where(and(eq(applications.id, id), eq(applications.userId, userId)));
-
-  try {
-    await enqueueGenerateDocs({
-      application_id: app.id,
-      user_id: userId,
-      job_id: app.jobId,
-    });
-  } catch {
-    throw new ApplicationError("Failed to enqueue document generation", 503);
-  }
-  return { status: "generating" as const };
+        .where(and(eq(applications.id, id), eq(applications.userId, userId)))
+        .returning();
+    if (!updated)
+        throw new ApplicationError("Application not found", 404);
+    try {
+        await enqueueGenerateDocs({
+            application_id: app.id,
+            user_id: userId,
+            job_id: app.jobId,
+        });
+    }
+    catch {
+        throw new ApplicationError("Failed to enqueue document generation", 503);
+    }
+    return {
+        application: toPublic(updated),
+        status: "generating" as const,
+    };
 }
-
-/**
- * Switch CV/CL template and regenerate docs (layout only — HG-9 re-validated).
- * Clears review/approve so Apply stays gated until re-review.
- */
-export async function setApplicationTemplate(
-  userId: string,
-  id: string,
-  body: SetTemplateBody,
-) {
-  const app = await getOwned(userId, id);
-  const clTemplate = body.clTemplate ?? body.cvTemplate;
-
-  const [updated] = await db
-    .update(applications)
-    .set({
-      cvTemplate: body.cvTemplate,
-      clTemplate,
-      documentsReviewedAt: null,
-      approvedAt: null,
-      tailoredCvContent: null,
-      coverLetterContent: null,
-      bulletTraces: [],
-      generationModel: "pending",
-      generationDurationMs: null,
-      status: "draft",
-      updatedAt: new Date(),
+export async function updateBulletTraces(userId: string, id: string, body: UpdateBulletsBody) {
+    await getOwned(userId, id);
+    const normalized = normalizeBulletTraces(body.traces);
+    if (normalized.length !== body.traces.length) {
+        throw new ApplicationError("Every bullet must include text and chunkId (HG-9)", 400);
+    }
+    const [updated] = await db
+        .update(applications)
+        .set({
+        bulletTraces: normalized,
+        documentsReviewedAt: null,
+        approvedAt: null,
+        updatedAt: new Date(),
     })
-    .where(and(eq(applications.id, id), eq(applications.userId, userId)))
-    .returning();
-
-  if (!updated) throw new ApplicationError("Application not found", 404);
-
-  try {
-    await enqueueGenerateDocs({
-      application_id: app.id,
-      user_id: userId,
-      job_id: app.jobId,
-    });
-  } catch {
-    throw new ApplicationError("Failed to enqueue document generation", 503);
-  }
-
-  return {
-    application: toPublic(updated),
-    status: "generating" as const,
-  };
+        .where(and(eq(applications.id, id), eq(applications.userId, userId)))
+        .returning();
+    if (!updated)
+        throw new ApplicationError("Application not found", 404);
+    return { application: toPublic(updated) };
 }
-
-/**
- * Persist accept/reject on each bullet (HG-9: every trace must have chunkId).
- * Does not unlock Apply — Confirm review still required.
- */
-export async function updateBulletTraces(
-  userId: string,
-  id: string,
-  body: UpdateBulletsBody,
-) {
-  await getOwned(userId, id);
-  const normalized = normalizeBulletTraces(body.traces);
-  if (normalized.length !== body.traces.length) {
-    throw new ApplicationError(
-      "Every bullet must include text and chunkId (HG-9)",
-      400,
-    );
-  }
-
-  const [updated] = await db
-    .update(applications)
-    .set({
-      bulletTraces: normalized,
-      documentsReviewedAt: null,
-      approvedAt: null,
-      updatedAt: new Date(),
+export async function regenerateSection(userId: string, id: string, body: RegenerateSectionBody) {
+    const app = await getOwned(userId, id);
+    const section = body.section.trim().toLowerCase();
+    const current = normalizeBulletTraces(app.bulletTraces);
+    const accepted = current.filter((t) => t.status === "accepted" && t.section.toLowerCase() !== section);
+    const acceptedInSection = current.filter((t) => t.status === "accepted" && t.section.toLowerCase() === section);
+    const keep = [...accepted, ...acceptedInSection];
+    const [updated] = await db
+        .update(applications)
+        .set({
+        documentsReviewedAt: null,
+        approvedAt: null,
+        tailoredCvContent: null,
+        coverLetterContent: null,
+        generationModel: "pending",
+        generationDurationMs: null,
+        status: "draft",
+        updatedAt: new Date(),
     })
-    .where(and(eq(applications.id, id), eq(applications.userId, userId)))
-    .returning();
-
-  if (!updated) throw new ApplicationError("Application not found", 404);
-  return { application: toPublic(updated) };
+        .where(and(eq(applications.id, id), eq(applications.userId, userId)))
+        .returning();
+    if (!updated)
+        throw new ApplicationError("Application not found", 404);
+    try {
+        await enqueueGenerateDocs({
+            application_id: app.id,
+            user_id: userId,
+            job_id: app.jobId,
+            accepted_traces: keep.map((t) => ({
+                text: t.text,
+                chunk_id: t.chunkId,
+                section: t.section,
+                status: "accepted",
+            })),
+            regenerate_sections: [section],
+        });
+    }
+    catch {
+        throw new ApplicationError("Failed to enqueue document generation", 503);
+    }
+    return {
+        application: toPublic(updated),
+        status: "generating" as const,
+    };
 }
-
-/**
- * Regenerate one section; keep accepted bullets from other/same sections.
- */
-export async function regenerateSection(
-  userId: string,
-  id: string,
-  body: RegenerateSectionBody,
-) {
-  const app = await getOwned(userId, id);
-  const section = body.section.trim().toLowerCase();
-  const current = normalizeBulletTraces(app.bulletTraces);
-  const accepted = current.filter(
-    (t) => t.status === "accepted" && t.section.toLowerCase() !== section,
-  );
-  // Also keep accepted bullets in the same section? Spec: regenerate section —
-  // typically replace all non-accepted in that section. Keep accepted in that section.
-  const acceptedInSection = current.filter(
-    (t) => t.status === "accepted" && t.section.toLowerCase() === section,
-  );
-  const keep = [...accepted, ...acceptedInSection];
-
-  const [updated] = await db
-    .update(applications)
-    .set({
-      documentsReviewedAt: null,
-      approvedAt: null,
-      tailoredCvContent: null,
-      coverLetterContent: null,
-      generationModel: "pending",
-      generationDurationMs: null,
-      status: "draft",
-      updatedAt: new Date(),
-    })
-    .where(and(eq(applications.id, id), eq(applications.userId, userId)))
-    .returning();
-
-  if (!updated) throw new ApplicationError("Application not found", 404);
-
-  try {
-    await enqueueGenerateDocs({
-      application_id: app.id,
-      user_id: userId,
-      job_id: app.jobId,
-      accepted_traces: keep.map((t) => ({
-        text: t.text,
-        chunk_id: t.chunkId,
-        section: t.section,
-        status: "accepted",
-      })),
-      regenerate_sections: [section],
-    });
-  } catch {
-    throw new ApplicationError("Failed to enqueue document generation", 503);
-  }
-
-  return {
-    application: toPublic(updated),
-    status: "generating" as const,
-  };
-}
-
-/** Mark documents reviewed — unlocks Apply (still no submit without P4 approve). */
 export async function markDocumentsReviewed(userId: string, id: string) {
-  const app = await getOwned(userId, id);
-  if (!app.tailoredCvContent || !app.coverLetterContent) {
-    throw new ApplicationError("Documents not ready for review", 400);
-  }
-  const traces = normalizeBulletTraces(app.bulletTraces);
-  if (traces.some((t) => t.status === "rejected")) {
-    throw new ApplicationError(
-      "Remove or replace rejected source lines before confirming review",
-      400,
-    );
-  }
-  if (traces.some((t) => !t.chunkId)) {
-    throw new ApplicationError("Untraced bullets cannot be saved (HG-9)", 400);
-  }
-
-  // Persist markdown + ATS PDFs + ZIP to MinIO for download URLs
-  const cvKey = `applications/${userId}/${id}/tailored-cv.md`;
-  const clKey = `applications/${userId}/${id}/cover-letter.md`;
-  const cvPdfKey = `applications/${userId}/${id}/tailored-cv.pdf`;
-  const clPdfKey = `applications/${userId}/${id}/cover-letter.pdf`;
-  const zipKey = `applications/${userId}/${id}/application-pack.zip`;
-
-  const cvPdf = await textToAtsPdf("Tailored CV", app.tailoredCvContent);
-  const clPdf = await textToAtsPdf("Cover Letter", app.coverLetterContent);
-  const zipBuf = await buildApplicationZip({
-    cvText: app.tailoredCvContent,
-    clText: app.coverLetterContent,
-    metadata: {
-      applicationId: id,
-      jobId: app.jobId,
-      cvTemplate: app.cvTemplate,
-      clTemplate: app.clTemplate,
-      bulletTraces: traces,
-      generatedAt: new Date().toISOString(),
-    },
-  });
-
-  await uploadObject({
-    key: cvKey,
-    body: Buffer.from(app.tailoredCvContent, "utf8"),
-    contentType: "text/markdown; charset=utf-8",
-  });
-  await uploadObject({
-    key: clKey,
-    body: Buffer.from(app.coverLetterContent, "utf8"),
-    contentType: "text/markdown; charset=utf-8",
-  });
-  await uploadObject({
-    key: cvPdfKey,
-    body: Buffer.from(cvPdf),
-    contentType: "application/pdf",
-  });
-  await uploadObject({
-    key: clPdfKey,
-    body: Buffer.from(clPdf),
-    contentType: "application/pdf",
-  });
-  await uploadObject({
-    key: zipKey,
-    body: zipBuf,
-    contentType: "application/zip",
-  });
-
-  const [updated] = await db
-    .update(applications)
-    .set({
-      documentsReviewedAt: new Date(),
-      tailoredCvUrl: cvPdfKey,
-      coverLetterUrl: clPdfKey,
-      updatedAt: new Date(),
-    })
-    .where(and(eq(applications.id, id), eq(applications.userId, userId)))
-    .returning();
-
-  if (!updated) throw new ApplicationError("Application not found", 404);
-  return { application: toPublic(updated) };
-}
-
-export async function getDocumentDownloadUrl(
-  userId: string,
-  id: string,
-  kind: "cv" | "cl" | "zip",
-) {
-  const app = await getOwned(userId, id);
-  if (kind === "zip") {
-    if (!app.documentsReviewedAt || !app.tailoredCvContent || !app.coverLetterContent) {
-      throw new ApplicationError("Confirm review before downloading ZIP", 400);
+    const app = await getOwned(userId, id);
+    if (!app.tailoredCvContent || !app.coverLetterContent) {
+        throw new ApplicationError("Documents not ready for review", 400);
     }
-    const zipKey = `applications/${userId}/${id}/application-pack.zip`;
     const traces = normalizeBulletTraces(app.bulletTraces);
+    if (traces.some((t) => t.status === "rejected")) {
+        throw new ApplicationError("Remove or replace rejected source lines before confirming review", 400);
+    }
+    if (traces.some((t) => !t.chunkId)) {
+        throw new ApplicationError("Untraced bullets cannot be saved (HG-9)", 400);
+    }
+    const cvKey = `applications/${userId}/${id}/tailored-cv.md`;
+    const clKey = `applications/${userId}/${id}/cover-letter.md`;
+    const cvPdfKey = `applications/${userId}/${id}/tailored-cv.pdf`;
+    const clPdfKey = `applications/${userId}/${id}/cover-letter.pdf`;
+    const zipKey = `applications/${userId}/${id}/application-pack.zip`;
+    const cvPdf = await textToAtsPdf("Tailored CV", app.tailoredCvContent);
+    const clPdf = await textToAtsPdf("Cover Letter", app.coverLetterContent);
     const zipBuf = await buildApplicationZip({
-      cvText: app.tailoredCvContent,
-      clText: app.coverLetterContent,
-      metadata: {
-        applicationId: id,
-        jobId: app.jobId,
-        cvTemplate: app.cvTemplate,
-        clTemplate: app.clTemplate,
-        bulletTraces: traces,
-        generatedAt: new Date().toISOString(),
-      },
+        cvText: app.tailoredCvContent,
+        clText: app.coverLetterContent,
+        metadata: {
+            applicationId: id,
+            jobId: app.jobId,
+            cvTemplate: app.cvTemplate,
+            clTemplate: app.clTemplate,
+            bulletTraces: traces,
+            generatedAt: new Date().toISOString(),
+        },
     });
     await uploadObject({
-      key: zipKey,
-      body: zipBuf,
-      contentType: "application/zip",
+        key: cvKey,
+        body: Buffer.from(app.tailoredCvContent, "utf8"),
+        contentType: "text/markdown; charset=utf-8",
     });
-    const url = await getPresignedGetUrl(zipKey, 600);
-    return { url, contentType: "application/zip" as const };
-  }
-  const key = kind === "cv" ? app.tailoredCvUrl : app.coverLetterUrl;
-  if (!key) throw new ApplicationError("Document not available", 404);
-  const url = await getPresignedGetUrl(key, 600);
-  return {
-    url,
-    contentType: key.endsWith(".pdf")
-      ? ("application/pdf" as const)
-      : ("text/markdown" as const),
-  };
-}
-
-/**
- * P4.1 / HG-4: draft → pending_approval → approved, then enqueue submit.
- * Submit is never enqueued without approved_at.
- */
-export async function approveApplication(userId: string, id: string) {
-  const app = await getOwned(userId, id);
-
-  if (!app.documentsReviewedAt) {
-    throw new ApplicationError("Documents must be reviewed before approval", 400);
-  }
-  if (!app.tailoredCvContent || !app.coverLetterContent) {
-    throw new ApplicationError("Documents not ready for approval", 400);
-  }
-  if (!APPROVABLE_STATUSES.has(app.status)) {
-    throw new ApplicationError(
-      `Cannot approve application in status '${app.status}'`,
-      409,
-    );
-  }
-
-  // Intermediate pending_approval (contract state machine)
-  await db
-    .update(applications)
-    .set({ status: "pending_approval", updatedAt: new Date() })
-    .where(and(eq(applications.id, id), eq(applications.userId, userId)));
-
-  const approvedAt = new Date();
-  const [updated] = await db
-    .update(applications)
-    .set({
-      status: "approved",
-      approvedAt,
-      updatedAt: new Date(),
-    })
-    .where(and(eq(applications.id, id), eq(applications.userId, userId)))
-    .returning();
-
-  if (!updated?.approvedAt) {
-    throw new ApplicationError("Failed to approve application", 400);
-  }
-
-  const [jobRow] = await db
-    .select({
-      applicationUrl: jobs.applicationUrl,
-      sourceUrl: jobs.sourceUrl,
-    })
-    .from(jobs)
-    .where(and(eq(jobs.id, updated.jobId), eq(jobs.userId, userId)))
-    .limit(1);
-  const site = siteKeyFromUrl(
-    jobRow?.applicationUrl ?? jobRow?.sourceUrl ?? null,
-  );
-
-  try {
-    await enqueueSubmitApplication({
-      application_id: updated.id,
-      user_id: userId,
-      approved_at: updated.approvedAt.toISOString(),
-      site,
+    await uploadObject({
+        key: clKey,
+        body: Buffer.from(app.coverLetterContent, "utf8"),
+        contentType: "text/markdown; charset=utf-8",
     });
-  } catch (err) {
-    // Roll back to pending_approval so user can retry — never leave approved
-    // without a queue payload that carries approved_at.
-    await db
-      .update(applications)
-      .set({
-        status: "pending_approval",
+    await uploadObject({
+        key: cvPdfKey,
+        body: Buffer.from(cvPdf),
+        contentType: "application/pdf",
+    });
+    await uploadObject({
+        key: clPdfKey,
+        body: Buffer.from(clPdf),
+        contentType: "application/pdf",
+    });
+    await uploadObject({
+        key: zipKey,
+        body: zipBuf,
+        contentType: "application/zip",
+    });
+    const [updated] = await db
+        .update(applications)
+        .set({
+        documentsReviewedAt: new Date(),
+        tailoredCvUrl: cvPdfKey,
+        coverLetterUrl: clPdfKey,
         updatedAt: new Date(),
-      })
-      .where(and(eq(applications.id, id), eq(applications.userId, userId)));
-    if (err instanceof SubmitLimitError) {
-      throw new ApplicationError(
-        err.message,
-        err.code === "emergency_stop" ? 429 : 429,
-      );
-    }
-    throw new ApplicationError("Failed to enqueue submission", 503);
-  }
-
-  return { application: toPublic(updated), status: "approved" as const };
-}
-
-/**
- * P4.4 — move application across Kanban stages (AppFlow §2.4).
- * Drafts cannot enter the pipeline until they leave draft.
- */
-export async function updateApplicationStage(
-  userId: string,
-  id: string,
-  body: UpdateStageBody,
-) {
-  const app = await getOwned(userId, id);
-  if (statusToStage(app.status) === null && app.status === "draft") {
-    throw new ApplicationError(
-      "Draft applications are not on the pipeline yet",
-      400,
-    );
-  }
-
-  const nextStatus = STAGE_TO_STATUS[body.stage as PipelineStage];
-  const [updated] = await db
-    .update(applications)
-    .set({
-      status: nextStatus,
-      updatedAt: new Date(),
     })
-    .where(and(eq(applications.id, id), eq(applications.userId, userId)))
-    .returning();
-
-  if (!updated) throw new ApplicationError("Application not found", 404);
-  return { application: toPublic(updated) };
+        .where(and(eq(applications.id, id), eq(applications.userId, userId)))
+        .returning();
+    if (!updated)
+        throw new ApplicationError("Application not found", 404);
+    return { application: toPublic(updated) };
 }
-
-type InterviewEvent = NonNullable<Application["interviewStages"]>[number];
-
-function stagesOf(app: Application): InterviewEvent[] {
-  return Array.isArray(app.interviewStages) ? [...app.interviewStages] : [];
-}
-
-export async function addInterview(
-  userId: string,
-  id: string,
-  body: CreateInterviewBody,
-) {
-  const app = await getOwned(userId, id);
-  const event: InterviewEvent = {
-    id: crypto.randomUUID(),
-    stage: body.stage,
-    type: body.type,
-    scheduledAt: body.scheduledAt,
-    completedAt: null,
-    status: "scheduled",
-    interviewers: body.interviewers,
-    meetingLink: body.meetingLink ?? null,
-    notes: body.notes ?? null,
-    feedback: null,
-  };
-  const next = [...stagesOf(app), event];
-  const [row] = await db
-    .update(applications)
-    .set({
-      interviewStages: next,
-      status: "interviewing",
-      updatedAt: new Date(),
-    })
-    .where(and(eq(applications.id, id), eq(applications.userId, userId)))
-    .returning();
-  if (!row) throw new ApplicationError("Application not found", 404);
-  return { application: toPublic(row), interviewEvent: event };
-}
-
-export async function patchInterview(
-  userId: string,
-  id: string,
-  eventId: string,
-  body: PatchInterviewBody,
-) {
-  const app = await getOwned(userId, id);
-  const next = stagesOf(app);
-  const idx = next.findIndex((e) => e.id === eventId);
-  if (idx < 0) throw new ApplicationError("Interview event not found", 404);
-  const current = next[idx]!;
-  next[idx] = {
-    ...current,
-    status: body.status ?? current.status,
-    completedAt: body.completedAt ?? current.completedAt,
-    feedback: body.feedback ?? current.feedback,
-    notes: body.notes ?? current.notes,
-  };
-  const [row] = await db
-    .update(applications)
-    .set({ interviewStages: next, updatedAt: new Date() })
-    .where(and(eq(applications.id, id), eq(applications.userId, userId)))
-    .returning();
-  if (!row) throw new ApplicationError("Application not found", 404);
-  return { application: toPublic(row), interviewEvent: next[idx] };
-}
-
-export async function patchApplicationMeta(
-  userId: string,
-  id: string,
-  body: PatchApplicationMetaBody,
-) {
-  await getOwned(userId, id);
-  const patch: Record<string, unknown> = { updatedAt: new Date() };
-  if (body.userNotes !== undefined) patch.userNotes = body.userNotes;
-  if (body.nextFollowupAt !== undefined) {
-    patch.nextFollowupAt = body.nextFollowupAt
-      ? new Date(body.nextFollowupAt)
-      : null;
-  }
-  const [row] = await db
-    .update(applications)
-    .set(patch)
-    .where(and(eq(applications.id, id), eq(applications.userId, userId)))
-    .returning();
-  if (!row) throw new ApplicationError("Application not found", 404);
-  return { application: toPublic(row) };
-}
-
-/**
- * Bulk archive / withdraw / follow-up / regenerate docs.
- * Only mutates rows owned by userId (IDOR-safe). Never enqueues submit (HG-4).
- */
-export async function bulkAction(userId: string, body: BulkActionBody) {
-  const owned = await db
-    .select({ id: applications.id, jobId: applications.jobId })
-    .from(applications)
-    .where(
-      and(
-        eq(applications.userId, userId),
-        inArray(applications.id, body.applicationIds),
-      ),
-    );
-  if (owned.length !== body.applicationIds.length) {
-    throw new ApplicationError("Application not found", 404);
-  }
-  const ids = owned.map((r) => r.id);
-
-  if (body.action === "archive" || body.action === "withdraw") {
-    const status = body.action === "archive" ? "archived" : "withdrawn";
-    await db
-      .update(applications)
-      .set({ status, updatedAt: new Date() })
-      .where(
-        and(eq(applications.userId, userId), inArray(applications.id, ids)),
-      );
-    return {
-      updated: ids.length,
-      action: body.action,
-      submitEnqueued: false as const,
-    };
-  }
-
-  if (body.action === "followup") {
-    const when = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    await db
-      .update(applications)
-      .set({
-        nextFollowupAt: when,
-        followupCount: sql`${applications.followupCount} + 1`,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(eq(applications.userId, userId), inArray(applications.id, ids)),
-      );
-    return {
-      updated: ids.length,
-      action: body.action,
-      submitEnqueued: false as const,
-    };
-  }
-
-  for (const row of owned) {
-    try {
-      await enqueueGenerateDocs({
-        application_id: row.id,
-        user_id: userId,
-        job_id: row.jobId,
-      });
-    } catch {
-      throw new ApplicationError("Failed to enqueue document generation", 503);
-    }
-  }
-  await db
-    .update(applications)
-    .set({
-      documentsReviewedAt: null,
-      approvedAt: null,
-      updatedAt: new Date(),
-    })
-    .where(and(eq(applications.userId, userId), inArray(applications.id, ids)));
-  return {
-    updated: ids.length,
-    action: body.action,
-    submitEnqueued: false as const,
-  };
-}
-
-function asStringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter((x): x is string => typeof x === "string");
-}
-
-function toPublicPrep(row: typeof interviewPreps.$inferSelect) {
-  const questionsRaw = Array.isArray(row.questions) ? row.questions : [];
-  const storiesRaw = Array.isArray(row.starStories) ? row.starStories : [];
-  const neg = row.negotiation as Record<string, unknown> | null;
-  return {
-    id: row.id,
-    applicationId: row.applicationId,
-    jobId: row.jobId,
-    status: row.status,
-    questions: questionsRaw.map((q) => {
-      const o = q as Record<string, unknown>;
-      return {
-        question: String(o.question ?? ""),
-        suggestedAnswer: String(o.suggestedAnswer ?? o.suggested_answer ?? ""),
-        category: String(o.category ?? "behavioral"),
-        chunkIds: asStringArray(o.chunkIds ?? o.chunk_ids),
-      };
-    }),
-    starStories: storiesRaw.map((s) => {
-      const o = s as Record<string, unknown>;
-      return {
-        title: String(o.title ?? ""),
-        situation: String(o.situation ?? ""),
-        task: String(o.task ?? ""),
-        action: String(o.action ?? ""),
-        result: String(o.result ?? ""),
-        chunkIds: asStringArray(o.chunkIds ?? o.chunk_ids),
-      };
-    }),
-    negotiation: neg
-      ? {
-          currency: String(neg.currency ?? "USD"),
-          rangeMinCents:
-            typeof neg.rangeMinCents === "number"
-              ? neg.rangeMinCents
-              : typeof neg.range_min_cents === "number"
-                ? neg.range_min_cents
-                : null,
-          rangeMaxCents:
-            typeof neg.rangeMaxCents === "number"
-              ? neg.rangeMaxCents
-              : typeof neg.range_max_cents === "number"
-                ? neg.range_max_cents
-                : null,
-          targetCents:
-            typeof neg.targetCents === "number"
-              ? neg.targetCents
-              : typeof neg.target_cents === "number"
-                ? neg.target_cents
-                : null,
-          walkawayCents:
-            typeof neg.walkawayCents === "number"
-              ? neg.walkawayCents
-              : typeof neg.walkaway_cents === "number"
-                ? neg.walkaway_cents
-                : null,
-          talkingPoints: asStringArray(neg.talkingPoints ?? neg.talking_points),
-          chunkIds: asStringArray(neg.chunkIds ?? neg.chunk_ids),
+export async function getDocumentDownloadUrl(userId: string, id: string, kind: "cv" | "cl" | "zip") {
+    const app = await getOwned(userId, id);
+    if (kind === "zip") {
+        if (!app.documentsReviewedAt || !app.tailoredCvContent || !app.coverLetterContent) {
+            throw new ApplicationError("Confirm review before downloading ZIP", 400);
         }
-      : null,
-    modelUsed: row.modelUsed,
-    errorCode: row.errorCode,
-    updatedAt: row.updatedAt,
-  };
-}
-
-export async function requestInterviewPrep(userId: string, id: string) {
-  const app = await getOwned(userId, id);
-  const [existing] = await db
-    .select()
-    .from(interviewPreps)
-    .where(
-      and(
-        eq(interviewPreps.userId, userId),
-        eq(interviewPreps.applicationId, id),
-      ),
-    )
-    .limit(1);
-  if (existing) {
-    await db
-      .update(interviewPreps)
-      .set({
-        status: "pending",
-        errorCode: null,
-        updatedAt: new Date(),
-      })
-      .where(eq(interviewPreps.id, existing.id));
-  } else {
-    await db.insert(interviewPreps).values({
-      userId,
-      applicationId: id,
-      jobId: app.jobId,
-      status: "pending",
-    });
-  }
-  try {
-    await enqueueInterviewPrep({
-      application_id: id,
-      user_id: userId,
-      job_id: app.jobId,
-    });
-  } catch {
-    throw new ApplicationError("Failed to enqueue interview prep", 503);
-  }
-  return { status: "generating" as const, applicationId: id };
-}
-
-export async function getInterviewPrep(userId: string, id: string) {
-  await getOwned(userId, id);
-  const [row] = await db
-    .select()
-    .from(interviewPreps)
-    .where(
-      and(
-        eq(interviewPreps.userId, userId),
-        eq(interviewPreps.applicationId, id),
-      ),
-    )
-    .limit(1);
-  if (!row) return { prep: null, status: "idle" as const };
-  return { prep: toPublicPrep(row), status: row.status };
-}
-
-function toPublicVideoScript(row: typeof videoCoverScripts.$inferSelect) {
-  return {
-    id: row.id,
-    applicationId: row.applicationId,
-    jobId: row.jobId,
-    status: row.status,
-    script: row.script,
-    hook: row.hook,
-    close: row.close,
-    chunkIds: row.chunkIds ?? [],
-    estimatedSeconds: row.estimatedSeconds,
-    modelUsed: row.modelUsed,
-    errorCode: row.errorCode,
-    updatedAt: row.updatedAt,
-  };
-}
-
-export async function requestVideoCover(userId: string, id: string) {
-  const app = await getOwned(userId, id);
-  const [existing] = await db
-    .select()
-    .from(videoCoverScripts)
-    .where(
-      and(
-        eq(videoCoverScripts.userId, userId),
-        eq(videoCoverScripts.applicationId, id),
-      ),
-    )
-    .limit(1);
-  if (existing) {
-    await db
-      .update(videoCoverScripts)
-      .set({
-        status: "pending",
-        errorCode: null,
-        updatedAt: new Date(),
-      })
-      .where(eq(videoCoverScripts.id, existing.id));
-  } else {
-    await db.insert(videoCoverScripts).values({
-      userId,
-      applicationId: id,
-      jobId: app.jobId,
-      status: "pending",
-    });
-  }
-  try {
-    await enqueueVideoCover({
-      application_id: id,
-      user_id: userId,
-      job_id: app.jobId,
-    });
-  } catch {
-    throw new ApplicationError("Failed to enqueue video cover script", 503);
-  }
-  return { status: "generating" as const, applicationId: id };
-}
-
-export async function getVideoCover(userId: string, id: string) {
-  await getOwned(userId, id);
-  const [row] = await db
-    .select()
-    .from(videoCoverScripts)
-    .where(
-      and(
-        eq(videoCoverScripts.userId, userId),
-        eq(videoCoverScripts.applicationId, id),
-      ),
-    )
-    .limit(1);
-  if (!row) return { script: null, status: "idle" as const };
-  return { script: toPublicVideoScript(row), status: row.status };
-}
-
-async function loadMockInterviewContext(userId: string, applicationId: string) {
-  const [prepRow] = await db
-    .select()
-    .from(interviewPreps)
-    .where(
-      and(
-        eq(interviewPreps.userId, userId),
-        eq(interviewPreps.applicationId, applicationId),
-      ),
-    )
-    .limit(1);
-  if (!prepRow || prepRow.status !== "ready" || prepRow.errorCode) {
-    throw new ApplicationError(
-      "Interview prep must be ready before voice practice",
-      409,
-    );
-  }
-  const prep = toPublicPrep(prepRow);
-  const [job] = await db
-    .select({ title: jobs.title, company: jobs.company })
-    .from(jobs)
-    .innerJoin(applications, eq(applications.jobId, jobs.id))
-    .where(
-      and(eq(applications.id, applicationId), eq(applications.userId, userId)),
-    )
-    .limit(1);
-  return {
-    prepId: prepRow.id,
-    jobTitle: job?.title ?? "Role",
-    company: job?.company ?? "Company",
-    sampleQuestions: prep.questions.map((q) => q.question),
-    starTitles: prep.starStories.map((s) => s.title),
-  };
-}
-
-function toPublicMockSession(row: typeof mockInterviewSessions.$inferSelect) {
-  const turns = Array.isArray(row.turns) ? row.turns : [];
-  return {
-    sessionId: row.id,
-    applicationId: row.applicationId,
-    status: row.status,
-    turns: turns.map((t) => ({
-      role: t.role,
-      content: t.content,
-    })),
-    turnIndex: turns.filter((t) => t.role === "user").length,
-    modelUsed: row.modelUsed,
-    updatedAt: row.updatedAt,
-  };
-}
-
-function nowIso(): string {
-  return new Date().toISOString();
-}
-
-export async function startMockInterview(userId: string, applicationId: string) {
-  await getOwned(userId, applicationId);
-  const ctx = await loadMockInterviewContext(userId, applicationId);
-
-  await db
-    .update(mockInterviewSessions)
-    .set({
-      status: "abandoned",
-      endedAt: new Date(),
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(mockInterviewSessions.userId, userId),
-        eq(mockInterviewSessions.applicationId, applicationId),
-        eq(mockInterviewSessions.status, "active"),
-      ),
-    );
-
-  const seedUser: MockInterviewTurn = {
-    role: "user",
-    content: "Hello, I'm ready for the interview.",
-    createdAt: nowIso(),
-  };
-  const llmTurns: MockInterviewTurnForLlm[] = [
-    { role: "user", content: seedUser.content },
-  ];
-  let assistantText: string;
-  let modelUsed: string;
-  try {
-    const out = await generateMockInterviewReply(
-      {
-        jobTitle: ctx.jobTitle,
-        company: ctx.company,
-        sampleQuestions: ctx.sampleQuestions,
-        starTitles: ctx.starTitles,
-      },
-      llmTurns,
-    );
-    assistantText = out.assistantText;
-    modelUsed = out.modelUsed;
-  } catch {
-    const out = openingLine({
-      jobTitle: ctx.jobTitle,
-      company: ctx.company,
-      sampleQuestions: ctx.sampleQuestions,
-      starTitles: ctx.starTitles,
-    });
-    assistantText = out.assistantText;
-    modelUsed = out.modelUsed;
-  }
-
-  const assistantTurn: MockInterviewTurn = {
-    role: "assistant",
-    content: assistantText,
-    createdAt: nowIso(),
-  };
-
-  const [row] = await db
-    .insert(mockInterviewSessions)
-    .values({
-      userId,
-      applicationId,
-      status: "active",
-      turns: [seedUser, assistantTurn],
-      meta: {
-        jobTitle: ctx.jobTitle,
-        company: ctx.company,
-        prepId: ctx.prepId,
-      },
-      modelUsed,
-    })
-    .returning();
-
-  if (!row) throw new ApplicationError("Failed to start mock interview", 503);
-
-  console.info(
-    JSON.stringify({
-      event: "mock_interview_start",
-      userId,
-      applicationId,
-      sessionId: row.id,
-      turnCount: 0,
-    }),
-  );
-
-  return {
-    sessionId: row.id,
-    assistantText,
-    turnIndex: 0,
-    done: false,
-  };
-}
-
-export async function mockInterviewTurn(
-  userId: string,
-  applicationId: string,
-  body: { sessionId: string; candidateText: string },
-) {
-  await getOwned(userId, applicationId);
-  const [row] = await db
-    .select()
-    .from(mockInterviewSessions)
-    .where(
-      and(
-        eq(mockInterviewSessions.id, body.sessionId),
-        eq(mockInterviewSessions.userId, userId),
-        eq(mockInterviewSessions.applicationId, applicationId),
-      ),
-    )
-    .limit(1);
-  if (!row) throw new ApplicationError("Session not found", 404);
-  if (row.status !== "active") {
-    throw new ApplicationError("Session is not active", 409);
-  }
-
-  const text = body.candidateText.trim();
-  const turns = [...(Array.isArray(row.turns) ? row.turns : [])];
-  const userTurn: MockInterviewTurn = {
-    role: "user",
-    content: text,
-    createdAt: nowIso(),
-  };
-  turns.push(userTurn);
-  const userCount = turns.filter((t) => t.role === "user").length;
-
-  const meta = row.meta;
-  const ctx = {
-    jobTitle: meta?.jobTitle ?? "Role",
-    company: meta?.company ?? "Company",
-    sampleQuestions: [] as string[],
-    starTitles: [] as string[],
-  };
-
-  let done =
-    isInterviewEndPhrase(text) || shouldEndSession(userCount);
-  let assistantText =
-    done
-      ? "Thank you for your time today. Good luck with your application!"
-      : "";
-
-  let modelUsed = row.modelUsed;
-  if (!done) {
-    const llmTurns: MockInterviewTurnForLlm[] = turns.map((t) => ({
-      role: t.role,
-      content: t.content,
-    }));
-    try {
-      const prepCtx = await loadMockInterviewContext(userId, applicationId);
-      ctx.sampleQuestions = prepCtx.sampleQuestions;
-      ctx.starTitles = prepCtx.starTitles;
-      const out = await generateMockInterviewReply(ctx, llmTurns);
-      assistantText = out.assistantText;
-      modelUsed = out.modelUsed;
-    } catch {
-      assistantText =
-        "Let's continue. Can you expand on how your experience fits this role?";
-      modelUsed = "heuristic:fallback";
+        const zipKey = `applications/${userId}/${id}/application-pack.zip`;
+        const traces = normalizeBulletTraces(app.bulletTraces);
+        const zipBuf = await buildApplicationZip({
+            cvText: app.tailoredCvContent,
+            clText: app.coverLetterContent,
+            metadata: {
+                applicationId: id,
+                jobId: app.jobId,
+                cvTemplate: app.cvTemplate,
+                clTemplate: app.clTemplate,
+                bulletTraces: traces,
+                generatedAt: new Date().toISOString(),
+            },
+        });
+        await uploadObject({
+            key: zipKey,
+            body: zipBuf,
+            contentType: "application/zip",
+        });
+        const url = await getPresignedGetUrl(zipKey, 600);
+        return { url, contentType: "application/zip" as const };
     }
-  }
-
-  turns.push({
-    role: "assistant",
-    content: assistantText,
-    createdAt: nowIso(),
-  });
-
-  const status = done ? "completed" : "active";
-  await db
-    .update(mockInterviewSessions)
-    .set({
-      turns,
-      status,
-      modelUsed,
-      endedAt: done ? new Date() : null,
-      updatedAt: new Date(),
-    })
-    .where(eq(mockInterviewSessions.id, row.id));
-
-  console.info(
-    JSON.stringify({
-      event: "mock_interview_turn",
-      userId,
-      applicationId,
-      sessionId: row.id,
-      turnIndex: userCount,
-      candidateChars: text.length,
-      done,
-    }),
-  );
-
-  return {
-    assistantText,
-    turnIndex: userCount,
-    done,
-    sessionId: row.id,
-  };
+    const key = kind === "cv" ? app.tailoredCvUrl : app.coverLetterUrl;
+    if (!key)
+        throw new ApplicationError("Document not available", 404);
+    const url = await getPresignedGetUrl(key, 600);
+    return {
+        url,
+        contentType: key.endsWith(".pdf")
+            ? ("application/pdf" as const)
+            : ("text/markdown" as const),
+    };
 }
-
-export async function endMockInterview(
-  userId: string,
-  applicationId: string,
-  sessionId: string,
-) {
-  await getOwned(userId, applicationId);
-  const [row] = await db
-    .select()
-    .from(mockInterviewSessions)
-    .where(
-      and(
-        eq(mockInterviewSessions.id, sessionId),
-        eq(mockInterviewSessions.userId, userId),
-        eq(mockInterviewSessions.applicationId, applicationId),
-      ),
-    )
-    .limit(1);
-  if (!row) throw new ApplicationError("Session not found", 404);
-  if (row.status === "completed") {
+export async function approveApplication(userId: string, id: string) {
+    const app = await getOwned(userId, id);
+    if (!app.documentsReviewedAt) {
+        throw new ApplicationError("Documents must be reviewed before approval", 400);
+    }
+    if (!app.tailoredCvContent || !app.coverLetterContent) {
+        throw new ApplicationError("Documents not ready for approval", 400);
+    }
+    if (!APPROVABLE_STATUSES.has(app.status)) {
+        throw new ApplicationError(`Cannot approve application in status '${app.status}'`, 409);
+    }
+    await db
+        .update(applications)
+        .set({ status: "pending_approval", updatedAt: new Date() })
+        .where(and(eq(applications.id, id), eq(applications.userId, userId)));
+    const approvedAt = new Date();
+    const [updated] = await db
+        .update(applications)
+        .set({
+        status: "approved",
+        approvedAt,
+        updatedAt: new Date(),
+    })
+        .where(and(eq(applications.id, id), eq(applications.userId, userId)))
+        .returning();
+    if (!updated?.approvedAt) {
+        throw new ApplicationError("Failed to approve application", 400);
+    }
+    const [jobRow] = await db
+        .select({
+        applicationUrl: jobs.applicationUrl,
+        sourceUrl: jobs.sourceUrl,
+    })
+        .from(jobs)
+        .where(and(eq(jobs.id, updated.jobId), eq(jobs.userId, userId)))
+        .limit(1);
+    const site = siteKeyFromUrl(jobRow?.applicationUrl ?? jobRow?.sourceUrl ?? null);
+    try {
+        await enqueueSubmitApplication({
+            application_id: updated.id,
+            user_id: userId,
+            approved_at: updated.approvedAt.toISOString(),
+            site,
+        });
+    }
+    catch (err) {
+        await db
+            .update(applications)
+            .set({
+            status: "pending_approval",
+            updatedAt: new Date(),
+        })
+            .where(and(eq(applications.id, id), eq(applications.userId, userId)));
+        if (err instanceof SubmitLimitError) {
+            throw new ApplicationError(err.message, err.code === "emergency_stop" ? 429 : 429);
+        }
+        throw new ApplicationError("Failed to enqueue submission", 503);
+    }
+    return { application: toPublic(updated), status: "approved" as const };
+}
+export async function updateApplicationStage(userId: string, id: string, body: UpdateStageBody) {
+    const app = await getOwned(userId, id);
+    if (statusToStage(app.status) === null && app.status === "draft") {
+        throw new ApplicationError("Draft applications are not on the pipeline yet", 400);
+    }
+    const nextStatus = STAGE_TO_STATUS[body.stage as PipelineStage];
+    const [updated] = await db
+        .update(applications)
+        .set({
+        status: nextStatus,
+        updatedAt: new Date(),
+    })
+        .where(and(eq(applications.id, id), eq(applications.userId, userId)))
+        .returning();
+    if (!updated)
+        throw new ApplicationError("Application not found", 404);
+    return { application: toPublic(updated) };
+}
+type InterviewEvent = NonNullable<Application["interviewStages"]>[number];
+function stagesOf(app: Application): InterviewEvent[] {
+    return Array.isArray(app.interviewStages) ? [...app.interviewStages] : [];
+}
+export async function addInterview(userId: string, id: string, body: CreateInterviewBody) {
+    const app = await getOwned(userId, id);
+    const event: InterviewEvent = {
+        id: crypto.randomUUID(),
+        stage: body.stage,
+        type: body.type,
+        scheduledAt: body.scheduledAt,
+        completedAt: null,
+        status: "scheduled",
+        interviewers: body.interviewers,
+        meetingLink: body.meetingLink ?? null,
+        notes: body.notes ?? null,
+        feedback: null,
+    };
+    const next = [...stagesOf(app), event];
+    const [row] = await db
+        .update(applications)
+        .set({
+        interviewStages: next,
+        status: "interviewing",
+        updatedAt: new Date(),
+    })
+        .where(and(eq(applications.id, id), eq(applications.userId, userId)))
+        .returning();
+    if (!row)
+        throw new ApplicationError("Application not found", 404);
+    return { application: toPublic(row), interviewEvent: event };
+}
+export async function patchInterview(userId: string, id: string, eventId: string, body: PatchInterviewBody) {
+    const app = await getOwned(userId, id);
+    const next = stagesOf(app);
+    const idx = next.findIndex((e) => e.id === eventId);
+    if (idx < 0)
+        throw new ApplicationError("Interview event not found", 404);
+    const current = next[idx]!;
+    next[idx] = {
+        ...current,
+        status: body.status ?? current.status,
+        completedAt: body.completedAt ?? current.completedAt,
+        feedback: body.feedback ?? current.feedback,
+        notes: body.notes ?? current.notes,
+    };
+    const [row] = await db
+        .update(applications)
+        .set({ interviewStages: next, updatedAt: new Date() })
+        .where(and(eq(applications.id, id), eq(applications.userId, userId)))
+        .returning();
+    if (!row)
+        throw new ApplicationError("Application not found", 404);
+    return { application: toPublic(row), interviewEvent: next[idx] };
+}
+export async function patchApplicationMeta(userId: string, id: string, body: PatchApplicationMetaBody) {
+    await getOwned(userId, id);
+    const patch: Record<string, unknown> = { updatedAt: new Date() };
+    if (body.userNotes !== undefined)
+        patch.userNotes = body.userNotes;
+    if (body.nextFollowupAt !== undefined) {
+        patch.nextFollowupAt = body.nextFollowupAt
+            ? new Date(body.nextFollowupAt)
+            : null;
+    }
+    const [row] = await db
+        .update(applications)
+        .set(patch)
+        .where(and(eq(applications.id, id), eq(applications.userId, userId)))
+        .returning();
+    if (!row)
+        throw new ApplicationError("Application not found", 404);
+    return { application: toPublic(row) };
+}
+export async function bulkAction(userId: string, body: BulkActionBody) {
+    const owned = await db
+        .select({ id: applications.id, jobId: applications.jobId })
+        .from(applications)
+        .where(and(eq(applications.userId, userId), inArray(applications.id, body.applicationIds)));
+    if (owned.length !== body.applicationIds.length) {
+        throw new ApplicationError("Application not found", 404);
+    }
+    const ids = owned.map((r) => r.id);
+    if (body.action === "archive" || body.action === "withdraw") {
+        const status = body.action === "archive" ? "archived" : "withdrawn";
+        await db
+            .update(applications)
+            .set({ status, updatedAt: new Date() })
+            .where(and(eq(applications.userId, userId), inArray(applications.id, ids)));
+        return {
+            updated: ids.length,
+            action: body.action,
+            submitEnqueued: false as const,
+        };
+    }
+    if (body.action === "followup") {
+        const when = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+        await db
+            .update(applications)
+            .set({
+            nextFollowupAt: when,
+            followupCount: sql `${applications.followupCount} + 1`,
+            updatedAt: new Date(),
+        })
+            .where(and(eq(applications.userId, userId), inArray(applications.id, ids)));
+        return {
+            updated: ids.length,
+            action: body.action,
+            submitEnqueued: false as const,
+        };
+    }
+    for (const row of owned) {
+        try {
+            await enqueueGenerateDocs({
+                application_id: row.id,
+                user_id: userId,
+                job_id: row.jobId,
+            });
+        }
+        catch {
+            throw new ApplicationError("Failed to enqueue document generation", 503);
+        }
+    }
+    await db
+        .update(applications)
+        .set({
+        documentsReviewedAt: null,
+        approvedAt: null,
+        updatedAt: new Date(),
+    })
+        .where(and(eq(applications.userId, userId), inArray(applications.id, ids)));
+    return {
+        updated: ids.length,
+        action: body.action,
+        submitEnqueued: false as const,
+    };
+}
+function asStringArray(value: unknown): string[] {
+    if (!Array.isArray(value))
+        return [];
+    return value.filter((x): x is string => typeof x === "string");
+}
+function toPublicPrep(row: typeof interviewPreps.$inferSelect) {
+    const questionsRaw = Array.isArray(row.questions) ? row.questions : [];
+    const storiesRaw = Array.isArray(row.starStories) ? row.starStories : [];
+    const neg = row.negotiation as Record<string, unknown> | null;
+    return {
+        id: row.id,
+        applicationId: row.applicationId,
+        jobId: row.jobId,
+        status: row.status,
+        questions: questionsRaw.map((q) => {
+            const o = q as Record<string, unknown>;
+            return {
+                question: String(o.question ?? ""),
+                suggestedAnswer: String(o.suggestedAnswer ?? o.suggested_answer ?? ""),
+                category: String(o.category ?? "behavioral"),
+                chunkIds: asStringArray(o.chunkIds ?? o.chunk_ids),
+            };
+        }),
+        starStories: storiesRaw.map((s) => {
+            const o = s as Record<string, unknown>;
+            return {
+                title: String(o.title ?? ""),
+                situation: String(o.situation ?? ""),
+                task: String(o.task ?? ""),
+                action: String(o.action ?? ""),
+                result: String(o.result ?? ""),
+                chunkIds: asStringArray(o.chunkIds ?? o.chunk_ids),
+            };
+        }),
+        negotiation: neg
+            ? {
+                currency: String(neg.currency ?? "USD"),
+                rangeMinCents: typeof neg.rangeMinCents === "number"
+                    ? neg.rangeMinCents
+                    : typeof neg.range_min_cents === "number"
+                        ? neg.range_min_cents
+                        : null,
+                rangeMaxCents: typeof neg.rangeMaxCents === "number"
+                    ? neg.rangeMaxCents
+                    : typeof neg.range_max_cents === "number"
+                        ? neg.range_max_cents
+                        : null,
+                targetCents: typeof neg.targetCents === "number"
+                    ? neg.targetCents
+                    : typeof neg.target_cents === "number"
+                        ? neg.target_cents
+                        : null,
+                walkawayCents: typeof neg.walkawayCents === "number"
+                    ? neg.walkawayCents
+                    : typeof neg.walkaway_cents === "number"
+                        ? neg.walkaway_cents
+                        : null,
+                talkingPoints: asStringArray(neg.talkingPoints ?? neg.talking_points),
+                chunkIds: asStringArray(neg.chunkIds ?? neg.chunk_ids),
+            }
+            : null,
+        modelUsed: row.modelUsed,
+        errorCode: row.errorCode,
+        updatedAt: row.updatedAt,
+    };
+}
+export async function requestInterviewPrep(userId: string, id: string) {
+    const app = await getOwned(userId, id);
+    const [existing] = await db
+        .select()
+        .from(interviewPreps)
+        .where(and(eq(interviewPreps.userId, userId), eq(interviewPreps.applicationId, id)))
+        .limit(1);
+    if (existing) {
+        await db
+            .update(interviewPreps)
+            .set({
+            status: "pending",
+            errorCode: null,
+            updatedAt: new Date(),
+        })
+            .where(eq(interviewPreps.id, existing.id));
+    }
+    else {
+        await db.insert(interviewPreps).values({
+            userId,
+            applicationId: id,
+            jobId: app.jobId,
+            status: "pending",
+        });
+    }
+    try {
+        await enqueueInterviewPrep({
+            application_id: id,
+            user_id: userId,
+            job_id: app.jobId,
+        });
+    }
+    catch {
+        throw new ApplicationError("Failed to enqueue interview prep", 503);
+    }
+    return { status: "generating" as const, applicationId: id };
+}
+export async function getInterviewPrep(userId: string, id: string) {
+    await getOwned(userId, id);
+    const [row] = await db
+        .select()
+        .from(interviewPreps)
+        .where(and(eq(interviewPreps.userId, userId), eq(interviewPreps.applicationId, id)))
+        .limit(1);
+    if (!row)
+        return { prep: null, status: "idle" as const };
+    return { prep: toPublicPrep(row), status: row.status };
+}
+function toPublicVideoScript(row: typeof videoCoverScripts.$inferSelect) {
+    return {
+        id: row.id,
+        applicationId: row.applicationId,
+        jobId: row.jobId,
+        status: row.status,
+        script: row.script,
+        hook: row.hook,
+        close: row.close,
+        chunkIds: row.chunkIds ?? [],
+        estimatedSeconds: row.estimatedSeconds,
+        modelUsed: row.modelUsed,
+        errorCode: row.errorCode,
+        updatedAt: row.updatedAt,
+    };
+}
+export async function requestVideoCover(userId: string, id: string) {
+    const app = await getOwned(userId, id);
+    const [existing] = await db
+        .select()
+        .from(videoCoverScripts)
+        .where(and(eq(videoCoverScripts.userId, userId), eq(videoCoverScripts.applicationId, id)))
+        .limit(1);
+    if (existing) {
+        await db
+            .update(videoCoverScripts)
+            .set({
+            status: "pending",
+            errorCode: null,
+            updatedAt: new Date(),
+        })
+            .where(eq(videoCoverScripts.id, existing.id));
+    }
+    else {
+        await db.insert(videoCoverScripts).values({
+            userId,
+            applicationId: id,
+            jobId: app.jobId,
+            status: "pending",
+        });
+    }
+    try {
+        await enqueueVideoCover({
+            application_id: id,
+            user_id: userId,
+            job_id: app.jobId,
+        });
+    }
+    catch {
+        throw new ApplicationError("Failed to enqueue video cover script", 503);
+    }
+    return { status: "generating" as const, applicationId: id };
+}
+export async function getVideoCover(userId: string, id: string) {
+    await getOwned(userId, id);
+    const [row] = await db
+        .select()
+        .from(videoCoverScripts)
+        .where(and(eq(videoCoverScripts.userId, userId), eq(videoCoverScripts.applicationId, id)))
+        .limit(1);
+    if (!row)
+        return { script: null, status: "idle" as const };
+    return { script: toPublicVideoScript(row), status: row.status };
+}
+async function loadMockInterviewContext(userId: string, applicationId: string) {
+    const [prepRow] = await db
+        .select()
+        .from(interviewPreps)
+        .where(and(eq(interviewPreps.userId, userId), eq(interviewPreps.applicationId, applicationId)))
+        .limit(1);
+    if (!prepRow || prepRow.status !== "ready" || prepRow.errorCode) {
+        throw new ApplicationError("Interview prep must be ready before voice practice", 409);
+    }
+    const prep = toPublicPrep(prepRow);
+    const [job] = await db
+        .select({ title: jobs.title, company: jobs.company })
+        .from(jobs)
+        .innerJoin(applications, eq(applications.jobId, jobs.id))
+        .where(and(eq(applications.id, applicationId), eq(applications.userId, userId)))
+        .limit(1);
+    return {
+        prepId: prepRow.id,
+        jobTitle: job?.title ?? "Role",
+        company: job?.company ?? "Company",
+        sampleQuestions: prep.questions.map((q) => q.question),
+        starTitles: prep.starStories.map((s) => s.title),
+    };
+}
+function toPublicMockSession(row: typeof mockInterviewSessions.$inferSelect) {
+    const turns = Array.isArray(row.turns) ? row.turns : [];
+    return {
+        sessionId: row.id,
+        applicationId: row.applicationId,
+        status: row.status,
+        turns: turns.map((t) => ({
+            role: t.role,
+            content: t.content,
+        })),
+        turnIndex: turns.filter((t) => t.role === "user").length,
+        modelUsed: row.modelUsed,
+        summary: row.summary ?? null,
+        updatedAt: row.updatedAt,
+    };
+}
+function nowIso(): string {
+    return new Date().toISOString();
+}
+export async function startMockInterview(userId: string, applicationId: string) {
+    await getOwned(userId, applicationId);
+    const ctx = await loadMockInterviewContext(userId, applicationId);
+    await db
+        .update(mockInterviewSessions)
+        .set({
+        status: "abandoned",
+        endedAt: new Date(),
+        updatedAt: new Date(),
+    })
+        .where(and(eq(mockInterviewSessions.userId, userId), eq(mockInterviewSessions.applicationId, applicationId), eq(mockInterviewSessions.status, "active")));
+    const seedUser: MockInterviewTurn = {
+        role: "user",
+        content: "Hello, I'm ready for the interview.",
+        createdAt: nowIso(),
+    };
+    const llmTurns: MockInterviewTurnForLlm[] = [
+        { role: "user", content: seedUser.content },
+    ];
+    let assistantText: string;
+    let modelUsed: string;
+    try {
+        const out = await generateMockInterviewReply({
+            jobTitle: ctx.jobTitle,
+            company: ctx.company,
+            sampleQuestions: ctx.sampleQuestions,
+            starTitles: ctx.starTitles,
+        }, llmTurns);
+        assistantText = out.assistantText;
+        modelUsed = out.modelUsed;
+    }
+    catch {
+        const out = openingLine({
+            jobTitle: ctx.jobTitle,
+            company: ctx.company,
+            sampleQuestions: ctx.sampleQuestions,
+            starTitles: ctx.starTitles,
+        });
+        assistantText = out.assistantText;
+        modelUsed = out.modelUsed;
+    }
+    const assistantTurn: MockInterviewTurn = {
+        role: "assistant",
+        content: assistantText,
+        createdAt: nowIso(),
+    };
+    const [row] = await db
+        .insert(mockInterviewSessions)
+        .values({
+        userId,
+        applicationId,
+        status: "active",
+        turns: [seedUser, assistantTurn],
+        meta: {
+            jobTitle: ctx.jobTitle,
+            company: ctx.company,
+            prepId: ctx.prepId,
+        },
+        modelUsed,
+    })
+        .returning();
+    if (!row)
+        throw new ApplicationError("Failed to start mock interview", 503);
+    console.info(JSON.stringify({
+        event: "mock_interview_start",
+        userId,
+        applicationId,
+        sessionId: row.id,
+        turnCount: 0,
+    }));
+    return {
+        sessionId: row.id,
+        assistantText,
+        turnIndex: 0,
+        done: false,
+        voiceGatewayUrl: voiceGatewayWsUrl(),
+        voiceContext: {
+            jobTitle: ctx.jobTitle,
+            company: ctx.company,
+            sampleQuestions: ctx.sampleQuestions,
+            starTitles: ctx.starTitles,
+        },
+    };
+}
+export async function mockInterviewTurn(userId: string, applicationId: string, body: {
+    sessionId: string;
+    candidateText: string;
+    assistantText?: string;
+    done?: boolean;
+}) {
+    await getOwned(userId, applicationId);
+    const [row] = await db
+        .select()
+        .from(mockInterviewSessions)
+        .where(and(eq(mockInterviewSessions.id, body.sessionId), eq(mockInterviewSessions.userId, userId), eq(mockInterviewSessions.applicationId, applicationId)))
+        .limit(1);
+    if (!row)
+        throw new ApplicationError("Session not found", 404);
+    if (row.status !== "active") {
+        throw new ApplicationError("Session is not active", 409);
+    }
+    const text = body.candidateText.trim();
+    const turns = [...(Array.isArray(row.turns) ? row.turns : [])];
+    const userTurn: MockInterviewTurn = {
+        role: "user",
+        content: text,
+        createdAt: nowIso(),
+    };
+    turns.push(userTurn);
+    const userCount = turns.filter((t) => t.role === "user").length;
+    const meta = row.meta;
+    const ctx = {
+        jobTitle: meta?.jobTitle ?? "Role",
+        company: meta?.company ?? "Company",
+        sampleQuestions: [] as string[],
+        starTitles: [] as string[],
+    };
+    let done =
+        body.done === true ||
+        isInterviewEndPhrase(text) ||
+        shouldEndSession(userCount);
+    let assistantText = done
+        ? "Thank you for your time today. Good luck with your application!"
+        : "";
+    let modelUsed = row.modelUsed;
+    if (body.assistantText?.trim() && !done) {
+        assistantText = body.assistantText.trim();
+        modelUsed = "ollama:local";
+    } else if (!done) {
+        const llmTurns: MockInterviewTurnForLlm[] = turns.map((t) => ({
+            role: t.role,
+            content: t.content,
+        }));
+        try {
+            const prepCtx = await loadMockInterviewContext(userId, applicationId);
+            ctx.sampleQuestions = prepCtx.sampleQuestions;
+            ctx.starTitles = prepCtx.starTitles;
+            const out = await generateMockInterviewReply(ctx, llmTurns);
+            assistantText = out.assistantText;
+            modelUsed = out.modelUsed;
+        }
+        catch {
+            assistantText =
+                "Let's continue. Can you expand on how your experience fits this role?";
+            modelUsed = "heuristic:fallback";
+        }
+    } else if (body.assistantText?.trim() && done) {
+        assistantText = body.assistantText.trim();
+    }
+    turns.push({
+        role: "assistant",
+        content: assistantText,
+        createdAt: nowIso(),
+    });
+    const status = done ? "completed" : "active";
+    await db
+        .update(mockInterviewSessions)
+        .set({
+        turns,
+        status,
+        modelUsed,
+        endedAt: done ? new Date() : null,
+        updatedAt: new Date(),
+    })
+        .where(eq(mockInterviewSessions.id, row.id));
+    console.info(JSON.stringify({
+        event: "mock_interview_turn",
+        userId,
+        applicationId,
+        sessionId: row.id,
+        turnIndex: userCount,
+        candidateChars: text.length,
+        done,
+    }));
+    return {
+        assistantText,
+        turnIndex: userCount,
+        done,
+        sessionId: row.id,
+    };
+}
+export async function endMockInterview(userId: string, applicationId: string, sessionId: string) {
+    await getOwned(userId, applicationId);
+    const [row] = await db
+        .select()
+        .from(mockInterviewSessions)
+        .where(and(eq(mockInterviewSessions.id, sessionId), eq(mockInterviewSessions.userId, userId), eq(mockInterviewSessions.applicationId, applicationId)))
+        .limit(1);
+    if (!row)
+        throw new ApplicationError("Session not found", 404);
+    if (row.status === "completed") {
+        return { sessionId: row.id, status: "completed" as const };
+    }
+    await db
+        .update(mockInterviewSessions)
+        .set({
+        status: "completed",
+        endedAt: new Date(),
+        updatedAt: new Date(),
+    })
+        .where(eq(mockInterviewSessions.id, row.id));
     return { sessionId: row.id, status: "completed" as const };
-  }
-  await db
-    .update(mockInterviewSessions)
-    .set({
-      status: "completed",
-      endedAt: new Date(),
-      updatedAt: new Date(),
-    })
-    .where(eq(mockInterviewSessions.id, row.id));
-  return { sessionId: row.id, status: "completed" as const };
+}
+export async function getMockInterview(userId: string, applicationId: string) {
+    await getOwned(userId, applicationId);
+    const [active] = await db
+        .select()
+        .from(mockInterviewSessions)
+        .where(and(eq(mockInterviewSessions.userId, userId), eq(mockInterviewSessions.applicationId, applicationId), eq(mockInterviewSessions.status, "active")))
+        .orderBy(desc(mockInterviewSessions.updatedAt))
+        .limit(1);
+    if (active) {
+        return { session: toPublicMockSession(active) };
+    }
+    const [last] = await db
+        .select()
+        .from(mockInterviewSessions)
+        .where(and(eq(mockInterviewSessions.userId, userId), eq(mockInterviewSessions.applicationId, applicationId)))
+        .orderBy(desc(mockInterviewSessions.updatedAt))
+        .limit(1);
+    if (!last)
+        return { session: null };
+    return { session: toPublicMockSession(last) };
 }
 
-export async function getMockInterview(userId: string, applicationId: string) {
-  await getOwned(userId, applicationId);
-  const [active] = await db
-    .select()
-    .from(mockInterviewSessions)
-    .where(
-      and(
-        eq(mockInterviewSessions.userId, userId),
-        eq(mockInterviewSessions.applicationId, applicationId),
-        eq(mockInterviewSessions.status, "active"),
-      ),
-    )
-    .orderBy(desc(mockInterviewSessions.updatedAt))
-    .limit(1);
-  if (active) {
-    return { session: toPublicMockSession(active) };
-  }
-  const [last] = await db
-    .select()
-    .from(mockInterviewSessions)
-    .where(
-      and(
-        eq(mockInterviewSessions.userId, userId),
-        eq(mockInterviewSessions.applicationId, applicationId),
-      ),
-    )
-    .orderBy(desc(mockInterviewSessions.updatedAt))
-    .limit(1);
-  if (!last) return { session: null };
-  return { session: toPublicMockSession(last) };
+export async function evaluateMockInterview(
+    userId: string,
+    applicationId: string,
+    sessionId: string,
+) {
+    await getOwned(userId, applicationId);
+    const [row] = await db
+        .select()
+        .from(mockInterviewSessions)
+        .where(
+            and(
+                eq(mockInterviewSessions.id, sessionId),
+                eq(mockInterviewSessions.userId, userId),
+                eq(mockInterviewSessions.applicationId, applicationId),
+            ),
+        )
+        .limit(1);
+    if (!row) throw new ApplicationError("Session not found", 404);
+    const turns = Array.isArray(row.turns) ? row.turns : [];
+    const meta = row.meta ?? {
+        jobTitle: "Role",
+        company: "Company",
+        prepId: "",
+    };
+    const summary = await buildMockInterviewSummary(
+        turns.map((t) => ({ role: t.role, content: t.content })),
+        { jobTitle: meta.jobTitle, company: meta.company },
+    );
+    await db
+        .update(mockInterviewSessions)
+        .set({
+            summary,
+            status: "completed",
+            endedAt: row.endedAt ?? new Date(),
+            updatedAt: new Date(),
+        })
+        .where(eq(mockInterviewSessions.id, row.id));
+    console.info(
+        JSON.stringify({
+            event: "mock_interview_evaluate",
+            userId,
+            applicationId,
+            sessionId: row.id,
+            strengthCount: summary.strengths.length,
+        }),
+    );
+    return { sessionId: row.id, summary };
 }

@@ -10,9 +10,9 @@ CREATE TABLE "mock_interview_sessions" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
---> statement-breakpoint
-ALTER TABLE "mock_interview_sessions" ADD CONSTRAINT "mock_interview_sessions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "mock_interview_sessions" ADD CONSTRAINT "mock_interview_sessions_application_id_applications_id_fk" FOREIGN KEY ("application_id") REFERENCES "public"."applications"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-CREATE INDEX "idx_mock_interview_sessions_user" ON "mock_interview_sessions" USING btree ("user_id");--> statement-breakpoint
-CREATE INDEX "idx_mock_interview_sessions_app" ON "mock_interview_sessions" USING btree ("application_id");--> statement-breakpoint
+
+ALTER TABLE "mock_interview_sessions" ADD CONSTRAINT "mock_interview_sessions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;
+ALTER TABLE "mock_interview_sessions" ADD CONSTRAINT "mock_interview_sessions_application_id_applications_id_fk" FOREIGN KEY ("application_id") REFERENCES "public"."applications"("id") ON DELETE cascade ON UPDATE no action;
+CREATE INDEX "idx_mock_interview_sessions_user" ON "mock_interview_sessions" USING btree ("user_id");
+CREATE INDEX "idx_mock_interview_sessions_app" ON "mock_interview_sessions" USING btree ("application_id");
 CREATE INDEX "idx_mock_interview_sessions_user_app_status" ON "mock_interview_sessions" USING btree ("user_id","application_id","status");

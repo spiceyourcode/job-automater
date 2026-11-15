@@ -3,33 +3,25 @@ import { redirect } from "next/navigation";
 import { jwtVerify } from "jose";
 import { OnboardingWizard } from "@/components/onboarding-wizard";
 import { listSourceCatalogAction } from "@/lib/actions/sources";
-
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET ?? "");
-
 export default async function OnboardingPage() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get("access_token");
-
-  if (!token?.value) {
-    redirect("/login");
-  }
-
-  try {
-    await jwtVerify(token.value, JWT_SECRET, { algorithms: ["HS256"] });
-  } catch {
-    redirect("/auth/session-expired");
-  }
-
-  if (cookieStore.get("onboarding_complete")?.value === "1") {
-    redirect("/dashboard");
-  }
-
-  const catalogResult = await listSourceCatalogAction();
-  const catalogEntries =
-    catalogResult.ok && catalogResult.data ? catalogResult.data.entries : [];
-
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4 py-10">
+    const cookieStore = await cookies();
+    const token = cookieStore.get("access_token");
+    if (!token?.value) {
+        redirect("/login");
+    }
+    try {
+        await jwtVerify(token.value, JWT_SECRET, { algorithms: ["HS256"] });
+    }
+    catch {
+        redirect("/auth/session-expired");
+    }
+    if (cookieStore.get("onboarding_complete")?.value === "1") {
+        redirect("/dashboard");
+    }
+    const catalogResult = await listSourceCatalogAction();
+    const catalogEntries = catalogResult.ok && catalogResult.data ? catalogResult.data.entries : [];
+    return (<div className="min-h-screen flex flex-col items-center justify-center bg-background px-4 py-10">
       <div className="mb-8 text-center space-y-1">
         <p className="text-sm font-semibold tracking-tight">JobAutomater</p>
         <h1 className="text-2xl font-semibold tracking-tight">
@@ -40,13 +32,8 @@ export default async function OnboardingPage() {
           fields cannot be skipped.
         </p>
       </div>
-      {catalogResult.ok ? (
-        <OnboardingWizard catalogEntries={catalogEntries} />
-      ) : (
-        <p className="text-sm text-destructive" role="alert">
+      {catalogResult.ok ? (<OnboardingWizard catalogEntries={catalogEntries}/>) : (<p className="text-sm text-destructive" role="alert">
           {catalogResult.error}
-        </p>
-      )}
-    </div>
-  );
+        </p>)}
+    </div>);
 }

@@ -41,7 +41,7 @@ def _skills_from_job(job: dict[str, Any]) -> list[str]:
             out.append(_norm_skill(str(t["name"])))
         elif isinstance(t, str):
             out.append(_norm_skill(t))
-    # Also mine description
+                           
     blob = " ".join(
         [
             str(job.get("title") or ""),
@@ -71,7 +71,7 @@ def _skills_from_job(job: dict[str, Any]) -> list[str]:
     ):
         if s in blob:
             out.append("postgresql" if s == "postgres" else s)
-    # unique
+            
     seen: set[str] = set()
     uniq: list[str] = []
     for s in out:
@@ -92,8 +92,8 @@ def score_skills(
         user_skills |= {_norm_skill(h) for h in vector_hits}
     job_skills = _skills_from_job(job)
     if not job_skills:
-        # Sparse posting (no JD/tags) — do not pretend a strong skill match (~70).
-        # Title-only overlap still helps when profile skills appear in the title.
+                                                                                  
+                                                                                 
         title = str(job.get("title") or "").lower()
         title_hits = [s for s in user_skills if s and s in title]
         if title_hits:
@@ -118,7 +118,7 @@ def score_experience(profile: dict[str, Any], job: dict[str, Any]) -> float:
     years = profile.get("years_experience")
     level = str(job.get("experience_level") or "").lower()
     title = str(job.get("title") or "").lower()
-    # Infer required years from level/title
+                                           
     need = 3
     if level in ("entry", "junior") or "junior" in title or "entry" in title:
         need = 1
@@ -158,7 +158,7 @@ def score_location(profile: dict[str, Any], job: dict[str, Any]) -> float:
     if remote or remote_type in ("fully_remote", "remote_ok"):
         if any("remote" in p for p in pref_strs):
             return 95.0
-        # Empty prefs: mild positive, not a near-perfect score for every remote job.
+                                                                                    
         if not pref_strs:
             return 70.0
         return 85.0
@@ -182,7 +182,7 @@ def score_salary(profile: dict[str, Any], job: dict[str, Any]) -> float:
         return 70.0
     if j_min is None and j_max is None:
         return 65.0
-    # Overlap of ranges
+                       
     a0 = int(u_min or 0)
     a1 = int(u_max or u_min or 0)
     b0 = int(j_min or 0)
@@ -196,7 +196,7 @@ def score_salary(profile: dict[str, Any], job: dict[str, Any]) -> float:
     ratio = overlap / span
     if overlap > 0:
         return round(min(100.0, 70.0 + ratio * 30), 2)
-    # Job pays above user min?
+                              
     if b1 >= a0:
         return 75.0
     if b1 >= a0 * 0.9:
@@ -210,10 +210,10 @@ def score_culture(profile: dict[str, Any], job: dict[str, Any]) -> float:
     job_emp = str(job.get("employment_type") or "").lower()
     emp_norm = [str(e).lower() for e in emp] if isinstance(emp, list) else ["full-time"]
     if not job_emp:
-        base = 50.0  # unknown employment type — do not default to strong culture fit
+        base = 50.0                                                                  
     else:
         base = 80.0 if job_emp in emp_norm else 50.0
-    # Soft skills mentioned in description
+                                          
     soft = profile.get("soft_skills") or []
     blob = str(job.get("description") or "").lower()
     hits = 0
@@ -266,7 +266,7 @@ def compute_match_score(
         + cult * w["culture"],
         2,
     )
-    # Incomplete postings (no JD / requirements) cannot claim high confidence matches.
+                                                                                      
     desc = str(job.get("description") or "").strip()
     reqs = str(job.get("requirements") or "").strip()
     if len(desc) < 40 and len(reqs) < 40:
@@ -299,7 +299,7 @@ def compute_match_score(
             if rewritten:
                 reasoning = rewritten
                 model_used = "hybrid-match-v1"
-    except Exception:  # noqa: BLE001
+    except Exception:                
         pass
     return {
         "overall_score": overall,

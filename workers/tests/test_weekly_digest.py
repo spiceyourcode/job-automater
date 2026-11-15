@@ -53,7 +53,7 @@ def test_render_cannot_embed_cv_or_email_fields() -> None:
 
 
 def test_digest_hour_monday_8_local() -> None:
-    # 2026-08-10 is a Monday; 05:00 UTC = 08:00 Europe/Helsinki (UTC+3 in August)
+                                                                                 
     now = datetime(2026, 8, 10, 5, 15, tzinfo=timezone.utc)
     assert is_digest_hour(now, "Europe/Helsinki")
     assert not is_digest_hour(now, "UTC")

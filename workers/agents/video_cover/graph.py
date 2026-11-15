@@ -42,7 +42,7 @@ def _validate_node(state: VideoState) -> dict[str, Any]:
         pack = validate_video_cover(draft)
         assert_script_grounded(pack, state["chunks"])
         return {"validated": pack.model_dump(mode="json"), "error": None}
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:                
         logger.warning("video_cover_validate_failed err=%s", type(exc).__name__)
         return {"validated": None, "error": f"{type(exc).__name__}: grounding failed"}
 

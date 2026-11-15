@@ -1,14 +1,6 @@
 "use client";
-
 import { useSyncExternalStore } from "react";
-
-const subscribe = () => () => {};
-
-/** False during SSR and the first client render, true once hydration is complete. */
+const subscribe = () => () => { };
 export function useHydrated(): boolean {
-  return useSyncExternalStore(
-    subscribe,
-    () => true,
-    () => false,
-  );
+    return useSyncExternalStore(subscribe, () => true, () => false);
 }

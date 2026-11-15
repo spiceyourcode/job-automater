@@ -59,10 +59,10 @@ def try_greenhouse_submit(
     endpoint = (
         f"https://boards-api.greenhouse.io/v1/boards/{board}/jobs/{job_id}"
     )
-    # Basic auth: API key as username, empty password (Greenhouse docs)
+                                                                       
     token = base64.b64encode(f"{api_key}:".encode()).decode()
     headers = {"Authorization": f"Basic {token}"}
-    # Minimal JSON body — resume text from tailored content when present
+                                                                        
     payload: dict[str, Any] = {
         "first_name": first,
         "last_name": last or "Applicant",
@@ -81,12 +81,12 @@ def try_greenhouse_submit(
                 "ats_greenhouse_http status=%s",
                 resp.status_code,
             )
-            return None  # fall back to portal
+            return None                       
         conf = None
         try:
             body = resp.json()
             conf = str(body.get("id") or body.get("application_id") or "") or None
-        except Exception:  # noqa: BLE001
+        except Exception:                
             conf = f"gh-{job_id}"
         logger.info("ats_greenhouse_ok board=%s", board)
         return SubmitResult(
@@ -95,7 +95,7 @@ def try_greenhouse_submit(
             external_application_id=conf or f"gh-{job_id}",
             screenshot_bytes=_MINI_PNG,
         )
-    except Exception:  # noqa: BLE001
+    except Exception:                
         logger.warning("ats_greenhouse_error")
         return None
     finally:

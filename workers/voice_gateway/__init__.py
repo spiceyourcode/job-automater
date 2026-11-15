@@ -1,0 +1,1 @@
+"""Local voice gateway — Whisper + Ollama + Piper (dev sidecar, not Celery)."""

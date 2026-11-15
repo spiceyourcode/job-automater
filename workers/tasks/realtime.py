@@ -46,5 +46,5 @@ def publish_event(user_id: str, event: dict[str, Any]) -> None:
         )
         client.publish(user_channel(user_id), json.dumps(payload))
         logger.info("ws_publish type=%s", payload.get("type"))
-    except Exception:  # noqa: BLE001
+    except Exception:                
         logger.warning("ws_publish_failed type=%s", payload.get("type"))

@@ -22,7 +22,7 @@ CREATE TABLE "emails" (
 	"needs_manual_review" boolean DEFAULT false NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
---> statement-breakpoint
+
 CREATE TABLE "notifications" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"user_id" uuid NOT NULL,
@@ -36,13 +36,13 @@ CREATE TABLE "notifications" (
 	"priority" integer DEFAULT 0 NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
---> statement-breakpoint
-ALTER TABLE "emails" ADD CONSTRAINT "emails_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "emails" ADD CONSTRAINT "emails_application_id_applications_id_fk" FOREIGN KEY ("application_id") REFERENCES "public"."applications"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "notifications" ADD CONSTRAINT "notifications_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-CREATE UNIQUE INDEX "uq_emails_user_external" ON "emails" USING btree ("user_id","external_id");--> statement-breakpoint
-CREATE INDEX "idx_emails_user_received" ON "emails" USING btree ("user_id","received_at");--> statement-breakpoint
-CREATE INDEX "idx_emails_application" ON "emails" USING btree ("application_id");--> statement-breakpoint
-CREATE INDEX "idx_emails_unprocessed" ON "emails" USING btree ("user_id","received_at");--> statement-breakpoint
-CREATE INDEX "idx_notifications_user_unread" ON "notifications" USING btree ("user_id","is_read","created_at");--> statement-breakpoint
+
+ALTER TABLE "emails" ADD CONSTRAINT "emails_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;
+ALTER TABLE "emails" ADD CONSTRAINT "emails_application_id_applications_id_fk" FOREIGN KEY ("application_id") REFERENCES "public"."applications"("id") ON DELETE set null ON UPDATE no action;
+ALTER TABLE "notifications" ADD CONSTRAINT "notifications_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;
+CREATE UNIQUE INDEX "uq_emails_user_external" ON "emails" USING btree ("user_id","external_id");
+CREATE INDEX "idx_emails_user_received" ON "emails" USING btree ("user_id","received_at");
+CREATE INDEX "idx_emails_application" ON "emails" USING btree ("application_id");
+CREATE INDEX "idx_emails_unprocessed" ON "emails" USING btree ("user_id","received_at");
+CREATE INDEX "idx_notifications_user_unread" ON "notifications" USING btree ("user_id","is_read","created_at");
 CREATE INDEX "idx_notifications_user_recent" ON "notifications" USING btree ("user_id","created_at");

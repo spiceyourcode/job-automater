@@ -31,7 +31,7 @@ def detect_ats(url: str | None) -> AtsVendor:
         return "workday"
     if _ASHBY_HOST.search(host) or "ashbyhq.com" in host:
         return "ashby"
-    # Some embeds put vendor in path
+                                    
     if "greenhouse" in path.lower():
         return "greenhouse"
     if "/lever/" in path.lower():
@@ -93,7 +93,7 @@ def parse_workday_tenant_site_job(url: str) -> tuple[str, str, str] | None:
     host = parsed.netloc.lower()
     m = re.match(r"^([a-z0-9-]+)\.wd\d+\.myworkdayjobs\.com$", host)
     if not m:
-        # Some hosts are tenant.myworkdayjobs.com without wdN
+                                                             
         m2 = re.match(r"^([a-z0-9-]+)\.myworkdayjobs\.com$", host)
         if not m2:
             return None
@@ -102,7 +102,7 @@ def parse_workday_tenant_site_job(url: str) -> tuple[str, str, str] | None:
         tenant = m.group(1)
 
     parts = [p for p in parsed.path.split("/") if p]
-    # Drop leading locale like en-US
+                                    
     if parts and re.match(r"^[a-z]{2}(-[A-Z]{2})?$", parts[0]):
         parts = parts[1:]
     if len(parts) < 3 or parts[1].lower() != "job":

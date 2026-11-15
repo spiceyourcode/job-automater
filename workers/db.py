@@ -296,7 +296,7 @@ def mark_source_failed(
     error: str,
     duration_ms: int,
 ) -> None:
-    # Truncate — never store secrets; caller must sanitize
+                                                          
     safe_error = error[:500]
     with conn.cursor() as cur:
         cur.execute(
@@ -840,7 +840,7 @@ def insert_notification(
                 "notification": {"id": nid, "type": type_, "title": title},
             },
         )
-    except Exception:  # noqa: BLE001
+    except Exception:                
         pass
     return nid
 
@@ -887,7 +887,7 @@ def _post_webhook(url: str, title: str, channel: str) -> None:
         method="POST",
     )
     try:
-        urllib.request.urlopen(req, timeout=5)  # noqa: S310
+        urllib.request.urlopen(req, timeout=5)              
         logger.info("webhook_sent channel=%s", channel)
     except (urllib.error.URLError, TimeoutError, OSError):
         logger.warning("webhook_failed channel=%s", channel)

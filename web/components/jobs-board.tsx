@@ -1,17 +1,8 @@
 "use client";
-
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { Inbox, Plus, Sparkles } from "lucide-react";
 import type { JobPublic } from "@/lib/jobs";
-import {
-  getJobAction,
-  getJobStatsAction,
-  importJobAction,
-  listJobsAction,
-  listSimilarJobsAction,
-  saveJobAction,
-  unsaveJobAction,
-} from "@/lib/actions/jobs";
+import { getJobAction, getJobStatsAction, importJobAction, listJobsAction, listSimilarJobsAction, saveJobAction, unsaveJobAction, } from "@/lib/actions/jobs";
 import { bulkGenerateAction } from "@/lib/actions/applications";
 import { pushToast } from "@/lib/toast-store";
 import { JobCard } from "@/components/job-card";
@@ -21,247 +12,191 @@ import { Button } from "@/components/ui/button";
 import { StatefulButton } from "@/components/ui/stateful-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AnimatedList } from "@/components/ui/animated-list";
 import { GooeyInput } from "@/components/ui/gooey-input";
-
 type Props = {
-  initialJobs: JobPublic[];
-  initialQ?: string;
-  initialJobId?: string;
+    initialJobs: JobPublic[];
+    initialQ?: string;
+    initialJobId?: string;
 };
-
 export function JobsBoard({ initialJobs, initialQ = "", initialJobId }: Props) {
-  const [jobs, setJobs] = useState(initialJobs);
-  const [sort, setSort] = useState<"score" | "date">("score");
-  const [minScore, setMinScore] = useState<string>("0");
-  const [q, setQ] = useState(initialQ);
-  const [remoteOnly, setRemoteOnly] = useState(false);
-  const [source, setSource] = useState<string>("all");
-  const [location, setLocation] = useState("");
-  const [salaryMinK, setSalaryMinK] = useState("");
-  const [status, setStatus] = useState<string>("all");
-  const [savedOnly, setSavedOnly] = useState(false);
-  const [moreFilters, setMoreFilters] = useState(false);
-  const [statsLine, setStatsLine] = useState<string | null>(null);
-  const [sourceOptions, setSourceOptions] = useState<string[]>([]);
-  const [importUrl, setImportUrl] = useState("");
-  const [selected, setSelected] = useState<JobPublic | null>(null);
-  const [similar, setSimilar] = useState<JobPublic[]>([]);
-  const [open, setOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [importMsg, setImportMsg] = useState<string | null>(null);
-  const [bulkMsg, setBulkMsg] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
-
-  const refresh = async (next?: {
-    sort?: "score" | "date";
-    minScore?: string;
-    q?: string;
-    remoteOnly?: boolean;
-    source?: string;
-    location?: string;
-    salaryMinK?: string;
-    status?: string;
-    savedOnly?: boolean;
-  }) => {
-    const s = next?.sort ?? sort;
-    const ms = next?.minScore ?? minScore;
-    const query = next?.q ?? q;
-    const remote = next?.remoteOnly ?? remoteOnly;
-    const src = next?.source ?? source;
-    const loc = next?.location ?? location;
-    const salK = next?.salaryMinK ?? salaryMinK;
-    const st = next?.status ?? status;
-    const saved = next?.savedOnly ?? savedOnly;
-    const min = Number(ms);
-    const salMin = Number(salK);
-    const result = await listJobsAction({
-      sort: s,
-      minScore: Number.isFinite(min) && min > 0 ? min : undefined,
-      q: query.trim() || undefined,
-      remoteOnly: remote || undefined,
-      source: src !== "all" ? src : undefined,
-      location: loc.trim() || undefined,
-      salaryMin:
-        Number.isFinite(salMin) && salMin > 0
-          ? Math.round(salMin * 1000 * 100)
-          : undefined,
-      status: st !== "all" ? st : undefined,
-      savedOnly: saved || undefined,
-    });
-    if (!result.ok) {
-      setError(result.error);
-      throw new Error("list_failed");
+    const [jobs, setJobs] = useState(initialJobs);
+    const [sort, setSort] = useState<"score" | "date">("score");
+    const [minScore, setMinScore] = useState<string>("0");
+    const [q, setQ] = useState(initialQ);
+    const [remoteOnly, setRemoteOnly] = useState(false);
+    const [source, setSource] = useState<string>("all");
+    const [location, setLocation] = useState("");
+    const [salaryMinK, setSalaryMinK] = useState("");
+    const [status, setStatus] = useState<string>("all");
+    const [savedOnly, setSavedOnly] = useState(false);
+    const [moreFilters, setMoreFilters] = useState(false);
+    const [statsLine, setStatsLine] = useState<string | null>(null);
+    const [sourceOptions, setSourceOptions] = useState<string[]>([]);
+    const [importUrl, setImportUrl] = useState("");
+    const [selected, setSelected] = useState<JobPublic | null>(null);
+    const [similar, setSimilar] = useState<JobPublic[]>([]);
+    const [open, setOpen] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [importMsg, setImportMsg] = useState<string | null>(null);
+    const [bulkMsg, setBulkMsg] = useState<string | null>(null);
+    const [pending, startTransition] = useTransition();
+    const refresh = async (next?: {
+        sort?: "score" | "date";
+        minScore?: string;
+        q?: string;
+        remoteOnly?: boolean;
+        source?: string;
+        location?: string;
+        salaryMinK?: string;
+        status?: string;
+        savedOnly?: boolean;
+    }) => {
+        const s = next?.sort ?? sort;
+        const ms = next?.minScore ?? minScore;
+        const query = next?.q ?? q;
+        const remote = next?.remoteOnly ?? remoteOnly;
+        const src = next?.source ?? source;
+        const loc = next?.location ?? location;
+        const salK = next?.salaryMinK ?? salaryMinK;
+        const st = next?.status ?? status;
+        const saved = next?.savedOnly ?? savedOnly;
+        const min = Number(ms);
+        const salMin = Number(salK);
+        const result = await listJobsAction({
+            sort: s,
+            minScore: Number.isFinite(min) && min > 0 ? min : undefined,
+            q: query.trim() || undefined,
+            remoteOnly: remote || undefined,
+            source: src !== "all" ? src : undefined,
+            location: loc.trim() || undefined,
+            salaryMin: Number.isFinite(salMin) && salMin > 0
+                ? Math.round(salMin * 1000 * 100)
+                : undefined,
+            status: st !== "all" ? st : undefined,
+            savedOnly: saved || undefined,
+        });
+        if (!result.ok) {
+            setError(result.error);
+            throw new Error("list_failed");
+        }
+        setError(null);
+        setJobs(result.data?.jobs ?? []);
+        const stats = await getJobStatsAction();
+        if (stats.ok && stats.data) {
+            setStatsLine(`${stats.data.total} jobs · ${stats.data.scored} scored · ${stats.data.saved} saved`);
+            setSourceOptions(stats.data.bySource.map((x) => x.source));
+        }
+    };
+    const openJob = (job: JobPublic) => {
+        setSelected(job);
+        setOpen(true);
+        setSimilar([]);
+        startTransition(async () => {
+            const res = await listSimilarJobsAction(job.id, 5);
+            if (res.ok)
+                setSimilar(res.data?.jobs ?? []);
+        });
+    };
+    useEffect(() => {
+        if (!initialJobId)
+            return;
+        const local = initialJobs.find((j) => j.id === initialJobId);
+        if (local) {
+            startTransition(() => openJob(local));
+            return;
+        }
+        startTransition(async () => {
+            const res = await getJobAction(initialJobId);
+            if (res.ok && res.data?.job)
+                openJob(res.data.job);
+        });
+    }, [initialJobId]);
+    const toggleSave = (job: JobPublic) => {
+        startTransition(async () => {
+            const nextSaved = !job.isSaved;
+            const res = nextSaved
+                ? await saveJobAction(job.id)
+                : await unsaveJobAction(job.id);
+            if (!res.ok) {
+                setError(res.error);
+                return;
+            }
+            const patch = (j: JobPublic) => j.id === job.id ? { ...j, isSaved: nextSaved } : j;
+            setJobs((prev) => prev.map(patch));
+            setSelected((prev) => (prev ? patch(prev) : prev));
+            setSimilar((prev) => prev.map(patch));
+        });
+    };
+    const heading = useMemo(() => {
+        if (jobs.length === 0)
+            return "No matches";
+        return `${jobs.length} match${jobs.length === 1 ? "" : "es"}`;
+    }, [jobs.length]);
+    const importJob = async () => {
+        const url = importUrl.trim();
+        if (!url)
+            throw new Error("empty_url");
+        setImportMsg(null);
+        const res = await importJobAction(url);
+        if (!res.ok) {
+            setError(res.error);
+            throw new Error("import_failed");
+        }
+        setError(null);
+        setImportUrl("");
+        setImportMsg(res.data?.deduped
+            ? "That URL was already imported."
+            : "Job imported — scoring in progress.");
+        if (res.data?.job) {
+            setJobs((prev) => [res.data!.job, ...prev]);
+            openJob(res.data.job);
+        }
+    };
+    if (initialJobs.length === 0 &&
+        jobs.length === 0 &&
+        !q &&
+        minScore === "0" &&
+        !remoteOnly &&
+        !importMsg) {
+        return (<div className="space-y-6">
+        <ImportBar importUrl={importUrl} setImportUrl={setImportUrl} pending={pending} importMsg={importMsg} onImport={importJob}/>
+        <EmptyState icon={<Inbox className="h-8 w-8" aria-hidden/>} title="No job matches yet" description="Paste a job URL above, or connect a source to start collecting openings." action={{
+                label: "Add sources",
+                href: "/settings/sources",
+                icon: <Plus className="mr-2 h-4 w-4" aria-hidden/>,
+            }}/>
+      </div>);
     }
-    setError(null);
-    setJobs(result.data?.jobs ?? []);
-    const stats = await getJobStatsAction();
-    if (stats.ok && stats.data) {
-      setStatsLine(
-        `${stats.data.total} jobs · ${stats.data.scored} scored · ${stats.data.saved} saved`,
-      );
-      setSourceOptions(stats.data.bySource.map((x) => x.source));
-    }
-  };
-
-  const openJob = (job: JobPublic) => {
-    setSelected(job);
-    setOpen(true);
-    setSimilar([]);
-    startTransition(async () => {
-      const res = await listSimilarJobsAction(job.id, 5);
-      if (res.ok) setSimilar(res.data?.jobs ?? []);
-    });
-  };
-
-  useEffect(() => {
-    if (!initialJobId) return;
-    const local = initialJobs.find((j) => j.id === initialJobId);
-    if (local) {
-      startTransition(() => openJob(local));
-      return;
-    }
-    startTransition(async () => {
-      const res = await getJobAction(initialJobId);
-      if (res.ok && res.data?.job) openJob(res.data.job);
-    });
-  }, [initialJobId]);
-
-  const toggleSave = (job: JobPublic) => {
-    startTransition(async () => {
-      const nextSaved = !job.isSaved;
-      const res = nextSaved
-        ? await saveJobAction(job.id)
-        : await unsaveJobAction(job.id);
-      if (!res.ok) {
-        setError(res.error);
-        return;
-      }
-      const patch = (j: JobPublic) =>
-        j.id === job.id ? { ...j, isSaved: nextSaved } : j;
-      setJobs((prev) => prev.map(patch));
-      setSelected((prev) => (prev ? patch(prev) : prev));
-      setSimilar((prev) => prev.map(patch));
-    });
-  };
-
-  const heading = useMemo(() => {
-    if (jobs.length === 0) return "No matches";
-    return `${jobs.length} match${jobs.length === 1 ? "" : "es"}`;
-  }, [jobs.length]);
-
-  const importJob = async () => {
-    const url = importUrl.trim();
-    if (!url) throw new Error("empty_url");
-    setImportMsg(null);
-    const res = await importJobAction(url);
-    if (!res.ok) {
-      setError(res.error);
-      throw new Error("import_failed");
-    }
-    setError(null);
-    setImportUrl("");
-    setImportMsg(
-      res.data?.deduped
-        ? "That URL was already imported."
-        : "Job imported — scoring in progress.",
-    );
-    if (res.data?.job) {
-      setJobs((prev) => [res.data!.job, ...prev]);
-      openJob(res.data.job);
-    }
-  };
-
-  if (
-    initialJobs.length === 0 &&
-    jobs.length === 0 &&
-    !q &&
-    minScore === "0" &&
-    !remoteOnly &&
-    !importMsg
-  ) {
-    return (
-      <div className="space-y-6">
-        <ImportBar
-          importUrl={importUrl}
-          setImportUrl={setImportUrl}
-          pending={pending}
-          importMsg={importMsg}
-          onImport={importJob}
-        />
-        <EmptyState
-          icon={<Inbox className="h-8 w-8" aria-hidden />}
-          title="No job matches yet"
-          description="Paste a job URL above, or connect a source to start collecting openings."
-          action={{
-            label: "Add sources",
-            href: "/settings/sources",
-            icon: <Plus className="mr-2 h-4 w-4" aria-hidden />,
-          }}
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-        <ImportBar
-          importUrl={importUrl}
-          setImportUrl={setImportUrl}
-          pending={pending}
-          importMsg={importMsg}
-          onImport={async () => {
+    return (<div className="space-y-4">
+        <ImportBar importUrl={importUrl} setImportUrl={setImportUrl} pending={pending} importMsg={importMsg} onImport={async () => {
             await importJob();
             setSort("date");
             await refresh({ sort: "date" });
-          }}
-        />
+        }}/>
 
-      <form
-        className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end"
-        onSubmit={(e) => {
-          e.preventDefault();
-          refresh();
-        }}
-        aria-label="Filter job matches"
-      >
+      <form className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end" onSubmit={(e) => {
+            e.preventDefault();
+            refresh();
+        }} aria-label="Filter job matches">
         <div className="min-w-48 flex-1 space-y-1.5">
           <Label htmlFor="jobs-q">Search</Label>
-          <GooeyInput
-            id="jobs-q"
-            value={q}
-            onValueChange={setQ}
-            placeholder="Title or company"
-            aria-label="Search jobs by title or company"
-            collapsedWidth={160}
-            expandedWidth={280}
-            expandedOffset={44}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
+          <GooeyInput id="jobs-q" value={q} onValueChange={setQ} placeholder="Title or company" aria-label="Search jobs by title or company" collapsedWidth={160} expandedWidth={280} expandedOffset={44} onKeyDown={(e) => {
+            if (e.key === "Enter") {
                 e.preventDefault();
                 refresh({ q });
-              }
-            }}
-          />
+            }
+        }}/>
         </div>
         <div className="w-full space-y-1.5 sm:w-36">
           <Label htmlFor="jobs-sort">Sort</Label>
-          <Select
-            value={sort}
-            onValueChange={(v) => {
-              const next = v as "score" | "date";
-              setSort(next);
-              refresh({ sort: next });
-            }}
-          >
+          <Select value={sort} onValueChange={(v) => {
+            const next = v as "score" | "date";
+            setSort(next);
+            refresh({ sort: next });
+        }}>
             <SelectTrigger id="jobs-sort" className="w-full cursor-pointer">
               <SelectValue />
             </SelectTrigger>
@@ -273,13 +208,10 @@ export function JobsBoard({ initialJobs, initialQ = "", initialJobId }: Props) {
         </div>
         <div className="w-full space-y-1.5 sm:w-36">
           <Label htmlFor="jobs-min-score">Min score</Label>
-          <Select
-            value={minScore}
-            onValueChange={(v) => {
-              setMinScore(v);
-              refresh({ minScore: v });
-            }}
-          >
+          <Select value={minScore} onValueChange={(v) => {
+            setMinScore(v);
+            refresh({ minScore: v });
+        }}>
             <SelectTrigger id="jobs-min-score" className="w-full cursor-pointer">
               <SelectValue />
             </SelectTrigger>
@@ -292,90 +224,55 @@ export function JobsBoard({ initialJobs, initialQ = "", initialJobId }: Props) {
           </Select>
         </div>
         <div className="flex items-center gap-2 pb-2">
-          <Checkbox
-            id="jobs-remote"
-            checked={remoteOnly}
-            onCheckedChange={(c) => {
-              const next = c === true;
-              setRemoteOnly(next);
-              refresh({ remoteOnly: next });
-            }}
-          />
+          <Checkbox id="jobs-remote" checked={remoteOnly} onCheckedChange={(c) => {
+            const next = c === true;
+            setRemoteOnly(next);
+            refresh({ remoteOnly: next });
+        }}/>
           <Label htmlFor="jobs-remote" className="cursor-pointer font-normal">
             Remote only
           </Label>
         </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="cursor-pointer"
-          onClick={() => setMoreFilters((v) => !v)}
-        >
+        <Button type="button" variant="ghost" size="sm" className="cursor-pointer" onClick={() => setMoreFilters((v) => !v)}>
           {moreFilters ? "Fewer filters" : "More filters"}
         </Button>
-        <StatefulButton
-          size="sm"
-          variant="default"
-          disabled={pending}
-          onClick={() => refresh()}
-        >
+        <StatefulButton size="sm" variant="default" disabled={pending} onClick={() => refresh()}>
           Apply
         </StatefulButton>
       </form>
 
-      {moreFilters && (
-        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+      {moreFilters && (<div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
           <div className="w-full space-y-1.5 sm:w-40">
             <Label htmlFor="jobs-source">Source</Label>
-            <Select
-              value={source}
-              onValueChange={(v) => {
+            <Select value={source} onValueChange={(v) => {
                 setSource(v);
                 refresh({ source: v });
-              }}
-            >
+            }}>
               <SelectTrigger id="jobs-source" className="w-full cursor-pointer">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Any source</SelectItem>
-                {sourceOptions.map((s) => (
-                  <SelectItem key={s} value={s}>
+                {sourceOptions.map((s) => (<SelectItem key={s} value={s}>
                     {s}
-                  </SelectItem>
-                ))}
+                  </SelectItem>))}
               </SelectContent>
             </Select>
           </div>
           <div className="min-w-[10rem] flex-1 space-y-1.5">
             <Label htmlFor="jobs-location">Location</Label>
-            <Input
-              id="jobs-location"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              placeholder="City or region"
-            />
+            <Input id="jobs-location" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="City or region"/>
           </div>
           <div className="w-full space-y-1.5 sm:w-36">
             <Label htmlFor="jobs-salary-min">Min salary ($k)</Label>
-            <Input
-              id="jobs-salary-min"
-              inputMode="numeric"
-              value={salaryMinK}
-              onChange={(e) => setSalaryMinK(e.target.value)}
-              placeholder="80"
-            />
+            <Input id="jobs-salary-min" inputMode="numeric" value={salaryMinK} onChange={(e) => setSalaryMinK(e.target.value)} placeholder="80"/>
           </div>
           <div className="w-full space-y-1.5 sm:w-36">
             <Label htmlFor="jobs-status">Status</Label>
-            <Select
-              value={status}
-              onValueChange={(v) => {
+            <Select value={status} onValueChange={(v) => {
                 setStatus(v);
                 refresh({ status: v });
-              }}
-            >
+            }}>
               <SelectTrigger id="jobs-status" className="w-full cursor-pointer">
                 <SelectValue />
               </SelectTrigger>
@@ -388,161 +285,94 @@ export function JobsBoard({ initialJobs, initialQ = "", initialJobId }: Props) {
             </Select>
           </div>
           <div className="flex items-center gap-2 pb-2">
-            <Checkbox
-              id="jobs-saved"
-              checked={savedOnly}
-              onCheckedChange={(c) => {
+            <Checkbox id="jobs-saved" checked={savedOnly} onCheckedChange={(c) => {
                 const next = c === true;
                 setSavedOnly(next);
                 refresh({ savedOnly: next });
-              }}
-            />
+            }}/>
             <Label htmlFor="jobs-saved" className="cursor-pointer font-normal">
               Saved only
             </Label>
           </div>
-        </div>
-      )}
+        </div>)}
 
-      {error && (
-        <p className="text-sm text-destructive" role="alert">
+      {error && (<p className="text-sm text-destructive" role="alert">
           {error}
-        </p>
-      )}
+        </p>)}
 
       <p className="text-sm text-muted-foreground" aria-live="polite">
         {statsLine ?? heading}
       </p>
 
       <div className="flex flex-wrap items-center gap-2">
-        <StatefulButton
-          size="sm"
-          variant="outline"
-          disabled={pending}
-          onClick={async () => {
+        <StatefulButton size="sm" variant="outline" disabled={pending} onClick={async () => {
             setBulkMsg(null);
             const min = Number(minScore);
-            const res = await bulkGenerateAction(
-              10,
-              Number.isFinite(min) && min > 0 ? min : undefined,
-            );
+            const res = await bulkGenerateAction(10, Number.isFinite(min) && min > 0 ? min : undefined);
             if (!res.ok) {
-              setError(res.error);
-              pushToast({
-                id: "bulk-drafts-error",
-                title: "Draft generation failed",
-                description: res.error,
-                duration: 8000,
-              });
-              throw new Error("bulk_failed");
+                setError(res.error);
+                pushToast({
+                    id: "bulk-drafts-error",
+                    title: "Draft generation failed",
+                    description: res.error,
+                    duration: 8000,
+                });
+                throw new Error("bulk_failed");
             }
             setError(null);
             const count = res.data?.count ?? 0;
             setBulkMsg(`Queued ${count} draft document packs (no submit).`);
             pushToast({
-              id: "bulk-drafts",
-              title: "Draft generation queued",
-              description:
-                count === 0
-                  ? "No unscored jobs matched — lower the minimum score and try again."
-                  : `${count} draft document pack${count === 1 ? "" : "s"} queued. Nothing was submitted.`,
-              duration: 8000,
+                id: "bulk-drafts",
+                title: "Draft generation queued",
+                description: count === 0
+                    ? "No unscored jobs matched — lower the minimum score and try again."
+                    : `${count} draft document pack${count === 1 ? "" : "s"} queued. Nothing was submitted.`,
+                duration: 8000,
             });
-          }}
-        >
-          <Sparkles className="h-3.5 w-3.5" aria-hidden />
+        }}>
+          <Sparkles className="h-3.5 w-3.5" aria-hidden/>
           Generate top 10 drafts
         </StatefulButton>
-        {bulkMsg && (
-          <p className="text-sm text-muted-foreground" role="status">
+        {bulkMsg && (<p className="text-sm text-muted-foreground" role="status">
             {bulkMsg}
-          </p>
-        )}
+          </p>)}
       </div>
 
-      {jobs.length === 0 ? (
-        <EmptyState
-          icon={<Inbox className="h-8 w-8" aria-hidden />}
-          title="No jobs match these filters"
-          description="Try lowering the minimum score or clearing search."
-        />
-      ) : (
-        <AnimatedList aria-label="Job matches">
-          {jobs.map((job) => (
-            <JobCard
-              key={job.id}
-              job={job}
-              selected={selected?.id === job.id}
-              onSelect={openJob}
-            />
-          ))}
-        </AnimatedList>
-      )}
+      {jobs.length === 0 ? (<EmptyState icon={<Inbox className="h-8 w-8" aria-hidden/>} title="No jobs match these filters" description="Try lowering the minimum score or clearing search."/>) : (<AnimatedList aria-label="Job matches">
+          {jobs.map((job) => (<JobCard key={job.id} job={job} selected={selected?.id === job.id} onSelect={openJob}/>))}
+        </AnimatedList>)}
 
-      <JobDetailDialog
-        job={selected}
-        open={open}
-        similar={similar}
-        onToggleSave={toggleSave}
-        onOpenChange={(v) => {
-          setOpen(v);
-          if (!v) {
-            setSelected(null);
-            setSimilar([]);
-          }
-        }}
-        onSelectSimilar={openJob}
-      />
-    </div>
-  );
+      <JobDetailDialog job={selected} open={open} similar={similar} onToggleSave={toggleSave} onOpenChange={(v) => {
+            setOpen(v);
+            if (!v) {
+                setSelected(null);
+                setSimilar([]);
+            }
+        }} onSelectSimilar={openJob}/>
+    </div>);
 }
-
-function ImportBar({
-  importUrl,
-  setImportUrl,
-  pending,
-  importMsg,
-  onImport,
-}: {
-  importUrl: string;
-  setImportUrl: (v: string) => void;
-  pending: boolean;
-  importMsg: string | null;
-  onImport: () => Promise<void> | void;
+function ImportBar({ importUrl, setImportUrl, pending, importMsg, onImport, }: {
+    importUrl: string;
+    setImportUrl: (v: string) => void;
+    pending: boolean;
+    importMsg: string | null;
+    onImport: () => Promise<void> | void;
 }) {
-  return (
-    <div className="space-y-2 rounded-lg border p-3">
-      <form
-        className="flex flex-col gap-2 sm:flex-row sm:items-end"
-        onSubmit={(e) => {
-          e.preventDefault();
-        }}
-        aria-label="Import job from URL"
-      >
+    return (<div className="space-y-2 rounded-lg border p-3">
+      <form className="flex flex-col gap-2 sm:flex-row sm:items-end" onSubmit={(e) => {
+            e.preventDefault();
+        }} aria-label="Import job from URL">
         <div className="min-w-0 flex-1 space-y-1.5">
           <Label htmlFor="jobs-import-url">Import job URL</Label>
-          <Input
-            id="jobs-import-url"
-            type="url"
-            value={importUrl}
-            onChange={(e) => setImportUrl(e.target.value)}
-            placeholder="https://company.com/careers/role"
-          />
+          <Input id="jobs-import-url" type="url" value={importUrl} onChange={(e) => setImportUrl(e.target.value)} placeholder="https://company.com/careers/role"/>
         </div>
-        <StatefulButton
-          size="sm"
-          variant="default"
-          disabled={pending || !importUrl.trim()}
-          onClick={() => onImport()}
-        >
+        <StatefulButton size="sm" variant="default" disabled={pending || !importUrl.trim()} onClick={() => onImport()}>
           Import
         </StatefulButton>
       </form>
-      {importMsg && (
-        <p className="text-sm text-muted-foreground" role="status">
+      {importMsg && (<p className="text-sm text-muted-foreground" role="status">
           {importMsg}
-        </p>
-      )}
-    </div>
-  );
+        </p>)}
+    </div>);
 }

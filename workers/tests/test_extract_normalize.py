@@ -86,10 +86,10 @@ def test_llm_refine_preserves_source_identity_fields():
     ):
         merged = llm_refine({"format": "rss"}, draft)
 
-    # Content fields still come from the model...
+                                                 
     assert merged["title"] == "Backend Engineer (Remote)"
     assert merged["field_confidence"]["title"] == 0.9
-    # ...but provenance stays anchored to the source row.
+                                                         
     assert merged["source"] == "rss"
     assert merged["source_id"] == "abc123"
     assert merged["source_url"] == "https://example.com/jobs/abc123"
@@ -103,7 +103,7 @@ def test_rejects_unvalidated_llm_shaped_payload():
                 "title": "X",
                 "company": "Y",
                 "source": "rss",
-                # missing field_confidence
+                                          
             }
         )
 
@@ -200,7 +200,7 @@ def test_process_normalize_never_inserts_on_validation_failure():
                     "source_config_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
                     "source_id": "x",
                     "source_url": None,
-                    "raw_data": {"format": "rss"},  # no title → may still produce Untitled
+                    "raw_data": {"format": "rss"},                                         
                     "processed": False,
                     "source_type": "rss",
                 }

@@ -39,7 +39,7 @@ def try_workday_submit(
     if not parsed:
         return None
 
-    # Optional shared secret for tenants that require it; empty still attempts CXS.
+                                                                                   
     _ = getattr(settings, "workday_client_id", "") or ""
 
     tenant, site, job_path_id = parsed
@@ -96,7 +96,7 @@ def try_workday_submit(
                 or body.get("candidateId")
                 or ""
             ) or None
-        except Exception:  # noqa: BLE001
+        except Exception:                
             conf = f"wd-{job_path_id[:16]}"
         logger.info("ats_workday_ok tenant=%s site=%s", tenant, site)
         return SubmitResult(
@@ -105,7 +105,7 @@ def try_workday_submit(
             external_application_id=conf or f"wd-{job_path_id[:16]}",
             screenshot_bytes=_MINI_PNG,
         )
-    except Exception:  # noqa: BLE001
+    except Exception:                
         logger.warning("ats_workday_error")
         return None
     finally:

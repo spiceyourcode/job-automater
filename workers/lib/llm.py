@@ -24,8 +24,8 @@ logger = logging.getLogger(__name__)
 
 Purpose = Literal["extract", "docs", "classify", "match"]
 
-# Prefer providers that typically have quota; cooldown skips 402/429 dead-ends.
-# Gemini first when GOOGLE_API_KEY is set; OpenAI second; then Groq/Cerebras.
+                                                                               
+                                                                             
 PURPOSE_ORDER: dict[Purpose, tuple[str, ...]] = {
     "extract": ("google", "openai", "qrok", "cerebras"),
     "docs": ("google", "openai", "qrok"),
@@ -33,29 +33,29 @@ PURPOSE_ORDER: dict[Purpose, tuple[str, ...]] = {
     "match": ("google", "openai", "qrok", "cerebras"),
 }
 
-# Production model IDs per current provider catalogs
+                                                    
 DEFAULT_MODELS = {
     "openai": "gpt-4o-mini",
-    # Groq production (QROK_API_KEY / GROQ_API_KEY) — https://console.groq.com/docs/models
+                                                                                          
     "qrok": "openai/gpt-oss-20b",
-    # Google AI Studio / Gemini API — https://ai.google.dev/gemini-api/docs/models/gemini-2.5-flash
+                                                                                                   
     "google": "gemini-2.5-flash",
-    # Cerebras production — https://inference-docs.cerebras.ai/models
+                                                                     
     "cerebras": "gpt-oss-120b",
 }
 
 _OPENAI_COMPAT = {
     "openai": ("https://api.openai.com/v1/chat/completions", "openai"),
-    # Groq OpenAI-compat base: https://api.groq.com/openai/v1
+                                                             
     "qrok": ("https://api.groq.com/openai/v1/chat/completions", "qrok"),
-    # Cerebras OpenAI-compat base: https://api.cerebras.ai/v1
+                                                             
     "cerebras": ("https://api.cerebras.ai/v1/chat/completions", "cerebras"),
 }
 
-# provider -> unix time when cooldown ends
+                                          
 _COOLDOWN_UNTIL: dict[str, float] = {}
-_COOLDOWN_BILLING_S = 3600.0  # 401/402/403 — billing or auth
-_COOLDOWN_RATE_S = 120.0  # 429 — rate limit
+_COOLDOWN_BILLING_S = 3600.0                                 
+_COOLDOWN_RATE_S = 120.0                    
 
 
 class LlmError(Exception):
@@ -166,7 +166,7 @@ def _openai_compat_chat(
         "temperature": 0.1,
         "messages": messages,
     }
-    # JSON object mode — supported on OpenAI / Groq / Cerebras chat completions
+                                                                               
     body["response_format"] = {"type": "json_object"}
     with httpx.Client(timeout=timeout) as client:
         res = client.post(
@@ -192,7 +192,7 @@ def _google_chat(
     model = DEFAULT_MODELS["google"]
     system = " ".join(m["content"] for m in messages if m["role"] == "system")
     user = "\n".join(m["content"] for m in messages if m["role"] != "system")
-    # Prefer header auth so the key is not echoed in httpx request URLs (HG-8).
+                                                                               
     url = (
         f"https://generativelanguage.googleapis.com/v1beta/models/"
         f"{model}:generateContent"
@@ -210,8 +210,8 @@ def _google_chat(
                 "generationConfig": {
                     "temperature": 0.1,
                     "responseMimeType": "application/json",
-                    # gemini-2.5-flash is a thinking model; disable budget so JSON
-                    # responses are not empty after thoughts tokens.
+                                                                                  
+                                                                    
                     "thinkingConfig": {"thinkingBudget": 0},
                 },
             },
@@ -262,7 +262,7 @@ def chat_json(
             parsed["_provider"] = provider
             parsed["_model"] = model
             return parsed
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:                
             last = exc
             status = _http_status(exc)
             _mark_provider_cooldown(provider, status)
@@ -274,7 +274,7 @@ def chat_json(
                 status,
             )
     if tried == 0:
-        # All keys missing or cooling down — treat as no usable provider for this call.
+                                                                                       
         if any(provider_key_present(p) for p in PURPOSE_ORDER[purpose]):
             raise LlmError(
                 f"all_providers_failed:{type(last).__name__ if last else 'cooldown'}"

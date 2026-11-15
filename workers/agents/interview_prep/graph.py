@@ -40,7 +40,7 @@ def _generate_node(state: PrepState) -> dict[str, Any]:
             pack = validate_prep(llm_draft)
             assert_star_grounded(pack, state["chunks"])
             draft = pack.model_dump(mode="json")
-        except Exception:  # noqa: BLE001
+        except Exception:                
             logger.warning("interview_prep_llm_ungrounded_fallback")
             draft = heuristic
     logger.info(
@@ -60,7 +60,7 @@ def _validate_node(state: PrepState) -> dict[str, Any]:
         pack = validate_prep(draft)
         assert_star_grounded(pack, state["chunks"])
         return {"validated": pack.model_dump(mode="json"), "error": None}
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:                
         logger.warning("interview_prep_validate_failed err=%s", type(exc).__name__)
         return {"validated": None, "error": f"{type(exc).__name__}: grounding failed"}
 

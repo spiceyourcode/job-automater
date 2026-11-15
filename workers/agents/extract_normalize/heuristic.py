@@ -70,17 +70,17 @@ def _parse_salary_cents(blob: str) -> tuple[int | None, int | None]:
     def to_cents(raw: str, had_k: bool) -> int:
         n = float(raw.replace(",", ""))
         if had_k or n < 1000:
-            # treat small numbers / trailing k as thousands of dollars
+                                                                      
             if "k" in blob[m.start() : m.end()].lower() or n < 1000:
                 n *= 1000
         return int(n * 100)
 
-    # Re-check k in matched span
+                                
     span = blob[m.start() : m.end()].lower()
     lo = to_cents(m.group(1), "k" in span)
     hi = to_cents(m.group(2), "k" in span) if m.group(2) else None
-    # Guard absurd values
-    if lo and lo > 10_000_000_00:  # > $10M
+                         
+    if lo and lo > 10_000_000_00:          
         return None, None
     return lo, hi
 
@@ -102,7 +102,7 @@ def _remote_flags(blob: str) -> tuple[bool, str | None]:
 def _tags_from_text(blob: str) -> list[str]:
     lower = blob.lower()
     found = [t for t in _TECH if t in lower]
-    # normalize postgres → postgresql
+                                     
     out: list[str] = []
     for t in found:
         if t == "postgres":
@@ -210,7 +210,7 @@ def extract_heuristic(
             )
         )
         if not description:
-            # Still surface list metadata so the dialog is not empty.
+                                                                     
             bits = [b for b in (title, department, location) if b]
             description = " · ".join(str(b) for b in bits)
         application_url = (
@@ -248,7 +248,7 @@ def extract_heuristic(
         }
 
     else:
-        # Generic fallback
+                          
         title = str(raw_data.get("title") or raw_data.get("subject") or "Untitled role").strip()
         company = str(raw_data.get("company") or raw_data.get("from") or "Unknown").strip()
         title, company, extracted = _split_company_from_title(title, company)

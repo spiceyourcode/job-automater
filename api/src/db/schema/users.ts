@@ -1,18 +1,6 @@
 import { sql } from "drizzle-orm";
-import {
-  boolean,
-  integer,
-  pgTable,
-  text,
-  timestamp,
-  uniqueIndex,
-  uuid,
-  varchar,
-} from "drizzle-orm/pg-core";
-
-export const users = pgTable(
-  "users",
-  {
+import { boolean, integer, pgTable, text, timestamp, uniqueIndex, uuid, varchar, } from "drizzle-orm/pg-core";
+export const users = pgTable("users", {
     id: uuid("id").primaryKey().defaultRandom(),
     email: varchar("email", { length: 255 }).notNull(),
     emailVerified: boolean("email_verified").default(false).notNull(),
@@ -28,27 +16,24 @@ export const users = pgTable(
     lockedUntil: timestamp("locked_until", { withTimezone: true }),
     lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
+        .defaultNow()
+        .notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
-      .defaultNow()
-      .notNull()
-      .$onUpdate(() => new Date()),
+        .defaultNow()
+        .notNull()
+        .$onUpdate(() => new Date()),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
-  },
-  (table) => [
+}, (table) => [
     uniqueIndex("idx_users_email").on(table.email),
     uniqueIndex("idx_users_google_id")
-      .on(table.googleId)
-      .where(sql`${table.googleId} IS NOT NULL`),
+        .on(table.googleId)
+        .where(sql `${table.googleId} IS NOT NULL`),
     uniqueIndex("idx_users_github_id")
-      .on(table.githubId)
-      .where(sql`${table.githubId} IS NOT NULL`),
+        .on(table.githubId)
+        .where(sql `${table.githubId} IS NOT NULL`),
     uniqueIndex("idx_users_linkedin_id")
-      .on(table.linkedinId)
-      .where(sql`${table.linkedinId} IS NOT NULL`),
-  ],
-);
-
+        .on(table.linkedinId)
+        .where(sql `${table.linkedinId} IS NOT NULL`),
+]);
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;

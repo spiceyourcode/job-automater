@@ -15,8 +15,8 @@ CREATE TABLE "cv_documents" (
 	"is_active" boolean DEFAULT false NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
---> statement-breakpoint
-ALTER TABLE "cv_documents" ADD CONSTRAINT "cv_documents_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-CREATE UNIQUE INDEX "cv_documents_user_id_version_unique" ON "cv_documents" USING btree ("user_id","version");--> statement-breakpoint
-CREATE INDEX "idx_cv_docs_user" ON "cv_documents" USING btree ("user_id","is_active");--> statement-breakpoint
+
+ALTER TABLE "cv_documents" ADD CONSTRAINT "cv_documents_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;
+CREATE UNIQUE INDEX "cv_documents_user_id_version_unique" ON "cv_documents" USING btree ("user_id","version");
+CREATE INDEX "idx_cv_docs_user" ON "cv_documents" USING btree ("user_id","is_active");
 CREATE INDEX "idx_cv_docs_hash" ON "cv_documents" USING btree ("file_hash");

@@ -16,7 +16,7 @@ ClTemplate = Literal["modern", "classic", "minimal", "standard"]
 CV_TEMPLATES: tuple[str, ...] = ("modern", "classic", "minimal")
 CL_TEMPLATES: tuple[str, ...] = ("modern", "classic", "minimal", "standard")
 
-# Display order — omit empty sections at render time
+                                                    
 SECTION_HEADINGS_MODERN: dict[str, str] = {
     "summary": "Professional Summary",
     "experience": "Work Experience",
@@ -51,7 +51,7 @@ SECTION_RENDER_ORDER: tuple[str, ...] = (
 def normalize_cv_template(value: str | None) -> CvTemplate:
     v = (value or "modern").strip().lower()
     if v in CV_TEMPLATES:
-        return v  # type: ignore[return-value]
+        return v                              
     return "modern"
 
 
@@ -60,7 +60,7 @@ def normalize_cl_template(value: str | None) -> CvTemplate:
     if v == "standard":
         return "modern"
     if v in ("modern", "classic", "minimal"):
-        return v  # type: ignore[return-value]
+        return v                              
     return "modern"
 
 

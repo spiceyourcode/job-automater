@@ -18,7 +18,7 @@ def test_interview_above_threshold_auto() -> None:
 
 
 def test_below_threshold_does_not_auto() -> None:
-    # Exactly at threshold must NOT auto (strict >)
+                                                   
     assert not meets_auto_threshold("interview_invitation", 0.85)
     assert meets_auto_threshold("interview_invitation", 0.86)
 
@@ -63,7 +63,7 @@ def test_low_confidence_other_needs_review() -> None:
     assert out["new_status"] is None
 
 
-def test_process_monitor_happy(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+def test_process_monitor_happy(monkeypatch) -> None:                                
     from unittest.mock import MagicMock, patch
 
     from tasks.monitor_email import process_monitor_email

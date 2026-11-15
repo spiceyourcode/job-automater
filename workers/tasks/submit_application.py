@@ -32,16 +32,16 @@ def _is_emergency_stopped(user_id: str) -> bool:
 
         from config import settings
 
-        # Celery broker URL is Redis; reuse host for stop flags.
+                                                                
         url = getattr(settings, "celery_broker_url", "") or "redis://localhost:6379/0"
         client = redis.Redis.from_url(url, decode_responses=True)
         try:
             return client.get(f"jobautomater:submit_stop:{user_id}") == "1"
         finally:
             client.close()
-    except Exception:  # noqa: BLE001
-        # Fail open on Redis blips would be unsafe for stop; fail closed for stop check
-        # only when we can confirm — if Redis is down, allow process but log.
+    except Exception:                
+                                                                                       
+                                                                             
         logger.warning("emergency_stop_check_failed")
         return False
 
@@ -55,7 +55,7 @@ class SubmitApplicationJob(BaseModel):
 
 
 def process_submit_application(payload: dict[str, Any]) -> dict[str, Any]:
-    # HG-4 hard gate before any browser work
+                                            
     if not payload.get("approved_at"):
         logger.warning("submit_rejected reason=missing_approved_at")
         return {"status": "error", "error": "missing_approved_at"}
@@ -71,7 +71,7 @@ def process_submit_application(payload: dict[str, Any]) -> dict[str, Any]:
         logger.warning("submit_rejected reason=invalid_payload")
         return {"status": "error", "error": "invalid_payload"}
 
-    # Validate ISO timestamp
+                            
     try:
         datetime.fromisoformat(job.approved_at.replace("Z", "+00:00"))
     except ValueError:
@@ -95,7 +95,7 @@ def process_submit_application(payload: dict[str, Any]) -> dict[str, Any]:
 
         profile = load_profile_for_user(conn, job.user_id) or {}
         contact = load_user_contact(conn, job.user_id) or {}
-        # Merge contact onto profile for ATS (email lives on users)
+                                                                   
         if contact.get("email"):
             profile = {
                 **profile,
@@ -129,7 +129,7 @@ def process_submit_application(payload: dict[str, Any]) -> dict[str, Any]:
 
         if result.status == "submitted":
             if not shot_key:
-                # Contract: never mark submitted without screenshot proof
+                                                                         
                 mark_application_submit_failed(
                     conn,
                     application_id=job.application_id,
@@ -153,7 +153,7 @@ def process_submit_application(payload: dict[str, Any]) -> dict[str, Any]:
                         },
                         priority=2,
                     )
-                except Exception:  # noqa: BLE001
+                except Exception:                
                     logger.exception(
                         "submit_notify_failed application_id=%s",
                         job.application_id,
@@ -203,12 +203,12 @@ def process_submit_application(payload: dict[str, Any]) -> dict[str, Any]:
                 },
                 priority=2,
             )
-        except Exception:  # noqa: BLE001
+        except Exception:                
             logger.exception(
                 "submit_notify_failed application_id=%s",
                 job.application_id,
             )
-        # User-visible CAPTCHA / failure path — do not crash worker
+                                                                   
         logger.warning(
             "submit_failed application_id=%s error=%s",
             job.application_id,

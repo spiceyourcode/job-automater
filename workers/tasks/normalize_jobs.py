@@ -33,7 +33,7 @@ def process_normalize_jobs(payload: dict[str, Any]) -> dict[str, Any]:
     with connect() as conn:
         rows = load_jobs_raw(conn, user_id=job.user_id, job_ids=job.job_ids)
         found_ids = {str(r["id"]) for r in rows}
-        # Ownership: only rows for this user_id are returned (IDOR safe)
+                                                                        
         for raw_id in job.job_ids:
             if raw_id not in found_ids:
                 skipped += 1
@@ -64,7 +64,7 @@ def process_normalize_jobs(payload: dict[str, Any]) -> dict[str, Any]:
                 use_llm=has_chat_provider(),
             )
             if validated is None:
-                # HG-9: never insert unvalidated payload
+                                                        
                 mark_jobs_raw_processed(
                     conn,
                     jobs_raw_id=str(row["id"]),

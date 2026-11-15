@@ -55,6 +55,6 @@ def default_submitter() -> SubmitFn:
     return playwright_submit
 
 
-# Re-export for older imports / tests
+                                     
 _detect_captcha_markers = captcha_markers_present
 _MINI_PNG = MINI_PNG

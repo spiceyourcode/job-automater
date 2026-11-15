@@ -34,7 +34,7 @@ def reindex_document(conn: Any, user_id: str, cv_document_id: str) -> dict[str, 
         if not doc:
             return {"status": "error", "error": "cv_not_found"}
 
-        # Drop existing chunks first — no orphan embeddings (FAILURE clause)
+                                                                            
         cur.execute(
             "DELETE FROM cv_chunks WHERE cv_document_id = %s::uuid AND user_id = %s::uuid",
             (cv_document_id, user_id),
@@ -62,7 +62,7 @@ def reindex_document(conn: Any, user_id: str, cv_document_id: str) -> dict[str, 
             from lib.embeddings import embed_texts
 
             vectors = embed_texts(paragraphs)
-        except Exception:  # noqa: BLE001
+        except Exception:                
             logger.warning("reindex_embed_skipped")
             vectors = [None] * len(paragraphs)
 
