@@ -5,7 +5,7 @@
 | Criterion | Status (P12.3) | Notes |
 |-----------|----------------|-------|
 | Staging E2E critical paths green | **BLOCKED** | No dedicated staging host provisioned in this repo yet. Local path: `cd api && npm test` (includes `e2e/happy-path.test.ts`). |
-| No OPEN P0 blockers | **DONE (repo)** | No P0 tracked in `.agent-settings/blockers.md` as of P12.3. Re-check before real beta. |
+| No OPEN P0 blockers | **DONE (repo)** | No P0 tracked in `docs/runbooks/blockers.md` as of P12.3. Re-check before real beta. |
 | Hard gates enforced; validators in CI | **DONE** | HG-1–HG-10 in protocol; `.github/workflows/ci.yml` runs api/web/workers checks (P12.1). |
 | Support / on-call contact known | **BLOCKED** | Org-specific — fill owner + channel before invite. |
 | Feature flags for risky surfaces | **DONE** | `GET /health/flags` + `FEATURE_AUTO_APPLY` (default off, HG-4). |

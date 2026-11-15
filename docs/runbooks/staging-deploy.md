@@ -19,7 +19,7 @@ Deploy API + client to a staging environment for closed beta / E2E.
 3. Deploy frontend; set `NEXT_PUBLIC_API_URL` / `API_URL` to the staging API (public URL only — no secrets).  
 4. Smoke: `/health` → `/health/flags` → login → critical path.  
 5. Run API E2E: `cd api && npm test` (includes `e2e/happy-path.test.ts` — register → onboard → source → match → generate → **approve** → submit).  
-6. Record URLs and any OPEN blockers in `.agent-settings/blockers.md`.
+6. Record URLs and any OPEN blockers in `docs/runbooks/blockers.md`.
 
 ## Rollback
 
