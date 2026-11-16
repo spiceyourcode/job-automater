@@ -3,16 +3,19 @@
 from __future__ import annotations
 
 import base64
+import io
 import logging
 import os
 import subprocess
 import sys
 import tempfile
 import urllib.request
+import wave
 from pathlib import Path
 from typing import Any
 
 import httpx
+import numpy as np
 
 from voice_gateway.config import (
     MAX_TURNS_KEPT,
@@ -63,20 +66,68 @@ def get_whisper():
     return _whisper
 
 
+def _wav_bytes_to_float32(data: bytes) -> np.ndarray:
+    """PCM16 mono WAV → float32 @ native sample rate (Whisper resamples internally)."""
+    with wave.open(io.BytesIO(data), "rb") as wf:
+        channels = wf.getnchannels()
+        if channels != 1:
+            raise PipelineError("stt_failed")
+        width = wf.getsampwidth()
+        if width != 2:
+            raise PipelineError("stt_failed")
+        rate = wf.getframerate()
+        frames = wf.readframes(wf.getnframes())
+    pcm = np.frombuffer(frames, dtype=np.int16).astype(np.float32) / 32768.0
+    target = 16_000
+    if rate != target and len(pcm) > 0:
+        duration = len(pcm) / rate
+        new_len = max(1, int(duration * target))
+        x_old = np.linspace(0.0, 1.0, num=len(pcm), dtype=np.float32)
+        x_new = np.linspace(0.0, 1.0, num=new_len, dtype=np.float32)
+        pcm = np.interp(x_new, x_old, pcm).astype(np.float32)
+    return pcm
+
+
 def transcribe_audio(data: bytes, *, suffix: str = ".webm") -> str:
     if not data:
+        raise PipelineError("empty_audio")
+    if len(data) < 44:
         raise PipelineError("empty_audio")
     stt = get_whisper()
     path: Path | None = None
     try:
-        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-            tmp.write(data)
-            path = Path(tmp.name)
-        segments, _ = stt.transcribe(str(path), beam_size=1, vad_filter=True)
+        if suffix.lower() == ".wav":
+            audio = _wav_bytes_to_float32(data)
+            if audio.size < int(0.25 * 16_000):
+                raise PipelineError("empty_audio")
+            segments, _ = stt.transcribe(
+                audio,
+                beam_size=1,
+                vad_filter=False,
+                language="en",
+            )
+        else:
+            with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+                tmp.write(data)
+                path = Path(tmp.name)
+            try:
+                segments, _ = stt.transcribe(
+                    str(path),
+                    beam_size=1,
+                    vad_filter=True,
+                    language="en",
+                )
+            except TypeError:
+                raise PipelineError("stt_webm_unsupported") from None
         text = " ".join(s.text for s in segments).strip()
         if not text:
             raise PipelineError("no_speech_detected")
         return text
+    except PipelineError:
+        raise
+    except Exception as exc:
+        logger.warning("stt_error err=%s", type(exc).__name__)
+        raise PipelineError("stt_failed") from exc
     finally:
         if path is not None:
             path.unlink(missing_ok=True)

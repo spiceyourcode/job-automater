@@ -73,6 +73,11 @@ export function MockInterviewVoiceStage({
     [applicationId, sessionId],
   );
 
+  const onFallbackRef = useRef(onFallback);
+  const onCompletedRef = useRef(onCompleted);
+  onFallbackRef.current = onFallback;
+  onCompletedRef.current = onCompleted;
+
   const flushPendingTurn = useCallback(async () => {
     const pending = pendingTurnRef.current;
     if (!pending?.userText.trim() || !pending.assistantText.trim()) return;
@@ -92,20 +97,47 @@ export function MockInterviewVoiceStage({
         return;
       }
       clientRef.current?.sendEnd();
-      onCompleted(evalRes.data!.summary);
+      onCompletedRef.current(evalRes.data!.summary);
       toast.success("Debrief ready");
     }
-  }, [applicationId, onCompleted, sessionId, syncTurn]);
+  }, [applicationId, sessionId, syncTurn]);
+
+  const flushPendingRef = useRef(flushPendingTurn);
+  flushPendingRef.current = flushPendingTurn;
 
   useEffect(() => {
+    let fellBack = false;
+    const fallBackOnce = () => {
+      if (fellBack) return;
+      fellBack = true;
+      onFallbackRef.current();
+    };
     const client = new VoiceGatewayClient(gatewayUrl, {
       onPhase: (p) => {
         setPhase(p);
-        if (p === "idle") void flushPendingTurn();
+        if (p === "idle") void flushPendingRef.current();
       },
       onError: (code) => {
         setError(code);
-        if (code === "not_connected") onFallback();
+        if (code === "not_connected") {
+          fallBackOnce();
+          return;
+        }
+        const recoverable = new Set([
+          "empty_audio",
+          "stt_encode",
+          "stt_failed",
+          "stt_webm_unsupported",
+          "no_speech_detected",
+          "ollama_unavailable",
+          "ollama_empty",
+          "piper_failed",
+          "utterance_failed",
+          "audio_playback",
+        ]);
+        if (recoverable.has(code)) {
+          toast.message(`Voice issue (${code}) — try again or use browser fallback`);
+        }
       },
       onUserText: (t) => {
         userLineRef.current = t;
@@ -123,7 +155,9 @@ export function MockInterviewVoiceStage({
         };
       },
       onAudioLevel: setAudioLevel,
-      onClose: () => onFallback(),
+      onClose: () => {
+        fallBackOnce();
+      },
     });
     clientRef.current = client;
 
@@ -135,7 +169,7 @@ export function MockInterviewVoiceStage({
         client.sendHello(sessionId, voiceContext);
         client.speakText(openingText);
       } catch {
-        onFallback();
+        if (!cancelled) fallBackOnce();
       }
     })();
 
@@ -144,14 +178,9 @@ export function MockInterviewVoiceStage({
       client.disconnect();
       clientRef.current = null;
     };
-  }, [
-    flushPendingTurn,
-    gatewayUrl,
-    onFallback,
-    openingText,
-    sessionId,
-    voiceContext,
-  ]);
+    // One gateway connection per session; props captured at mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- stable session wire-up
+  }, [gatewayUrl, sessionId]);
 
   const beginListen = useCallback(async () => {
     const client = clientRef.current;

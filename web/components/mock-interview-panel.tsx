@@ -89,7 +89,11 @@ export function MockInterviewPanel({ applicationId, initialSession, prepStatus, 
     const recognitionRef = useRef<InstanceType<NonNullable<ReturnType<typeof getSpeechRecognition>>> | null>(null);
     const prepReady = prepStatus === "ready";
     const active = session?.status === "active";
-    const canStart = prepReady && !active && !summary;
+    const canStart =
+        prepReady &&
+        session?.status !== "active" &&
+        !summary &&
+        !voiceRuntime;
     const useLocalGateway = voiceMode && voiceRuntime && gatewayReachable === true;
     const speak = useCallback((text: string) => {
         speakAsInterviewer(text, {
@@ -98,6 +102,24 @@ export function MockInterviewPanel({ applicationId, initialSession, prepStatus, 
             rate: 0.94,
         });
     }, [speakEnabled, interviewerVoice]);
+
+    const handleVoiceFallback = useCallback(() => {
+        setVoiceMode(false);
+        setVoiceRuntime(null);
+        toast.message("Switched to browser voice");
+    }, []);
+
+    const handleVoiceCompleted = useCallback(
+        (s: MockInterviewSummaryPublic) => {
+            setSummary(s);
+            setSession((prev) =>
+                prev ? { ...prev, status: "completed", summary: s } : prev,
+            );
+            setVoiceMode(false);
+            setVoiceRuntime(null);
+        },
+        [],
+    );
 
     useEffect(() => {
         setSttSupported(Boolean(getSpeechRecognition()));
@@ -114,15 +136,18 @@ export function MockInterviewPanel({ applicationId, initialSession, prepStatus, 
         };
     }, []);
 
-    useEffect(() => {
-        let cancelled = false;
+    const refreshGatewayProbe = useCallback(() => {
         void probeVoiceGateway(defaultVoiceGatewayWsUrl()).then((ok) => {
-            if (!cancelled) setGatewayReachable(ok);
+            setGatewayReachable(ok);
         });
-        return () => {
-            cancelled = true;
-        };
     }, []);
+
+    useEffect(() => {
+        refreshGatewayProbe();
+        const onFocus = () => refreshGatewayProbe();
+        window.addEventListener("focus", onFocus);
+        return () => window.removeEventListener("focus", onFocus);
+    }, [refreshGatewayProbe]);
 
     function appendTurns(prev: MockInterviewSessionPublic | null, userText: string, assistantText: string, done: boolean): MockInterviewSessionPublic | null {
         if (!prev)
@@ -148,7 +173,7 @@ export function MockInterviewPanel({ applicationId, initialSession, prepStatus, 
             }
             const data = res.data!;
             const gatewayUrl = data.voiceGatewayUrl ?? defaultVoiceGatewayWsUrl();
-            const reachable = gatewayReachable ?? (await probeVoiceGateway(gatewayUrl));
+            const reachable = await probeVoiceGateway(gatewayUrl);
             setGatewayReachable(reachable);
             const next: MockInterviewSessionPublic = {
                 sessionId: data.sessionId,
@@ -273,7 +298,11 @@ export function MockInterviewPanel({ applicationId, initialSession, prepStatus, 
         setSummary(null);
         setVoiceMode(false);
         setVoiceRuntime(null);
-        void onRefresh();
+        setDraft("");
+        window.speechSynthesis.cancel();
+        void probeVoiceGateway(defaultVoiceGatewayWsUrl()).then((ok) => {
+            setGatewayReachable(ok);
+        });
     }
     return (<div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -331,24 +360,14 @@ export function MockInterviewPanel({ applicationId, initialSession, prepStatus, 
 
       {useLocalGateway && voiceRuntime && (
         <MockInterviewVoiceStage
+          key={voiceRuntime.sessionId}
           applicationId={applicationId}
           sessionId={voiceRuntime.sessionId}
           gatewayUrl={voiceRuntime.gatewayUrl}
           voiceContext={voiceRuntime.voiceContext}
           openingText={voiceRuntime.openingText}
-          onFallback={() => {
-            setVoiceMode(false);
-            setVoiceRuntime(null);
-            toast.message("Switched to browser voice");
-          }}
-          onCompleted={(s) => {
-            setSummary(s);
-            setSession((prev) =>
-              prev ? { ...prev, status: "completed", summary: s } : prev,
-            );
-            setVoiceMode(false);
-            setVoiceRuntime(null);
-          }}
+          onFallback={handleVoiceFallback}
+          onCompleted={handleVoiceCompleted}
         />
       )}
 

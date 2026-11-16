@@ -50,6 +50,64 @@ type WsIncoming =
   | { type: "audio"; format: string; data: string }
   | { type: "error"; code: string };
 
+const STT_SAMPLE_RATE = 16000;
+
+function encodePcm16Wav(samples: Float32Array, sampleRate: number): ArrayBuffer {
+  const numChannels = 1;
+  const bitsPerSample = 16;
+  const blockAlign = (numChannels * bitsPerSample) / 8;
+  const byteRate = sampleRate * blockAlign;
+  const dataSize = samples.length * blockAlign;
+  const buffer = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(buffer);
+  const writeStr = (offset: number, s: string) => {
+    for (let i = 0; i < s.length; i++) view.setUint8(offset + i, s.charCodeAt(i));
+  };
+  writeStr(0, "RIFF");
+  view.setUint32(4, 36 + dataSize, true);
+  writeStr(8, "WAVE");
+  writeStr(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, numChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, byteRate, true);
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, bitsPerSample, true);
+  writeStr(36, "data");
+  view.setUint32(40, dataSize, true);
+  let offset = 44;
+  for (let i = 0; i < samples.length; i++) {
+    const s = Math.max(-1, Math.min(1, samples[i] ?? 0));
+    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+    offset += 2;
+  }
+  return buffer;
+}
+
+/** Decode browser WebM/Opus to 16 kHz mono WAV for faster-whisper (no server ffmpeg). */
+async function mediaBlobToWav16k(blob: Blob): Promise<Blob> {
+  const decodeCtx = new AudioContext();
+  try {
+    const decoded = await decodeCtx.decodeAudioData(
+      await blob.arrayBuffer(),
+    );
+    const frames = Math.ceil(decoded.duration * STT_SAMPLE_RATE);
+    const offline = new OfflineAudioContext(1, frames, STT_SAMPLE_RATE);
+    const src = offline.createBufferSource();
+    src.buffer = decoded;
+    src.connect(offline.destination);
+    src.start(0);
+    const rendered = await offline.startRendering();
+    const pcm = rendered.getChannelData(0);
+    return new Blob([encodePcm16Wav(pcm, STT_SAMPLE_RATE)], {
+      type: "audio/wav",
+    });
+  } finally {
+    await decodeCtx.close();
+  }
+}
+
 function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -94,8 +152,10 @@ export class VoiceGatewayClient {
       };
       ws.onerror = () => reject(new Error("ws_failed"));
       ws.onclose = () => {
-        this.handlers.onClose?.();
-        if (!this.closed) this.ws = null;
+        if (!this.closed) {
+          this.handlers.onClose?.();
+        }
+        this.ws = null;
       };
       ws.onmessage = (ev) => {
         void this.onMessage(String(ev.data));
@@ -180,7 +240,13 @@ export class VoiceGatewayClient {
       this.handlers.onPhase?.("idle");
       return;
     }
-    await this.sendUtteranceBlob(blob, "webm");
+    try {
+      const wav = await mediaBlobToWav16k(blob);
+      await this.sendUtteranceBlob(wav, "wav");
+    } catch {
+      this.handlers.onError?.("stt_encode");
+      this.handlers.onPhase?.("idle");
+    }
   }
 
   private send(payload: Record<string, unknown>): void {

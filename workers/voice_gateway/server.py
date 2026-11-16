@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from typing import Any
@@ -108,7 +109,7 @@ async def voice_ws(ws: WebSocket) -> None:
                     continue
                 await send_json(ws, {"type": "phase", "phase": "thinking"})
                 try:
-                    wav = synthesize_piper(text)
+                    wav = await asyncio.to_thread(synthesize_piper, text)
                     await send_json(ws, {"type": "phase", "phase": "speaking"})
                     await send_json(
                         ws,
@@ -136,7 +137,8 @@ async def voice_ws(ws: WebSocket) -> None:
                 try:
                     audio = base64_to_audio(b64)
                     await send_json(ws, {"type": "phase", "phase": "thinking"})
-                    user_text, reply, wav = process_utterance(
+                    user_text, reply, wav = await asyncio.to_thread(
+                        process_utterance,
                         ctx=ctx,
                         history=history,
                         audio=audio,
@@ -165,6 +167,14 @@ async def voice_ws(ws: WebSocket) -> None:
                         ws,
                         {"type": "error", "code": str(exc.args[0] if exc.args else "utterance")},
                     )
+                    await send_json(ws, {"type": "phase", "phase": "idle"})
+                except Exception as exc:
+                    logger.warning(
+                        "voice_utterance_failed session_id=%s err=%s",
+                        ctx.get("session_id"),
+                        type(exc).__name__,
+                    )
+                    await send_json(ws, {"type": "error", "code": "utterance_failed"})
                     await send_json(ws, {"type": "phase", "phase": "idle"})
 
             elif kind == "end":
