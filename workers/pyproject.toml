@@ -38,7 +38,8 @@ voice = [
     "faster-whisper>=1.0",
     "piper-tts>=1.2",
     "numpy>=1.26",
-]
+    "webrtcvad-wheels>=2.0.14",
+    ]
 
 [project.scripts]
 voice-gateway = "voice_gateway.server:main"

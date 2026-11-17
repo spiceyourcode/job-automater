@@ -29,11 +29,24 @@ type Props = {
   onCompleted: (summary: MockInterviewSummaryPublic) => void;
 };
 
-const phaseLabel: Record<VoiceGatewayPhase, string> = {
-  idle: "Tap the orb or hold Space to answer",
-  listening: "Listening…",
-  thinking: "Thinking…",
-  speaking: "Speaking",
+const phaseLabel = (
+  phase: VoiceGatewayPhase,
+  handsFree: boolean,
+): string => {
+  const labels: Record<VoiceGatewayPhase, string> = handsFree
+    ? {
+        idle: "Hands-free — speak when ready",
+        listening: "Listening…",
+        thinking: "Thinking…",
+        speaking: "Speaking — interrupt anytime",
+      }
+    : {
+        idle: "Tap the orb or hold Space to answer",
+        listening: "Listening…",
+        thinking: "Thinking…",
+        speaking: "Speaking",
+      };
+  return labels[phase];
 };
 
 export function MockInterviewVoiceStage({
@@ -54,6 +67,7 @@ export function MockInterviewVoiceStage({
   const [busy, setBusy] = useState(false);
   const [lastLine, setLastLine] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [handsFree, setHandsFree] = useState(true);
 
   const syncTurn = useCallback(
     async (userText: string, assistantText: string) => {
@@ -129,8 +143,8 @@ export function MockInterviewVoiceStage({
           "stt_failed",
           "stt_webm_unsupported",
           "no_speech_detected",
-          "ollama_unavailable",
-          "ollama_empty",
+          "llm_unavailable",
+          "llm_empty",
           "piper_failed",
           "utterance_failed",
           "audio_playback",
@@ -154,6 +168,8 @@ export function MockInterviewVoiceStage({
           assistantText: t,
         };
       },
+      onAssistantPartial: (t) => setLastLine(t),
+      onHandsFree: setHandsFree,
       onAudioLevel: setAudioLevel,
       onClose: () => {
         fallBackOnce();
@@ -166,7 +182,10 @@ export function MockInterviewVoiceStage({
       try {
         await client.connect();
         if (cancelled) return;
-        client.sendHello(sessionId, voiceContext);
+        client.sendHello(sessionId, voiceContext, {
+          handsFree: true,
+          requestOpening: false,
+        });
         client.speakText(openingText);
       } catch {
         if (!cancelled) fallBackOnce();
@@ -184,7 +203,7 @@ export function MockInterviewVoiceStage({
 
   const beginListen = useCallback(async () => {
     const client = clientRef.current;
-    if (!client?.connected || busy) return;
+    if (!client?.connected || busy || handsFree) return;
     if (phase === "thinking" || phase === "speaking") return;
     setListening(true);
     setError(null);
@@ -195,7 +214,7 @@ export function MockInterviewVoiceStage({
       toast.error("Microphone permission denied");
       setListening(false);
     }
-  }, [busy, phase]);
+  }, [busy, handsFree, phase]);
 
   const endListen = useCallback(async () => {
     const client = clientRef.current;
@@ -206,6 +225,7 @@ export function MockInterviewVoiceStage({
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      if (handsFree) return;
       if (e.code !== "Space" || e.repeat) return;
       if (phase !== "idle" && phase !== "listening") return;
       e.preventDefault();
@@ -223,9 +243,16 @@ export function MockInterviewVoiceStage({
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
     };
-  }, [beginListen, endListen, listening, phase]);
+  }, [beginListen, endListen, handsFree, listening, phase]);
 
   async function onOrbClick() {
+    if (handsFree) {
+      const client = clientRef.current;
+      if (phase === "speaking" || phase === "thinking") {
+        client?.sendInterrupt();
+      }
+      return;
+    }
     if (listening) await endListen();
     else await beginListen();
   }
@@ -261,7 +288,7 @@ export function MockInterviewVoiceStage({
         type="button"
         className="relative flex size-72 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent p-0 outline-none focus-visible:ring-2 focus-visible:ring-primary"
         aria-label={listening ? "Stop speaking" : "Speak answer"}
-        disabled={busy || phase === "thinking" || phase === "speaking"}
+        disabled={busy || (!handsFree && (phase === "thinking" || phase === "speaking"))}
         onClick={() => void onOrbClick()}
       >
         <Orb
@@ -274,7 +301,7 @@ export function MockInterviewVoiceStage({
         />
       </button>
       <p className="text-center text-sm text-muted-foreground">
-        {busy ? "Saving turn…" : phaseLabel[phase]}
+        {busy ? "Saving turn…" : phaseLabel(phase, handsFree)}
       </p>
       {lastLine && (
         <p className="max-w-lg text-center text-sm text-foreground/90 line-clamp-3">
@@ -290,7 +317,11 @@ export function MockInterviewVoiceStage({
           variant="outline"
           size="sm"
           className="cursor-pointer"
-          onClick={onFallback}
+          onClick={() => {
+            setHandsFree(false);
+            clientRef.current?.stopContinuousListen?.();
+            onFallback();
+          }}
         >
           Browser fallback
         </Button>

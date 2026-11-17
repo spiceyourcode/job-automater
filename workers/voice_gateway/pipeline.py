@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import io
+import json
 import logging
 import os
 import subprocess
@@ -19,8 +20,6 @@ import numpy as np
 
 from voice_gateway.config import (
     MAX_TURNS_KEPT,
-    OLLAMA_MODEL,
-    OLLAMA_URL,
     VOICES_DIR,
     VOICE_NAME,
     WHISPER_MODEL,
@@ -151,23 +150,42 @@ def build_system_prompt(ctx: dict[str, Any]) -> str:
 
 
 def chat_ollama(history: list[dict[str, str]]) -> str:
-    body = {
-        "model": OLLAMA_MODEL,
-        "messages": history,
-        "stream": False,
-        "keep_alive": "30m",
-        "options": {"num_predict": 120, "temperature": 0.7},
-    }
+    """Back-compat alias — uses cloud voice LLM (OpenAI/Groq/Cerebras)."""
+    from voice_gateway.llm_chat import chat_reply
+
     try:
-        with httpx.Client(timeout=120.0) as client:
-            res = client.post(OLLAMA_URL, json=body)
-            res.raise_for_status()
-            content = res.json()["message"]["content"].strip()
+        content = chat_reply(history)
+    except PipelineError:
+        raise
     except Exception as exc:
-        raise PipelineError("ollama_unavailable") from exc
+        raise PipelineError("llm_unavailable") from exc
     if not content:
-        raise PipelineError("ollama_empty")
-    return content[:400]
+        raise PipelineError("llm_empty")
+    return content
+
+
+def stream_chat_ollama(history: list[dict[str, str]]):
+    """Back-compat alias — streaming voice LLM."""
+    from voice_gateway.llm_chat import stream_chat_reply
+
+    yield from stream_chat_reply(history)
+
+
+def pcm16_to_wav(pcm16: bytes, *, sample_rate: int = 16_000) -> bytes:
+    if not pcm16:
+        raise PipelineError("empty_audio")
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(sample_rate)
+        wf.writeframes(pcm16)
+    return buf.getvalue()
+
+
+def transcribe_pcm16_wav(pcm16: bytes, *, sample_rate: int = 16_000) -> str:
+    wav = pcm16_to_wav(pcm16, sample_rate=sample_rate)
+    return transcribe_audio(wav, suffix=".wav")
 
 
 def synthesize_piper(text: str) -> bytes:

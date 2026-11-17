@@ -14,6 +14,11 @@ export type VoiceGatewayHandlers = {
   onError?: (code: string) => void;
   onUserText?: (text: string) => void;
   onAssistantText?: (text: string) => void;
+  onAssistantPartial?: (text: string) => void;
+  onTurnStart?: (turnId: string) => void;
+  onTurnEnd?: (turnId: string) => void;
+  onInterrupt?: (turnId: string) => void;
+  onHandsFree?: (enabled: boolean) => void;
   onAudioLevel?: (level: number) => void;
   onOpen?: () => void;
   onClose?: () => void;
@@ -46,11 +51,18 @@ export async function probeVoiceGateway(wsUrl?: string): Promise<boolean> {
 
 type WsIncoming =
   | { type: "phase"; phase: VoiceGatewayPhase }
-  | { type: "text"; role: "user" | "assistant"; content: string }
-  | { type: "audio"; format: string; data: string }
-  | { type: "error"; code: string };
+  | { type: "text"; role: "user" | "assistant"; content: string; turnId?: string }
+  | { type: "partial_text"; role: "assistant"; content: string; turnId?: string }
+  | { type: "audio"; format: string; data: string; turnId?: string; final?: boolean }
+  | { type: "audio_chunk"; format: string; data: string; turnId?: string }
+  | { type: "error"; code: string }
+  | { type: "listen_mode"; mode: string; enabled?: boolean }
+  | { type: "turn_start"; turnId: string }
+  | { type: "turn_end"; turnId: string }
+  | { type: "interrupt"; turnId?: string };
 
 const STT_SAMPLE_RATE = 16000;
+const CHUNK_SAMPLES = 480;
 
 function encodePcm16Wav(samples: Float32Array, sampleRate: number): ArrayBuffer {
   const numChannels = 1;
@@ -121,6 +133,23 @@ function blobToBase64(blob: Blob): Promise<string> {
   });
 }
 
+function arrayBufferToBase64(buf: ArrayBuffer): string {
+  const bytes = new Uint8Array(buf);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i] ?? 0);
+  return btoa(binary);
+}
+
+function floatToPcm16Base64(samples: Float32Array): string {
+  const buf = new ArrayBuffer(samples.length * 2);
+  const view = new DataView(buf);
+  for (let i = 0; i < samples.length; i++) {
+    const s = Math.max(-1, Math.min(1, samples[i] ?? 0));
+    view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+  }
+  return arrayBufferToBase64(buf);
+}
+
 export class VoiceGatewayClient {
   private ws: WebSocket | null = null;
   private audioCtx: AudioContext | null = null;
@@ -130,6 +159,17 @@ export class VoiceGatewayClient {
   private recordChunks: Blob[] = [];
   private stream: MediaStream | null = null;
   private closed = false;
+  private handsFree = false;
+  private continuousActive = false;
+  private scriptNode: ScriptProcessorNode | null = null;
+  private captureCtx: AudioContext | null = null;
+  private pcmCarry = new Float32Array(0);
+  private playbackTurnId: string | null = null;
+  private playbackQueue: Promise<void> = Promise.resolve();
+  private currentSource: AudioBufferSourceNode | null = null;
+  /** Server-side VAD handles barge-in; client mic picks up speaker echo. */
+  private clientBargeInEnabled = false;
+  private bargeInThreshold = 0.12;
 
   constructor(
     private readonly wsUrl: string,
@@ -165,7 +205,9 @@ export class VoiceGatewayClient {
 
   disconnect(): void {
     this.closed = true;
+    this.stopContinuousListen();
     this.stopLevelMeter();
+    this.stopPlayback();
     this.ws?.close();
     this.ws = null;
     this.stream?.getTracks().forEach((t) => t.stop());
@@ -177,8 +219,9 @@ export class VoiceGatewayClient {
   sendHello(
     sessionId: string,
     ctx: VoiceGatewayContext,
-    opts?: { requestOpening?: boolean },
+    opts?: { requestOpening?: boolean; handsFree?: boolean },
   ): void {
+    this.handsFree = Boolean(opts?.handsFree);
     this.send({
       type: "hello",
       sessionId,
@@ -187,6 +230,7 @@ export class VoiceGatewayClient {
       sampleQuestions: ctx.sampleQuestions,
       starTitles: ctx.starTitles,
       requestOpening: Boolean(opts?.requestOpening),
+      handsFree: this.handsFree,
     });
   }
 
@@ -194,6 +238,11 @@ export class VoiceGatewayClient {
     const trimmed = text.trim();
     if (!trimmed) return;
     this.send({ type: "tts", text: trimmed });
+  }
+
+  sendInterrupt(turnId?: string): void {
+    this.send({ type: "interrupt", turnId });
+    this.stopPlayback();
   }
 
   async sendUtteranceBlob(blob: Blob, format = "webm"): Promise<void> {
@@ -249,6 +298,66 @@ export class VoiceGatewayClient {
     }
   }
 
+  async startContinuousListen(): Promise<void> {
+    if (!this.handsFree || this.continuousActive) return;
+    if (!this.stream) {
+      this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    }
+    this.captureCtx = new AudioContext();
+    const src = this.captureCtx.createMediaStreamSource(this.stream);
+    const processor = this.captureCtx.createScriptProcessor(4096, 1, 1);
+    this.scriptNode = processor;
+    processor.onaudioprocess = (ev) => {
+      if (!this.connected || this.closed) return;
+      const input = ev.inputBuffer.getChannelData(0);
+      const ratio = this.captureCtx!.sampleRate / STT_SAMPLE_RATE;
+      const outLen = Math.floor(input.length / ratio);
+      const down = new Float32Array(outLen);
+      for (let i = 0; i < outLen; i++) {
+        down[i] = input[Math.floor(i * ratio)] ?? 0;
+      }
+      const merged = new Float32Array(this.pcmCarry.length + down.length);
+      merged.set(this.pcmCarry);
+      merged.set(down, this.pcmCarry.length);
+      let offset = 0;
+      while (offset + CHUNK_SAMPLES <= merged.length) {
+        const slice = merged.subarray(offset, offset + CHUNK_SAMPLES);
+        offset += CHUNK_SAMPLES;
+        const b64 = floatToPcm16Base64(slice);
+        this.send({
+          type: "audio_chunk",
+          format: "pcm16",
+          sampleRate: STT_SAMPLE_RATE,
+          data: b64,
+        });
+        if (this.clientBargeInEnabled && this.playbackTurnId) {
+          let sum = 0;
+          for (let i = 0; i < slice.length; i++) sum += Math.abs(slice[i] ?? 0);
+          const avg = sum / slice.length;
+          if (avg > this.bargeInThreshold) {
+            this.sendInterrupt(this.playbackTurnId);
+          }
+        }
+      }
+      this.pcmCarry = merged.subarray(offset);
+    };
+    const silent = this.captureCtx.createGain();
+    silent.gain.value = 0;
+    src.connect(processor);
+    processor.connect(silent);
+    silent.connect(this.captureCtx.destination);
+    this.continuousActive = true;
+  }
+
+  stopContinuousListen(): void {
+    this.continuousActive = false;
+    this.pcmCarry = new Float32Array(0);
+    this.scriptNode?.disconnect();
+    this.scriptNode = null;
+    void this.captureCtx?.close();
+    this.captureCtx = null;
+  }
+
   private send(payload: Record<string, unknown>): void {
     if (!this.connected) {
       this.handlers.onError?.("not_connected");
@@ -267,6 +376,18 @@ export class VoiceGatewayClient {
     if (this.audioCtx.state === "suspended") {
       await this.audioCtx.resume();
     }
+  }
+
+  private stopPlayback(): void {
+    try {
+      this.currentSource?.stop();
+    } catch {
+      /* already stopped */
+    }
+    this.currentSource = null;
+    this.playbackTurnId = null;
+    this.stopLevelMeter();
+    this.playbackQueue = Promise.resolve();
   }
 
   private startLevelMeter(): void {
@@ -292,18 +413,34 @@ export class VoiceGatewayClient {
     this.handlers.onAudioLevel?.(0);
   }
 
-  private async playWavBase64(b64: string): Promise<void> {
+  private enqueuePlayback(task: () => Promise<void>): void {
+    this.playbackQueue = this.playbackQueue.then(task).catch(() => undefined);
+  }
+
+  private async playWavBase64(b64: string, turnId?: string): Promise<void> {
+    if (!b64) return;
     await this.ensurePlaybackGraph();
     const binary = atob(b64);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    const buffer = await this.audioCtx!.decodeAudioData(bytes.buffer.slice(0));
+    let buffer: AudioBuffer;
+    try {
+      buffer = await this.audioCtx!.decodeAudioData(bytes.buffer.slice(0));
+    } catch {
+      throw new Error("decode_failed");
+    }
+    if (turnId && this.playbackTurnId && turnId !== this.playbackTurnId) {
+      return;
+    }
     const source = this.audioCtx!.createBufferSource();
     source.buffer = buffer;
     source.connect(this.analyser!);
+    this.currentSource = source;
+    if (turnId) this.playbackTurnId = turnId;
     this.startLevelMeter();
     await new Promise<void>((resolve) => {
       source.onended = () => {
+        if (this.currentSource === source) this.currentSource = null;
         this.stopLevelMeter();
         resolve();
       };
@@ -321,6 +458,32 @@ export class VoiceGatewayClient {
     }
     if (msg.type === "phase") {
       this.handlers.onPhase?.(msg.phase);
+      if (msg.phase === "idle" && this.handsFree) {
+        void this.startContinuousListen();
+      }
+      return;
+    }
+    if (msg.type === "listen_mode") {
+      this.handsFree = Boolean(msg.enabled ?? msg.mode === "continuous");
+      this.handlers.onHandsFree?.(this.handsFree);
+      if (this.handsFree) void this.startContinuousListen();
+      return;
+    }
+    if (msg.type === "turn_start") {
+      this.playbackTurnId = msg.turnId;
+      this.handlers.onTurnStart?.(msg.turnId);
+      return;
+    }
+    if (msg.type === "turn_end") {
+      this.handlers.onTurnEnd?.(msg.turnId);
+      if (this.playbackTurnId === msg.turnId) {
+        this.playbackTurnId = null;
+      }
+      return;
+    }
+    if (msg.type === "interrupt") {
+      this.stopPlayback();
+      if (msg.turnId) this.handlers.onInterrupt?.(msg.turnId);
       return;
     }
     if (msg.type === "error") {
@@ -332,13 +495,41 @@ export class VoiceGatewayClient {
       else this.handlers.onAssistantText?.(msg.content);
       return;
     }
-    if (msg.type === "audio" && msg.data) {
-      try {
-        await this.playWavBase64(msg.data);
-      } catch {
-        this.handlers.onError?.("audio_playback");
+    if (msg.type === "partial_text") {
+      this.handlers.onAssistantPartial?.(msg.content);
+      return;
+    }
+    if (msg.type === "audio_chunk" && msg.data) {
+      const turnId = msg.turnId;
+      this.enqueuePlayback(async () => {
+        if (turnId) this.playbackTurnId = turnId;
+        this.handlers.onPhase?.("speaking");
+        try {
+          await this.playWavBase64(msg.data, turnId);
+        } catch {
+          this.handlers.onError?.("audio_playback");
+        }
+      });
+      return;
+    }
+    if (msg.type === "audio") {
+      if (msg.final && !msg.data) {
+        await this.playbackQueue;
+        this.playbackTurnId = null;
         this.handlers.onPhase?.("idle");
+        return;
       }
+      if (!msg.data) return;
+      const turnId = msg.turnId;
+      this.enqueuePlayback(async () => {
+        if (turnId) this.playbackTurnId = turnId;
+        this.handlers.onPhase?.("speaking");
+        try {
+          await this.playWavBase64(msg.data, turnId);
+        } catch {
+          this.handlers.onError?.("audio_playback");
+        }
+      });
     }
   }
 }

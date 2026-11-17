@@ -32,7 +32,10 @@ def test_process_utterance_mocked():
     history = [{"role": "system", "content": build_system_prompt(ctx)}]
     with (
         patch("voice_gateway.pipeline.transcribe_audio", return_value="I built APIs."),
-        patch("voice_gateway.pipeline.chat_ollama", return_value="Tell me more about APIs."),
+        patch(
+            "voice_gateway.pipeline.chat_ollama",
+            return_value="Tell me more about APIs.",
+        ),
         patch("voice_gateway.pipeline.synthesize_piper", return_value=b"RIFF"),
     ):
         user, reply, wav = process_utterance(
@@ -92,3 +95,41 @@ def test_ws_tts_mocked():
                     break
             assert "thinking" in phases
             assert "speaking" in phases
+
+
+def test_ws_hello_hands_free_listen_mode():
+    from fastapi.testclient import TestClient
+
+    from voice_gateway.server import app
+
+    client = TestClient(app)
+    with client.websocket_connect("/ws") as ws:
+        ws.send_text(
+            json.dumps(
+                {
+                    "type": "hello",
+                    "sessionId": "sess-hf",
+                    "handsFree": True,
+                }
+            )
+        )
+        idle = json.loads(ws.receive_text())
+        mode = json.loads(ws.receive_text())
+        assert idle == {"type": "phase", "phase": "idle"}
+        assert mode["type"] == "listen_mode"
+        assert mode.get("mode") == "continuous"
+
+
+def test_ws_interrupt_ack():
+    from fastapi.testclient import TestClient
+
+    from voice_gateway.server import app
+
+    client = TestClient(app)
+    with client.websocket_connect("/ws") as ws:
+        ws.send_text(json.dumps({"type": "hello", "sessionId": "sess-int"}))
+        ws.receive_text()
+        ws.send_text(json.dumps({"type": "interrupt", "turnId": "t-dead"}))
+        msg = json.loads(ws.receive_text())
+        assert msg["type"] == "phase"
+        assert msg["phase"] == "idle"
